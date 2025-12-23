@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
+import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 
 class TicketsScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   bool isLoading = true;
   String search = '';
   String? errorMsg;
+  bool showAtendidos = false; // false = pendientes, true = atendidos
 
   @override
   void initState() {
@@ -43,7 +45,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
   Future<void> fetchTickets() async {
     setState(() { isLoading = true; errorMsg = null; });
     try {
-      final data = await api.getTickets(sucursalId: selectedSucursalId);
+      final data = await api.getTickets(
+        sucursalId: selectedSucursalId,
+        estadoTicket: showAtendidos,
+      );
       tickets = data;
       filteredTickets = tickets;
     } catch (e) {
@@ -57,8 +62,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
       search = value;
       filteredTickets = tickets.where((t) {
         final cliente = t['cliente']?['nombreCliente'] ?? '';
+        final apellido = t['cliente']?['apellidoCliente'] ?? '';
         final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '';
         return cliente.toLowerCase().contains(value.toLowerCase()) ||
+               apellido.toLowerCase().contains(value.toLowerCase()) ||
                tratamiento.toLowerCase().contains(value.toLowerCase());
       }).toList();
     });
@@ -150,6 +157,32 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  // Filtro de estado (Pendientes / Atendidos)
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment<bool>(
+                        value: false,
+                        label: Text('Pendientes'),
+                        icon: Icon(Icons.pending_actions),
+                      ),
+                      ButtonSegment<bool>(
+                        value: true,
+                        label: Text('Atendidos'),
+                        icon: Icon(Icons.check_circle),
+                      ),
+                    ],
+                    selected: {showAtendidos},
+                    onSelectionChanged: (Set<bool> newSelection) async {
+                      setState(() {
+                        showAtendidos = newSelection.first;
+                      });
+                      await fetchTickets();
+                    },
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.comfortable,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -176,10 +209,16 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.receipt_long_outlined, size: 64, color: colorScheme.onSurfaceVariant),
+                                  Icon(
+                                    showAtendidos ? Icons.check_circle_outline : Icons.pending_actions_outlined,
+                                    size: 64,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'No hay tickets registrados',
+                                    showAtendidos
+                                        ? 'No hay tickets atendidos'
+                                        : 'No hay tickets pendientes',
                                     style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ],
@@ -190,8 +229,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               itemCount: filteredTickets.length,
                               itemBuilder: (context, i) {
                                 final t = filteredTickets[i];
-                                final fecha = t['fecha'] != null
-                                    ? DateFormat('dd/MM/yyyy').format(DateTime.parse(t['fecha']))
+                                final fechaDateTime = t['fecha'] != null
+                                    ? DateTime.parse(t['fecha'])
+                                    : null;
+                                final hora = fechaDateTime != null
+                                    ? DateFormat('HH:mm').format(fechaDateTime)
+                                    : '-';
+                                final fecha = fechaDateTime != null
+                                    ? DateFormat('dd/MM/yyyy').format(fechaDateTime)
                                     : '-';
                                 final cliente = t['cliente'] != null
                                     ? ((t['cliente']['apellidoCliente'] ?? '').isNotEmpty
@@ -199,151 +244,114 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                         : t['cliente']['nombreCliente'] ?? '-')
                                     : '-';
                                 final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '-';
-                                final cuota = t['cuota']?.toString() ?? '-';
-                                final saldo = t['saldoPendiente']?.toString() ?? '-';
-                                final estadoPago = t['estadoPago'] ?? '-';
-                                final estadoTicket = t['estadoTicket'] == true;
-                                final sucursalNombre = t['sucursal']?['nombreSucursal'] ?? '-';
+                                final saldoPendiente = t['saldoPendiente']?.toDouble() ?? 0.0;
+                                final tieneSaldo = saldoPendiente > 0;
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 12),
                                   elevation: 1,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
-                                    onTap: () {
-                                      // TODO: Ver detalles del ticket
+                                    onTap: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => TicketDetailScreen(ticket: t),
+                                        ),
+                                      );
+                                      // Refrescar por si se modificó algo
+                                      await fetchTickets();
                                     },
                                     child: Padding(
                                       padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      child: Row(
                                         children: [
-                                          // Header
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(12),
-                                                decoration: BoxDecoration(
-                                                  color: estadoTicket
-                                                      ? colorScheme.primaryContainer
-                                                      : colorScheme.errorContainer,
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Icon(
-                                                  estadoTicket ? Icons.check_circle : Icons.cancel,
-                                                  color: estadoTicket
-                                                      ? colorScheme.onPrimaryContainer
-                                                      : colorScheme.onErrorContainer,
-                                                  size: 24,
-                                                ),
+                                          // Avatar con inicial del cliente
+                                          CircleAvatar(
+                                            radius: 28,
+                                            backgroundColor: colorScheme.primaryContainer,
+                                            child: Text(
+                                              cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
+                                              style: textTheme.titleLarge?.copyWith(
+                                                color: colorScheme.onPrimaryContainer,
+                                                fontWeight: FontWeight.bold,
                                               ),
-                                              const SizedBox(width: 16),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          // Información del ticket
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  cliente,
+                                                  style: textTheme.titleMedium?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  tratamiento,
+                                                  style: textTheme.bodyMedium?.copyWith(
+                                                    color: colorScheme.primary,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
                                                   children: [
-                                                    Text(
-                                                      cliente,
-                                                      style: textTheme.titleMedium?.copyWith(
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
+                                                    Icon(
+                                                      Icons.access_time,
+                                                      size: 16,
+                                                      color: colorScheme.onSurfaceVariant,
                                                     ),
-                                                    const SizedBox(height: 4),
+                                                    const SizedBox(width: 4),
                                                     Text(
-                                                      tratamiento,
-                                                      style: textTheme.bodyMedium?.copyWith(
-                                                        color: colorScheme.primary,
+                                                      '$fecha - $hora',
+                                                      style: textTheme.bodySmall?.copyWith(
+                                                        color: colorScheme.onSurfaceVariant,
                                                       ),
                                                     ),
                                                   ],
                                                 ),
-                                              ),
-                                              IconButton.filledTonal(
-                                                onPressed: () {
-                                                  // TODO: Editar ticket
-                                                },
-                                                icon: const Icon(Icons.edit_outlined),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 16),
-                                          const Divider(),
-                                          const SizedBox(height: 12),
-                                          // Información
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: _InfoChip(
-                                                  icon: Icons.location_on_outlined,
-                                                  label: 'Sucursal',
-                                                  value: sucursalNombre,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: _InfoChip(
-                                                  icon: Icons.calendar_today_outlined,
-                                                  label: 'Fecha',
-                                                  value: fecha,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: _InfoChip(
-                                                  icon: Icons.payments_outlined,
-                                                  label: 'Cuota',
-                                                  value: 'Bs $cuota',
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: _InfoChip(
-                                                  icon: Icons.account_balance_wallet_outlined,
-                                                  label: 'Saldo',
-                                                  value: 'Bs $saldo',
-                                                  valueColor: saldo != '0' ? colorScheme.error : null,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          // Estado de pago
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                            decoration: BoxDecoration(
-                                              color: estadoPago == 'Completo'
-                                                  ? colorScheme.primaryContainer
-                                                  : colorScheme.errorContainer,
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  estadoPago == 'Completo'
-                                                      ? Icons.check_circle_outline
-                                                      : Icons.warning_amber_outlined,
-                                                  size: 18,
-                                                  color: estadoPago == 'Completo'
-                                                      ? colorScheme.onPrimaryContainer
-                                                      : colorScheme.onErrorContainer,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'Estado: $estadoPago',
-                                                  style: textTheme.labelMedium?.copyWith(
-                                                    color: estadoPago == 'Completo'
-                                                        ? colorScheme.onPrimaryContainer
-                                                        : colorScheme.onErrorContainer,
-                                                    fontWeight: FontWeight.w600,
+                                                if (tieneSaldo) ...[
+                                                  const SizedBox(height: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: colorScheme.errorContainer,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.warning_amber,
+                                                          size: 14,
+                                                          color: colorScheme.onErrorContainer,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                                          style: textTheme.labelSmall?.copyWith(
+                                                            color: colorScheme.onErrorContainer,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
+                                                ],
                                               ],
                                             ),
+                                          ),
+                                          // Icono de navegación
+                                          Icon(
+                                            Icons.chevron_right,
+                                            color: colorScheme.onSurfaceVariant,
                                           ),
                                         ],
                                       ),
@@ -371,49 +379,4 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color? valueColor;
-
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(
-            color: valueColor ?? colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
 

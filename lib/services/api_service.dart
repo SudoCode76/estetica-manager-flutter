@@ -96,11 +96,14 @@ class ApiService {
   }
 
   // Obtener tickets filtrados por sucursal (estructura directa o por cliente)
-  Future<List<dynamic>> getTickets({int? sucursalId}) async {
+  Future<List<dynamic>> getTickets({int? sucursalId, bool? estadoTicket}) async {
     // 1. Intentar con relación directa
-    String url = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamiento]=true&populate[sucursal]=true';
+    String url = '$_baseUrl/tickets?populate[cliente]=true&populate[tratamiento]=true&populate[sucursal]=true';
     if (sucursalId != null) {
       url += '&filters[sucursal][id]=$sucursalId';
+    }
+    if (estadoTicket != null) {
+      url += '&filters[estadoTicket]=$estadoTicket';
     }
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
@@ -114,6 +117,9 @@ class ApiService {
     if (sucursalId != null) {
       String urlCliente = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamiento]=true';
       urlCliente += '&filters[cliente][sucursal][id]=$sucursalId';
+      if (estadoTicket != null) {
+        urlCliente += '&filters[estadoTicket]=$estadoTicket';
+      }
       final responseCliente = await http.get(Uri.parse(urlCliente));
       if (responseCliente.statusCode == 200) {
         final dataCliente = jsonDecode(responseCliente.body);
@@ -121,5 +127,21 @@ class ApiService {
       }
     }
     return [];
+  }
+
+  // Actualizar estado del ticket
+  Future<bool> actualizarEstadoTicket(String documentId, bool estadoTicket) async {
+    final url = Uri.parse('$_baseUrl/tickets/$documentId');
+    final response = await http.put(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'data': {'estadoTicket': estadoTicket}}),
+    );
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      print('Error al actualizar estado del ticket: ${response.body}');
+      return false;
+    }
   }
 }
