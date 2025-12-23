@@ -97,28 +97,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Mostrar sucursal asignada al empleado (sin dropdown)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            _sucursalProvider.selectedSucursalName ?? 'Mi Sucursal',
-                            style: TextStyle(
-                              color: colorScheme.onPrimary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const SizedBox(height: 0),
                   ],
                 ),
               ),
@@ -254,4 +233,3 @@ class _DrawerItem extends StatelessWidget {
     );
   }
 }
-

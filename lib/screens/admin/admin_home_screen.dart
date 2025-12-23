@@ -276,7 +276,43 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         body: ScaffoldKeyInherited(
           scaffoldKey: _scaffoldKey,
-          child: _screens[_selectedIndex],
+          child: Column(
+            children: [
+              // Header global (menú + logo + título)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.menu),
+                      onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(40, 40),
+                        fixedSize: const Size(40, 40),
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.spa_rounded, color: colorScheme.primary, size: 28),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'App Estética',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+              ),
+              // Pantalla seleccionada
+              Expanded(child: _screens[_selectedIndex]),
+            ],
+          ),
         ),
       ),
     );
@@ -339,4 +375,3 @@ class _DrawerItem extends StatelessWidget {
     );
   }
 }
-
