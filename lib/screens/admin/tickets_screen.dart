@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/providers/sucursal_provider.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -15,46 +16,49 @@ class _TicketsScreenState extends State<TicketsScreen> {
   final ApiService api = ApiService();
   List<dynamic> tickets = [];
   List<dynamic> filteredTickets = [];
-  List<dynamic> sucursales = [];
-  int? selectedSucursalId;
   bool isLoading = true;
   String search = '';
   String? errorMsg;
   bool showAtendidos = false; // false = pendientes, true = atendidos
+  SucursalProvider? _sucursalProvider;
 
   @override
   void initState() {
     super.initState();
-    fetchSucursalesAndTickets();
   }
 
-  Future<void> fetchSucursalesAndTickets() async {
-    setState(() {
-      isLoading = true;
-      errorMsg = null;
-    });
-    try {
-      sucursales = await api.getSucursales();
-      if (sucursales.isNotEmpty) {
-        selectedSucursalId = sucursales.first['id'];
-      }
-      await fetchTickets();
-    } catch (e) {
-      errorMsg = 'No se pudo conectar al servidor.';
-      setState(() {
-        isLoading = false;
-      });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = SucursalInherited.of(context);
+    if (provider != _sucursalProvider) {
+      _sucursalProvider?.removeListener(_onSucursalChanged);
+      _sucursalProvider = provider;
+      _sucursalProvider?.addListener(_onSucursalChanged);
+      fetchTickets();
     }
   }
 
+  @override
+  void dispose() {
+    _sucursalProvider?.removeListener(_onSucursalChanged);
+    super.dispose();
+  }
+
+  void _onSucursalChanged() {
+    fetchTickets();
+  }
+
   Future<void> fetchTickets() async {
+    if (_sucursalProvider?.selectedSucursalId == null) return;
+
     setState(() {
       isLoading = true;
       errorMsg = null;
     });
     try {
       final data = await api.getTickets(
-        sucursalId: selectedSucursalId,
+        sucursalId: _sucursalProvider!.selectedSucursalId,
         estadoTicket: showAtendidos,
       );
       tickets = data;
@@ -91,9 +95,36 @@ class _TicketsScreenState extends State<TicketsScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Header con botón de menú y título
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () {
+                      final scaffoldKey = ScaffoldKeyInherited.of(context);
+                      scaffoldKey?.currentState?.openDrawer();
+                    },
+                    style: IconButton.styleFrom(
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(Icons.spa_rounded, color: colorScheme.primary, size: 28),
+                  const SizedBox(width: 8),
+                  Text(
+                    'App Estética',
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             // Barra de búsqueda y acciones
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
                   Row(
@@ -119,61 +150,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Filtro de sucursal
-                  Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          color: colorScheme.primary,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Sucursal:',
-                          style: textTheme.titleMedium?.copyWith(
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<int>(
-                              value: selectedSucursalId,
-                              isExpanded: true,
-                              icon: Icon(Icons.arrow_drop_down,
-                                  color: colorScheme.primary),
-                              style: textTheme.bodyLarge?.copyWith(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              items: sucursales.map((s) {
-                                return DropdownMenuItem<int>(
-                                  value: s['id'],
-                                  child: Text(s['nombreSucursal'] ?? '-'),
-                                );
-                              }).toList(),
-                              onChanged: (value) async {
-                                setState(() {
-                                  selectedSucursalId = value;
-                                });
-                                await fetchTickets();
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
                   // Filtro de estado (Pendientes / Atendidos)
                   SegmentedButton<bool>(
                     segments: const [
@@ -199,6 +175,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       visualDensity: VisualDensity.comfortable,
                     ),
                   ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),

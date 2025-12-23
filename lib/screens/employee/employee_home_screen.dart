@@ -3,6 +3,7 @@ import 'package:app_estetica/screens/employee/clients_screen.dart';
 import 'package:app_estetica/screens/employee/tickets_screen.dart';
 import 'package:app_estetica/screens/employee/treatments_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
+import 'package:app_estetica/providers/sucursal_provider.dart';
 
 class EmployeeHomeScreen extends StatefulWidget {
   const EmployeeHomeScreen({Key? key}) : super(key: key);
@@ -13,6 +14,8 @@ class EmployeeHomeScreen extends StatefulWidget {
 
 class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   int _selectedIndex = 0;
+  final SucursalProvider _sucursalProvider = SucursalProvider();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final List<Widget> _screens = [
     const EmployeeTicketsScreen(),
@@ -20,23 +23,12 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     const EmployeeTreatmentsScreen(),
   ];
 
-  final List<NavigationDestination> _destinations = [
-    const NavigationDestination(
-      icon: Icon(Icons.receipt_long_outlined),
-      selectedIcon: Icon(Icons.receipt_long),
-      label: 'Tickets',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.people_outline),
-      selectedIcon: Icon(Icons.people),
-      label: 'Clientes',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.spa_outlined),
-      selectedIcon: Icon(Icons.spa),
-      label: 'Tratamientos',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // TODO: Cargar la sucursal del empleado desde el backend
+    // Por ahora se dejará para que el empleado vea su sucursal asignada
+  }
 
   void _logout() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -76,42 +68,188 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(Icons.spa_rounded, color: colorScheme.primary),
-            const SizedBox(width: 8),
-            const Text('App Estética'),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Mostrar notificaciones
-            },
-            tooltip: 'Notificaciones',
+    return SucursalInherited(
+      provider: _sucursalProvider,
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: Drawer(
+          child: Column(
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
+                        const SizedBox(width: 12),
+                        Text(
+                          'App Estética',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Mostrar sucursal asignada al empleado (sin dropdown)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            _sucursalProvider.selectedSucursalName ?? 'Mi Sucursal',
+                            style: TextStyle(
+                              color: colorScheme.onPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  children: [
+                    _DrawerItem(
+                      icon: Icons.receipt_long_outlined,
+                      selectedIcon: Icons.receipt_long,
+                      label: 'Tickets',
+                      selected: _selectedIndex == 0,
+                      onTap: () {
+                        setState(() { _selectedIndex = 0; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.people_outline,
+                      selectedIcon: Icons.people,
+                      label: 'Clientes',
+                      selected: _selectedIndex == 1,
+                      onTap: () {
+                        setState(() { _selectedIndex = 1; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.spa_outlined,
+                      selectedIcon: Icons.spa,
+                      label: 'Tratamientos',
+                      selected: _selectedIndex == 2,
+                      onTap: () {
+                        setState(() { _selectedIndex = 2; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // Cerrar sesión al final
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ListTile(
+                    leading: Icon(Icons.logout_rounded, color: colorScheme.error),
+                    title: Text(
+                      'Cerrar Sesión',
+                      style: TextStyle(
+                        color: colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _logout();
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              icon: const Icon(Icons.logout_outlined),
-              onPressed: _logout,
-              tooltip: 'Cerrar sesión',
+        ),
+        body: ScaffoldKeyInherited(
+          scaffoldKey: _scaffoldKey,
+          child: _screens[_selectedIndex],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerItem extends StatelessWidget {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DrawerItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.primaryContainer
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: ListTile(
+          leading: Icon(
+            selected ? selectedIcon : icon,
+            color: selected
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
+            size: 24,
+          ),
+          title: Text(
+            label,
+            style: textTheme.bodyLarge?.copyWith(
+              color: selected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurface,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
-        ],
-      ),
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (int index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: _destinations,
+          onTap: onTap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
       ),
     );
   }
