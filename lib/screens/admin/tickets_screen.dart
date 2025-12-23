@@ -1,11 +1,10 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 
 class TicketsScreen extends StatefulWidget {
-  const TicketsScreen({Key? key}) : super(key: key);
+  const TicketsScreen({super.key});
 
   @override
   State<TicketsScreen> createState() => _TicketsScreenState();
@@ -57,28 +56,350 @@ class _TicketsScreenState extends State<TicketsScreen> {
     setState(() {
       search = value;
       filteredTickets = tickets.where((t) {
-        final cliente = t['attributes']?['cliente']?['data']?['attributes']?['nombreCliente'] ?? '';
-        final tratamiento = t['attributes']?['tratamiento']?['data']?['attributes']?['nombreTratamiento'] ?? '';
+        final cliente = t['cliente']?['nombreCliente'] ?? '';
+        final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '';
         return cliente.toLowerCase().contains(value.toLowerCase()) ||
                tratamiento.toLowerCase().contains(value.toLowerCase());
       }).toList();
     });
   }
 
-  Widget _buildInfoItem(IconData icon, String label, String value, {Color? valueColor}) {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Barra de búsqueda y acciones
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SearchBar(
+                          hintText: 'Buscar por cliente o tratamiento',
+                          leading: const Icon(Icons.search),
+                          onChanged: filterTickets,
+                          elevation: const WidgetStatePropertyAll(1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton.icon(
+                        onPressed: fetchTickets,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text(''),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(56, 56),
+                          padding: const EdgeInsets.all(16),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Filtro de sucursal
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: colorScheme.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Sucursal:',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              value: selectedSucursalId,
+                              isExpanded: true,
+                              icon: Icon(Icons.arrow_drop_down, color: colorScheme.primary),
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              items: sucursales.map((s) {
+                                return DropdownMenuItem<int>(
+                                  value: s['id'],
+                                  child: Text(s['nombreSucursal'] ?? '-'),
+                                );
+                              }).toList(),
+                              onChanged: (value) async {
+                                setState(() { selectedSucursalId = value; });
+                                await fetchTickets();
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Lista de tickets
+            Expanded(
+              child: isLoading
+                  ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+                  : errorMsg != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+                              const SizedBox(height: 16),
+                              Text(
+                                errorMsg!,
+                                style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
+                              ),
+                            ],
+                          ),
+                        )
+                      : filteredTickets.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.receipt_long_outlined, size: 64, color: colorScheme.onSurfaceVariant),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No hay tickets registrados',
+                                    style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              itemCount: filteredTickets.length,
+                              itemBuilder: (context, i) {
+                                final t = filteredTickets[i];
+                                final fecha = t['fecha'] != null
+                                    ? DateFormat('dd/MM/yyyy').format(DateTime.parse(t['fecha']))
+                                    : '-';
+                                final cliente = t['cliente'] != null
+                                    ? ((t['cliente']['apellidoCliente'] ?? '').isNotEmpty
+                                        ? '${t['cliente']['nombreCliente'] ?? '-'} ${t['cliente']['apellidoCliente'] ?? ''}'
+                                        : t['cliente']['nombreCliente'] ?? '-')
+                                    : '-';
+                                final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '-';
+                                final cuota = t['cuota']?.toString() ?? '-';
+                                final saldo = t['saldoPendiente']?.toString() ?? '-';
+                                final estadoPago = t['estadoPago'] ?? '-';
+                                final estadoTicket = t['estadoTicket'] == true;
+                                final sucursalNombre = t['sucursal']?['nombreSucursal'] ?? '-';
+
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  elevation: 1,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () {
+                                      // TODO: Ver detalles del ticket
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Header
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: estadoTicket
+                                                      ? colorScheme.primaryContainer
+                                                      : colorScheme.errorContainer,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: Icon(
+                                                  estadoTicket ? Icons.check_circle : Icons.cancel,
+                                                  color: estadoTicket
+                                                      ? colorScheme.onPrimaryContainer
+                                                      : colorScheme.onErrorContainer,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      cliente,
+                                                      style: textTheme.titleMedium?.copyWith(
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      tratamiento,
+                                                      style: textTheme.bodyMedium?.copyWith(
+                                                        color: colorScheme.primary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              IconButton.filledTonal(
+                                                onPressed: () {
+                                                  // TODO: Editar ticket
+                                                },
+                                                icon: const Icon(Icons.edit_outlined),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 16),
+                                          const Divider(),
+                                          const SizedBox(height: 12),
+                                          // Información
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _InfoChip(
+                                                  icon: Icons.location_on_outlined,
+                                                  label: 'Sucursal',
+                                                  value: sucursalNombre,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: _InfoChip(
+                                                  icon: Icons.calendar_today_outlined,
+                                                  label: 'Fecha',
+                                                  value: fecha,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _InfoChip(
+                                                  icon: Icons.payments_outlined,
+                                                  label: 'Cuota',
+                                                  value: 'Bs $cuota',
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: _InfoChip(
+                                                  icon: Icons.account_balance_wallet_outlined,
+                                                  label: 'Saldo',
+                                                  value: 'Bs $saldo',
+                                                  valueColor: saldo != '0' ? colorScheme.error : null,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          // Estado de pago
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: estadoPago == 'Completo'
+                                                  ? colorScheme.primaryContainer
+                                                  : colorScheme.errorContainer,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  estadoPago == 'Completo'
+                                                      ? Icons.check_circle_outline
+                                                      : Icons.warning_amber_outlined,
+                                                  size: 18,
+                                                  color: estadoPago == 'Completo'
+                                                      ? colorScheme.onPrimaryContainer
+                                                      : colorScheme.onErrorContainer,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Estado: $estadoPago',
+                                                  style: textTheme.labelMedium?.copyWith(
+                                                    color: estadoPago == 'Completo'
+                                                        ? colorScheme.onPrimaryContainer
+                                                        : colorScheme.onErrorContainer,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const NewTicketScreen()),
+          );
+          if (result == true) fetchTickets();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Nuevo Ticket'),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, color: Colors.white60, size: 16),
+            Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -86,422 +407,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
-            color: valueColor ?? Colors.white,
-            fontSize: 14,
+          style: textTheme.bodyMedium?.copyWith(
+            color: valueColor ?? colorScheme.onSurface,
             fontWeight: FontWeight.w600,
           ),
         ),
       ],
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Fondo gradiente profesional
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1a1a2e),
-                Color(0xFF16213e),
-                Color(0xFF0f3460),
-              ],
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          onChanged: filterTickets,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Buscar por cliente o tratamiento',
-                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                            prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.7)),
-                            filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.1),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(color: Color(0xFF00d4ff), width: 2),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00d4ff).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF00d4ff).withValues(alpha: 0.3)),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.refresh),
-                        color: const Color(0xFF00d4ff),
-                        onPressed: fetchTickets,
-                        tooltip: 'Actualizar',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Filtro de sucursal
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.location_on, color: const Color(0xFF00d4ff), size: 22),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Sucursal:',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            value: selectedSucursalId,
-                            dropdownColor: const Color(0xFF1a1a2e),
-                            iconEnabledColor: const Color(0xFF00d4ff),
-                            isExpanded: true,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            items: sucursales.map((s) {
-                              return DropdownMenuItem<int>(
-                                value: s['id'],
-                                child: Text(s['nombreSucursal'] ?? '-'),
-                              );
-                            }).toList(),
-                            onChanged: (value) async {
-                              setState(() { selectedSucursalId = value; });
-                              await fetchTickets();
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : errorMsg != null
-                        ? Center(child: Text(errorMsg!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)))
-                        : filteredTickets.isEmpty
-                            ? const Center(child: Text('No hay tickets registrados', style: TextStyle(color: Colors.white70)))
-                            : ListView.builder(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                itemCount: filteredTickets.length,
-                                itemBuilder: (context, i) {
-                                  final t = filteredTickets[i];
-                                  final fecha = t['fecha'] != null ? DateFormat('dd/MM/yyyy').format(DateTime.parse(t['fecha'])) : '-';
-                                  final cliente = t['cliente'] != null
-                                      ? ((t['cliente']['apellidoCliente'] ?? '').isNotEmpty
-                                          ? '${t['cliente']['nombreCliente'] ?? '-'} ${t['cliente']['apellidoCliente'] ?? ''}'
-                                          : t['cliente']['nombreCliente'] ?? '-')
-                                      : '-';
-                                  final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '-';
-                                  final cuota = t['cuota']?.toString() ?? '-';
-                                  final saldo = t['saldoPendiente']?.toString() ?? '-';
-                                  final estadoPago = t['estadoPago'] ?? '-';
-                                  final estadoTicket = t['estadoTicket'] == true;
-                                  final sucursalNombre = t['sucursal']?['nombreSucursal'] ?? '-';
-
-                                  // Color según estado de pago
-                                  Color estadoColor = estadoPago == 'Completo'
-                                      ? const Color(0xFF00d4aa)
-                                      : const Color(0xFFff6b6b);
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 16),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(20),
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Colors.white.withValues(alpha: 0.15),
-                                                Colors.white.withValues(alpha: 0.05),
-                                              ],
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.white.withValues(alpha: 0.2),
-                                              width: 1.5,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withValues(alpha: 0.2),
-                                                blurRadius: 15,
-                                                offset: const Offset(0, 8),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                // Header con cliente y estado
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding: const EdgeInsets.all(10),
-                                                      decoration: BoxDecoration(
-                                                        color: estadoTicket
-                                                            ? const Color(0xFF00d4aa).withValues(alpha: 0.2)
-                                                            : const Color(0xFFff6b6b).withValues(alpha: 0.2),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                        border: Border.all(
-                                                          color: estadoTicket
-                                                              ? const Color(0xFF00d4aa)
-                                                              : const Color(0xFFff6b6b),
-                                                          width: 2,
-                                                        ),
-                                                      ),
-                                                      child: Icon(
-                                                        estadoTicket ? Icons.check_circle : Icons.cancel,
-                                                        color: estadoTicket
-                                                            ? const Color(0xFF00d4aa)
-                                                            : const Color(0xFFff6b6b),
-                                                        size: 24,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 16),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            cliente,
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 18,
-                                                              fontWeight: FontWeight.bold,
-                                                              letterSpacing: 0.5,
-                                                            ),
-                                                          ),
-                                                          const SizedBox(height: 4),
-                                                          Text(
-                                                            tratamiento,
-                                                            style: TextStyle(
-                                                              color: const Color(0xFF00d4ff),
-                                                              fontSize: 14,
-                                                              fontWeight: FontWeight.w500,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      padding: const EdgeInsets.all(8),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFF00d4ff).withValues(alpha: 0.2),
-                                                        borderRadius: BorderRadius.circular(10),
-                                                      ),
-                                                      child: IconButton(
-                                                        icon: const Icon(Icons.edit_outlined, size: 20),
-                                                        color: const Color(0xFF00d4ff),
-                                                        onPressed: () {
-                                                          // TODO: Editar ticket
-                                                        },
-                                                        padding: EdgeInsets.zero,
-                                                        constraints: const BoxConstraints(),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 16),
-                                                const Divider(
-                                                  color: Colors.white24,
-                                                  thickness: 1,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                // Información detallada
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: _buildInfoItem(
-                                                        Icons.location_on_outlined,
-                                                        'Sucursal',
-                                                        sucursalNombre,
-                                                      ),
-                                                    ),
-                                                    Expanded(
-                                                      child: _buildInfoItem(
-                                                        Icons.calendar_today_outlined,
-                                                        'Fecha',
-                                                        fecha,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: _buildInfoItem(
-                                                        Icons.payments_outlined,
-                                                        'Cuota',
-                                                        'Bs $cuota',
-                                                      ),
-                                                    ),
-                                                    Expanded(
-                                                      child: _buildInfoItem(
-                                                        Icons.account_balance_wallet_outlined,
-                                                        'Saldo',
-                                                        'Bs $saldo',
-                                                        valueColor: saldo != '0' ? const Color(0xFFff6b6b) : const Color(0xFF00d4aa),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 12),
-                                                // Estado de pago destacado
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                  decoration: BoxDecoration(
-                                                    color: estadoColor.withValues(alpha: 0.2),
-                                                    borderRadius: BorderRadius.circular(10),
-                                                    border: Border.all(
-                                                      color: estadoColor.withValues(alpha: 0.5),
-                                                    ),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        estadoPago == 'Completo'
-                                                            ? Icons.check_circle_outline
-                                                            : Icons.warning_amber_outlined,
-                                                        color: estadoColor,
-                                                        size: 18,
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      Text(
-                                                        'Estado: $estadoPago',
-                                                        style: TextStyle(
-                                                          color: estadoColor,
-                                                          fontSize: 13,
-                                                          fontWeight: FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-              ),
-            ],
-          ),
-        ),
-        Positioned(
-          bottom: 32,
-          right: 32,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF00d4ff), Color(0xFF0099cc)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00d4ff).withValues(alpha: 0.5),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: FloatingActionButton.extended(
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const NewTicketScreen()),
-                );
-                if (result == true) fetchTickets();
-              },
-              icon: const Icon(Icons.add, size: 24),
-              label: const Text(
-                'Nuevo Ticket',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              backgroundColor: Colors.transparent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
+
