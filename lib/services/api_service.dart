@@ -82,4 +82,44 @@ class ApiService {
       return false;
     }
   }
+
+  // Obtener todas las sucursales
+  Future<List<dynamic>> getSucursales() async {
+    final url = Uri.parse('$_baseUrl/sucursals');
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data'];
+    } else {
+      throw Exception('Error al obtener sucursales');
+    }
+  }
+
+  // Obtener tickets filtrados por sucursal (estructura directa o por cliente)
+  Future<List<dynamic>> getTickets({int? sucursalId}) async {
+    // 1. Intentar con relación directa
+    String url = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamiento]=true&populate[sucursal]=true';
+    if (sucursalId != null) {
+      url += '&filters[sucursal][id]=$sucursalId';
+    }
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      // Si hay resultados o no se filtró por sucursal, devolverlos
+      if ((data['data'] != null && (data['data'] as List).isNotEmpty) || sucursalId == null) {
+        return data['data'] ?? [];
+      }
+    }
+    // 2. Si no hay resultados y se filtró por sucursal, intentar por cliente.sucursal
+    if (sucursalId != null) {
+      String urlCliente = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamiento]=true';
+      urlCliente += '&filters[cliente][sucursal][id]=$sucursalId';
+      final responseCliente = await http.get(Uri.parse(urlCliente));
+      if (responseCliente.statusCode == 200) {
+        final dataCliente = jsonDecode(responseCliente.body);
+        return dataCliente['data'] ?? [];
+      }
+    }
+    return [];
+  }
 }
