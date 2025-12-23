@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_estetica/services/api_service.dart';
 
 class TicketDetailScreen extends StatefulWidget {
@@ -14,6 +15,17 @@ class TicketDetailScreen extends StatefulWidget {
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final ApiService api = ApiService();
   bool isUpdating = false;
+  bool localeReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeDateFormatting('es').then((_) {
+      setState(() {
+        localeReady = true;
+      });
+    });
+  }
 
   Future<void> _marcarComoAtendido() async {
     setState(() { isUpdating = true; });
@@ -59,6 +71,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    // Esperar a que la localización esté lista
+    if (!localeReady) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     // Extraer información del ticket
     final fecha = widget.ticket['fecha'] != null
