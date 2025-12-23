@@ -24,34 +24,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const SettingsScreen(),
   ];
 
-  final List<NavigationDestination> _destinations = [
-    const NavigationDestination(
-      icon: Icon(Icons.receipt_long_outlined),
-      selectedIcon: Icon(Icons.receipt_long),
-      label: 'Tickets',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.people_outline),
-      selectedIcon: Icon(Icons.people),
-      label: 'Clientes',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.spa_outlined),
-      selectedIcon: Icon(Icons.spa),
-      label: 'Tratamientos',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.bar_chart_outlined),
-      selectedIcon: Icon(Icons.bar_chart),
-      label: 'Reportes',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.settings_outlined),
-      selectedIcon: Icon(Icons.settings),
-      label: 'Configuración',
-    ),
-  ];
-
   void _logout() {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -89,7 +61,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -117,17 +88,76 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
         ],
       ),
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (int index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: _destinations,
+      drawer: Drawer(
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
+                  const SizedBox(width: 12),
+                  Text('App Estética', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: colorScheme.onPrimary)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('Tickets'),
+                    selected: _selectedIndex == 0,
+                    onTap: () {
+                      setState(() { _selectedIndex = 0; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.people_outline),
+                    title: const Text('Clientes'),
+                    selected: _selectedIndex == 1,
+                    onTap: () {
+                      setState(() { _selectedIndex = 1; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.spa_outlined),
+                    title: const Text('Tratamientos'),
+                    selected: _selectedIndex == 2,
+                    onTap: () {
+                      setState(() { _selectedIndex = 2; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.bar_chart_outlined),
+                    title: const Text('Reportes'),
+                    selected: _selectedIndex == 3,
+                    onTap: () {
+                      setState(() { _selectedIndex = 3; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.settings_outlined),
+                    title: const Text('Configuración'),
+                    selected: _selectedIndex == 4,
+                    onTap: () {
+                      setState(() { _selectedIndex = 4; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+      body: _screens[_selectedIndex],
     );
   }
 }
-
