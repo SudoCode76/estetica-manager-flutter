@@ -2,6 +2,8 @@ import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/screens/employee/employee_home_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -64,6 +66,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
       final user = result['user'];
       final userType = user['tipoUsuario'];
+      final jwt = result['jwt'];
+
+      // Guardar sesión en SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwt', jwt ?? '');
+      await prefs.setString('user', jsonEncode(user));
+      await prefs.setString('userType', userType ?? '');
 
       if (!mounted) return;
 

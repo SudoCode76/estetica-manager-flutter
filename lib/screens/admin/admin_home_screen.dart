@@ -7,6 +7,7 @@ import 'package:app_estetica/screens/admin/treatments_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({Key? key}) : super(key: key);
@@ -73,8 +74,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('jwt');
+                await prefs.remove('user');
+                await prefs.remove('userType');
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
