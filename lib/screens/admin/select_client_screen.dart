@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/widgets/create_client_dialog.dart';
 
 class SelectClientScreen extends StatefulWidget {
   final int sucursalId;
@@ -79,127 +80,13 @@ class _SelectClientScreenState extends State<SelectClientScreen> with SingleTick
   }
 
   Future<void> _showCreateClientDialog() async {
-    final nombreController = TextEditingController();
-    final apellidoController = TextEditingController();
-    final telefonoController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final result = await showDialog<Map<String,dynamic>?>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: colorScheme.surfaceTint,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        icon: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.person_add_rounded, size: 32, color: colorScheme.onPrimaryContainer),
-        ),
-        title: Text(
-          'Registrar nuevo cliente',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nombreController,
-                  decoration: InputDecoration(
-                    labelText: 'Nombre',
-                    prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    filled: true,
-                  ),
-                  validator: (v) => v == null || v.isEmpty ? 'Ingrese nombre' : null,
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: apellidoController,
-                  decoration: InputDecoration(
-                    labelText: 'Apellido',
-                    prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    filled: true,
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: telefonoController,
-                  decoration: InputDecoration(
-                    labelText: 'Teléfono',
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    filled: true,
-                  ),
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              try {
-                final Map<String, dynamic> nuevo = {
-                  'nombreCliente': nombreController.text.trim(),
-                  'apellidoCliente': apellidoController.text.trim(),
-                  'telefono': int.tryParse(telefonoController.text) ?? 0,
-                  'estadoCliente': true,
-                  'sucursal': widget.sucursalId,
-                };
-                final creado = await api.crearCliente(nuevo);
-                Navigator.pop(context, creado as Map<String, dynamic>?);
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Error al crear cliente'),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.check),
-            label: const Text('Crear'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
+    final result = await CreateClientDialog.show(context, widget.sucursalId);
 
     if (result != null) {
-      Navigator.pop(context, result);
+      // Si se creó un cliente, retornarlo al caller (NewTicketScreen)
+      if (mounted) Navigator.pop(context, result);
     } else {
+      // Si se canceló, recargar la lista
       await _loadClients(query);
     }
   }

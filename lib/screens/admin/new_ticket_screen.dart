@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/select_client_screen.dart';
+import 'package:app_estetica/widgets/create_client_dialog.dart';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
@@ -111,74 +112,30 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    }
 
    Future<void> _showCreateClientDialog() async {
-     final nombreController = TextEditingController();
-     final apellidoController = TextEditingController();
-     final telefonoController = TextEditingController();
-     final formKey = GlobalKey<FormState>();
-
-     final result = await showDialog<int?>(
-       context: context,
-       builder: (context) => AlertDialog(
-         title: const Text('Registrar cliente'),
-         content: Form(
-           key: formKey,
-           child: Column(
-             mainAxisSize: MainAxisSize.min,
-             children: [
-               TextFormField(
-                 controller: nombreController,
-                 decoration: const InputDecoration(labelText: 'Nombre'),
-                 validator: (v) => v == null || v.isEmpty ? 'Ingrese nombre' : null,
-               ),
-               TextFormField(
-                 controller: apellidoController,
-                 decoration: const InputDecoration(labelText: 'Apellido'),
-               ),
-               TextFormField(
-                 controller: telefonoController,
-                 decoration: const InputDecoration(labelText: 'Teléfono'),
-                 keyboardType: TextInputType.phone,
-               ),
-             ],
-           ),
+     // Validar que haya sucursal seleccionada antes de abrir el diálogo
+     if (_sucursalProvider?.selectedSucursalId == null) {
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(
+           content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+           behavior: SnackBarBehavior.floating,
          ),
-         actions: [
-           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-           FilledButton(onPressed: () async {
-             if (!formKey.currentState!.validate()) return;
-             try {
-               final nuevo = {
-                 'nombreCliente': nombreController.text.trim(),
-                 'apellidoCliente': apellidoController.text.trim(),
-                 'telefono': int.tryParse(telefonoController.text) ?? 0,
-                 'estadoCliente': true,
-                 if (_sucursalProvider?.selectedSucursalId != null) 'sucursal': _sucursalProvider!.selectedSucursalId,
-               };
-               final creado = await api.crearCliente(nuevo);
-               Navigator.pop(context, creado['id'] as int?);
-             } catch (e) {
-               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al crear cliente')));
-             }
-           }, child: const Text('Crear')),
-         ],
-       ),
-     );
+       );
+       return;
+     }
+
+     final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
 
      if (result != null) {
-       setState(() {
-         clienteId = result;
-       });
-       // Recargar lista de clientes para el dropdown según la sucursal seleccionada
-       await _loadClientsForSucursal();
-       // localizar el cliente creado y guardar su nombre
-       try {
-         final found = clientes.firstWhere((c) => c['id'] == clienteId, orElse: () => null);
-         if (found != null) {
-           setState(() {
-             clienteNombre = '${found['nombreCliente'] ?? ''} ${found['apellidoCliente'] ?? ''}'.trim();
-           });
-         }
-       } catch (_) {}
+       // Extraer el ID del cliente creado
+       final createdId = result['id'] as int?;
+       if (createdId != null) {
+         setState(() {
+           clienteId = createdId;
+           clienteNombre = '${result['nombreCliente'] ?? ''} ${result['apellidoCliente'] ?? ''}'.trim();
+         });
+         // Recargar lista de clientes para el dropdown
+         await _loadClientsForSucursal();
+       }
      }
    }
 
