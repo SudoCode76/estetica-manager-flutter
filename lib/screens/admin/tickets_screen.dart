@@ -1,6 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
@@ -211,152 +211,165 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               final tieneSaldo = saldoPendiente > 0;
                               final estadoTicket = t['estadoTicket'] == true;
 
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                elevation: 1,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () async {
-                                    final scaffoldKey = ScaffoldKeyInherited.of(context);
-                                    // Abrir detalle en nueva ruta
-                                    await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => TicketDetailScreen(ticket: t),
-                                      ),
-                                    );
-                                    await fetchTickets();
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 28,
-                                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                          child: Text(
-                                            cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
-                                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.06),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 6),
                                         ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                      ],
+                                      border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => TicketDetailScreen(ticket: t),
+                                            ),
+                                          );
+                                          await fetchTickets();
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Row(
                                             children: [
-                                              Text(
-                                                cliente,
-                                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
+                                              CircleAvatar(
+                                                radius: 28,
+                                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                                child: Text(
+                                                  cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
+                                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                tratamiento,
-                                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                  color: Theme.of(context).colorScheme.primary,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.access_time,
-                                                    size: 16,
-                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    '$fecha - $hora',
-                                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              if (tieneSaldo) ...[
-                                                const SizedBox(height: 8),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: Theme.of(context).colorScheme.errorContainer,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.warning_amber,
-                                                        size: 14,
-                                                        color: Theme.of(context).colorScheme.onErrorContainer,
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      cliente,
+                                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                        fontWeight: FontWeight.bold,
                                                       ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
-                                                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                          color: Theme.of(context).colorScheme.onErrorContainer,
-                                                          fontWeight: FontWeight.bold,
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      tratamiento,
+                                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                        color: Theme.of(context).colorScheme.primary,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.access_time,
+                                                          size: 16,
+                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          '$fecha - $hora',
+                                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    if (tieneSaldo) ...[
+                                                      const SizedBox(height: 8),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
+                                                        decoration: BoxDecoration(
+                                                          color: Theme.of(context).colorScheme.errorContainer,
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.warning_amber,
+                                                              size: 14,
+                                                              color: Theme.of(context).colorScheme.onErrorContainer,
+                                                            ),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                                color: Theme.of(context).colorScheme.onErrorContainer,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
                                                         ),
                                                       ),
                                                     ],
+                                                  ],
+                                                ),
+                                              ),
+                                              // Botón check mejorado
+                                              if (!estadoTicket)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(left: 12.0),
+                                                  child: _AttendButton(
+                                                    onPressed: () async {
+                                                      final documentId = t['documentId'];
+                                                      final success = await api.actualizarEstadoTicket(documentId, true);
+                                                      if (success) {
+                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                          SnackBar(
+                                                            content: Row(
+                                                              children: [
+                                                                const Icon(Icons.check_circle, color: Colors.white),
+                                                                const SizedBox(width: 8),
+                                                                const Text('Ticket marcado como atendido'),
+                                                              ],
+                                                            ),
+                                                            backgroundColor: colorScheme.primary,
+                                                            behavior: SnackBarBehavior.floating,
+                                                          ),
+                                                        );
+                                                        await fetchTickets();
+                                                      } else {
+                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                          SnackBar(
+                                                            content: Row(
+                                                              children: [
+                                                                const Icon(Icons.error, color: Colors.white),
+                                                                const SizedBox(width: 8),
+                                                                const Text('Error al actualizar el ticket'),
+                                                              ],
+                                                            ),
+                                                            backgroundColor: colorScheme.error,
+                                                            behavior: SnackBarBehavior.floating,
+                                                          ),
+                                                        );
+                                                      }
+                                                    },
                                                   ),
                                                 ),
-                                              ],
                                             ],
                                           ),
                                         ),
-                                        // Reemplazo de IconButton y flecha por un botón más notorio y profesional
-                                        if (!estadoTicket)
-                                          FilledButton(
-                                            style: FilledButton.styleFrom(
-                                              shape: const CircleBorder(),
-                                              backgroundColor: colorScheme.primary,
-                                              padding: const EdgeInsets.all(12),
-                                              elevation: 2,
-                                            ),
-                                            onPressed: () async {
-                                              final documentId = t['documentId'];
-                                              final success = await api.actualizarEstadoTicket(documentId, true);
-                                              if (success) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Row(
-                                                      children: [
-                                                        const Icon(Icons.check_circle, color: Colors.white),
-                                                        const SizedBox(width: 8),
-                                                        const Text('Ticket marcado como atendido'),
-                                                      ],
-                                                    ),
-                                                    backgroundColor: colorScheme.primary,
-                                                    behavior: SnackBarBehavior.floating,
-                                                  ),
-                                                );
-                                                await fetchTickets();
-                                              } else {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Row(
-                                                      children: [
-                                                        const Icon(Icons.error, color: Colors.white),
-                                                        const SizedBox(width: 8),
-                                                        const Text('Error al actualizar el ticket'),
-                                                      ],
-                                                    ),
-                                                    backgroundColor: colorScheme.error,
-                                                    behavior: SnackBarBehavior.floating,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                            child: const Icon(Icons.check, color: Colors.white, size: 28),
-                                          ),
-                                      ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -365,6 +378,81 @@ class _TicketsScreenState extends State<TicketsScreen> {
                           ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AttendButton extends StatefulWidget {
+  final VoidCallback onPressed;
+
+  const _AttendButton({required this.onPressed});
+
+  @override
+  State<_AttendButton> createState() => __AttendButtonState();
+}
+
+class __AttendButtonState extends State<_AttendButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 1.0, end: 0.0).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ScaleTransition(
+      scale: _animation,
+      child: GestureDetector(
+        onTapDown: (_) {
+          _controller.forward();
+        },
+        onTapUp: (_) {
+          _controller.reverse();
+        },
+        onTapCancel: () {
+          _controller.reverse();
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colorScheme.primary,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.check, color: Colors.white, size: 28),
+            onPressed: () {
+              widget.onPressed();
+              _controller.forward().then((_) => _controller.reverse());
+            },
+            splashRadius: 28,
+            padding: EdgeInsets.zero,
+          ),
+        ),
       ),
     );
   }

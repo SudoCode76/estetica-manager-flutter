@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SucursalProvider extends ChangeNotifier {
   int? _selectedSucursalId;
@@ -7,16 +8,54 @@ class SucursalProvider extends ChangeNotifier {
   int? get selectedSucursalId => _selectedSucursalId;
   String? get selectedSucursalName => _selectedSucursalName;
 
+  SucursalProvider() {
+    print('SucursalProvider: Constructor called');
+    _loadFromPrefs();
+  }
+
   void setSucursal(int id, String name) {
+    print('SucursalProvider: setSucursal called with id=$id, name=$name');
     _selectedSucursalId = id;
     _selectedSucursalName = name;
+    _saveToPrefs();
     notifyListeners();
   }
 
   void clearSucursal() {
+    print('SucursalProvider: clearSucursal called');
     _selectedSucursalId = null;
     _selectedSucursalName = null;
+    _saveToPrefs();
     notifyListeners();
+  }
+
+  Future<void> _saveToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_selectedSucursalId != null) {
+      await prefs.setInt('selectedSucursalId', _selectedSucursalId!);
+      await prefs.setString('selectedSucursalName', _selectedSucursalName ?? '');
+      print('SucursalProvider: Saved to prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
+    } else {
+      await prefs.remove('selectedSucursalId');
+      await prefs.remove('selectedSucursalName');
+      print('SucursalProvider: Removed from prefs');
+    }
+  }
+
+  Future<void> _loadFromPrefs() async {
+    print('SucursalProvider: _loadFromPrefs started');
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getInt('selectedSucursalId');
+    final name = prefs.getString('selectedSucursalName');
+    print('SucursalProvider: Loaded from prefs - id=$id, name=$name');
+    if (id != null) {
+      _selectedSucursalId = id;
+      _selectedSucursalName = name;
+      notifyListeners();
+      print('SucursalProvider: Set from prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
+    } else {
+      print('SucursalProvider: No saved sucursal in prefs');
+    }
   }
 }
 
@@ -57,4 +96,3 @@ class ScaffoldKeyInherited extends InheritedWidget {
     return oldWidget.scaffoldKey != scaffoldKey;
   }
 }
-

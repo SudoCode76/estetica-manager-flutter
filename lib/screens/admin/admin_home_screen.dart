@@ -6,8 +6,10 @@ import 'package:app_estetica/screens/admin/tickets_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({Key? key}) : super(key: key);
@@ -18,13 +20,13 @@ class AdminHomeScreen extends StatefulWidget {
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _selectedIndex = 0;
-  final SucursalProvider _sucursalProvider = SucursalProvider();
+  SucursalProvider? _sucursalProvider; // Obtener del contexto
   final ApiService _api = ApiService();
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  final List<Widget> _screens = [
+  List<Widget> _screens = [
     const TicketsScreen(),
     const ClientsScreen(),
     const TreatmentsScreen(),
@@ -35,23 +37,42 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSucursales();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_sucursalProvider == null) {
+      _sucursalProvider = SucursalInherited.of(context);
+      print('AdminHomeScreen: Got provider from context: $_sucursalProvider');
+      print('AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}');
+      _loadSucursales();
+    }
   }
 
   Future<void> _loadSucursales() async {
+    print('AdminHomeScreen: _loadSucursales started');
+    print('AdminHomeScreen: Provider selectedSucursalId ANTES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     try {
       final sucursales = await _api.getSucursales();
+      print('AdminHomeScreen: Loaded ${sucursales.length} sucursales');
       setState(() {
         _sucursales = sucursales;
         _isLoadingSucursales = false;
-        if (sucursales.isNotEmpty) {
-          _sucursalProvider.setSucursal(
-            sucursales.first['id'],
-            sucursales.first['nombreSucursal'],
+        // Sólo seleccionar la primera sucursal si no hay selección previa persistida
+        if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
+          print('AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}');
+          _sucursalProvider?.setSucursal(
+            _sucursales.first['id'],
+            _sucursales.first['nombreSucursal'],
           );
+        } else {
+          print('AdminHomeScreen: Sucursal ya establecida: ${_sucursalProvider?.selectedSucursalId} - ${_sucursalProvider?.selectedSucursalName}');
         }
       });
+      print('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     } catch (e) {
+      print('AdminHomeScreen: Error loading sucursales: $e');
       setState(() {
         _isLoadingSucursales = false;
       });
@@ -99,20 +120,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return SucursalInherited(
-      provider: _sucursalProvider,
-      child: Scaffold(
-        key: _scaffoldKey,
-        drawer: Drawer(
-          child: Column(
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+    // Ya no necesitamos SucursalInherited aquí, está a nivel global
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: Drawer(
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Row(
                       children: [
@@ -160,12 +180,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 Expanded(
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<int>(
-                                      value: _sucursalProvider.selectedSucursalId,
+                                      value: _sucursalProvider?.selectedSucursalId,
                                       isExpanded: true,
-                                      dropdownColor: colorScheme.primary,
-                                      icon: Icon(Icons.arrow_drop_down, color: colorScheme.onPrimary),
+                                      dropdownColor: colorScheme.surface,
+                                      icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
                                       style: TextStyle(
-                                        color: colorScheme.onPrimary,
+                                        color: colorScheme.onSurface,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -179,7 +199,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                         if (value != null) {
                                           final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
                                           setState(() {
-                                            _sucursalProvider.setSucursal(value, sucursal['nombreSucursal']);
+                                            _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
                                           });
                                         }
                                       },
@@ -319,7 +339,36 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ],
           ),
         ),
-      ),
+        floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended(
+          onPressed: () async {
+            // obtener user id desde prefs y pasarlo a NewTicketScreen
+            final prefs = await SharedPreferences.getInstance();
+            final userJson = prefs.getString('user');
+            String? userIdStr;
+            if (userJson != null && userJson.isNotEmpty) {
+              try {
+                final Map<String, dynamic> userMap = jsonDecode(userJson);
+                userIdStr = userMap['id']?.toString();
+              } catch (_) {
+                userIdStr = null;
+              }
+            }
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => NewTicketScreen(currentUserId: userIdStr)),
+            );
+            if (result == true) {
+              // refrescar tickets si se creó uno
+              // crear nueva instancia de TicketsScreen para forzar refresh
+              setState(() {
+                _screens[0] = const TicketsScreen();
+              });
+            }
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Nuevo Ticket'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ) : null,
     );
   }
 }

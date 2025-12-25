@@ -15,7 +15,7 @@ class EmployeeHomeScreen extends StatefulWidget {
 
 class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   int _selectedIndex = 0;
-  final SucursalProvider _sucursalProvider = SucursalProvider();
+  SucursalProvider? _sucursalProvider; // Obtener del contexto
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final List<Widget> _screens = [
@@ -29,6 +29,14 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     super.initState();
     // TODO: Cargar la sucursal del empleado desde el backend
     // Por ahora se dejará para que el empleado vea su sucursal asignada
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_sucursalProvider == null) {
+      _sucursalProvider = SucursalInherited.of(context);
+    }
   }
 
   void _logout() {
@@ -73,110 +81,105 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return SucursalInherited(
-      provider: _sucursalProvider,
-      child: Scaffold(
-        key: _scaffoldKey,
-        drawer: Drawer(
-          child: Column(
-            children: [
-              DrawerHeader(
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
-                        const SizedBox(width: 12),
-                        Text(
-                          'App Estética',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: Drawer(
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
+                      const SizedBox(width: 12),
+                      Text(
+                        'App Estética',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const SizedBox(height: 0),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    _DrawerItem(
-                      icon: Icons.receipt_long_outlined,
-                      selectedIcon: Icons.receipt_long,
-                      label: 'Tickets',
-                      selected: _selectedIndex == 0,
-                      onTap: () {
-                        setState(() { _selectedIndex = 0; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.people_outline,
-                      selectedIcon: Icons.people,
-                      label: 'Clientes',
-                      selected: _selectedIndex == 1,
-                      onTap: () {
-                        setState(() { _selectedIndex = 1; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.spa_outlined,
-                      selectedIcon: Icons.spa,
-                      label: 'Tratamientos',
-                      selected: _selectedIndex == 2,
-                      onTap: () {
-                        setState(() { _selectedIndex = 2; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ],
-                ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _DrawerItem(
+                    icon: Icons.receipt_long_outlined,
+                    selectedIcon: Icons.receipt_long,
+                    label: 'Tickets',
+                    selected: _selectedIndex == 0,
+                    onTap: () {
+                      setState(() { _selectedIndex = 0; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.people_outline,
+                    selectedIcon: Icons.people,
+                    label: 'Clientes',
+                    selected: _selectedIndex == 1,
+                    onTap: () {
+                      setState(() { _selectedIndex = 1; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.spa_outlined,
+                    selectedIcon: Icons.spa,
+                    label: 'Tratamientos',
+                    selected: _selectedIndex == 2,
+                    onTap: () {
+                      setState(() { _selectedIndex = 2; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
               ),
-              // Cerrar sesión al final
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.errorContainer,
+            ),
+            // Cerrar sesión al final
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: Icon(Icons.logout_rounded, color: colorScheme.error),
+                  title: Text(
+                    'Cerrar Sesión',
+                    style: TextStyle(
+                      color: colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _logout();
+                  },
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: ListTile(
-                    leading: Icon(Icons.logout_rounded, color: colorScheme.error),
-                    title: Text(
-                      'Cerrar Sesión',
-                      style: TextStyle(
-                        color: colorScheme.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _logout();
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        body: ScaffoldKeyInherited(
-          scaffoldKey: _scaffoldKey,
-          child: _screens[_selectedIndex],
-        ),
+      ),
+      body: ScaffoldKeyInherited(
+        scaffoldKey: _scaffoldKey,
+        child: _screens[_selectedIndex],
       ),
     );
   }

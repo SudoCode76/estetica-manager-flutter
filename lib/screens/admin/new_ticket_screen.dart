@@ -1,7 +1,10 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:app_estetica/screens/admin/select_client_screen.dart';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
@@ -12,307 +15,485 @@ class NewTicketScreen extends StatefulWidget {
 }
 
 class _NewTicketScreenState extends State<NewTicketScreen> {
-  final ApiService api = ApiService();
-  DateTime? fecha;
-  int? tratamientoId;
-  int? clienteId;
-  int? usuarioId;
-  double? cuota;
-  double? pago;
-  double saldoPendiente = 0;
-  String estadoPago = 'Incompleto';
-  bool estadoTicket = true;
+   final ApiService api = ApiService();
+   DateTime? fecha;
+   int? tratamientoId;
+   int? categoriaId;
+   int? clienteId;
+   String? clienteNombre;
+   int? usuarioId;
+   double? cuota;
+   double? pago;
+   double saldoPendiente = 0;
+   String estadoPago = 'Incompleto';
+   bool estadoTicket = false; // Nuevo ticket por defecto: no atendido
 
-  List<dynamic> tratamientos = [];
-  List<dynamic> clientes = [];
-  List<dynamic> usuarios = [];
-  bool isLoading = true;
-  String? error;
+   List<dynamic> tratamientos = [];
+   List<dynamic> categorias = [];
+   List<dynamic> clientes = [];
+   List<dynamic> usuarios = [];
+   bool isLoading = true;
+   String? error;
 
-  @override
-  void initState() {
-    super.initState();
-    cargarDatos();
-  }
+   SucursalProvider? _sucursalProvider;
+   Timer? _clientSearchDebounce;
 
-  Future<void> cargarDatos() async {
-    setState(() { isLoading = true; });
-    try {
-      tratamientos = await api.getTratamientos();
-      clientes = await api.getClientes();
-      usuarios = await api.getUsuarios();
-    } catch (e) {
-      error = 'Error al cargar datos';
-    }
-    setState(() { isLoading = false; });
-  }
+   @override
+   void initState() {
+     super.initState();
+     cargarDatos();
+   }
 
-  void calcularEstadoPago() {
-    if (cuota != null && pago != null) {
-      saldoPendiente = cuota! - pago!;
-      if (saldoPendiente <= 0) {
-        estadoPago = 'Completo';
-        saldoPendiente = 0;
-      } else {
-        estadoPago = 'Incompleto';
-      }
-    }
-  }
+   @override
+   void didChangeDependencies() {
+     super.didChangeDependencies();
+     final provider = SucursalInherited.of(context);
+     if (provider != _sucursalProvider) {
+       _sucursalProvider?.removeListener(_onSucursalChanged);
+       _sucursalProvider = provider;
+       _sucursalProvider?.addListener(_onSucursalChanged);
+       // cargar clientes de la sucursal seleccionada
+       _loadClientsForSucursal();
+     }
+   }
 
-  Future<void> crearTicket() async {
-    if (fecha == null || tratamientoId == null || clienteId == null || usuarioId == null || cuota == null || pago == null) {
-      setState(() { error = 'Completa todos los campos'; });
-      return;
-    }
-    calcularEstadoPago();
-    final ticket = {
-      'fecha': fecha!.toIso8601String(),
-      'cuota': cuota,
-      'saldoPendiente': saldoPendiente,
-      'estadoTicket': estadoTicket,
-      'tratamiento': tratamientoId,
-      'cliente': clienteId,
-      'users_permissions_user': usuarioId,
-      'estadoPago': estadoPago,
-    };
-    final ok = await api.crearTicket(ticket);
-    if (ok) {
-      if (mounted) Navigator.pop(context, true);
-    } else {
-      setState(() { error = 'Error al crear ticket'; });
-    }
-  }
+   @override
+   void dispose() {
+     _clientSearchDebounce?.cancel();
+     _sucursalProvider?.removeListener(_onSucursalChanged);
+     super.dispose();
+   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nuevo Ticket'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-            ),
-          ),
-        ),
-      ),
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF667eea), Color(0xFF764ba2), Color(0xFFf093fb)],
-              ),
-            ),
-          ),
-          if (isLoading)
-            const Center(child: CircularProgressIndicator())
-          else
-            SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.25),
-                          Colors.white.withValues(alpha: 0.10),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.10),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Fecha
-                        Text('Fecha y hora', style: Theme.of(context).textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              final time = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay.now(),
-                              );
-                              if (time != null) {
-                                setState(() {
-                                  fecha = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
-                                });
-                              }
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              fecha == null ? 'Seleccionar fecha y hora' : DateFormat('dd/MM/yyyy HH:mm').format(fecha!),
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        // Tratamiento
-                        Text('Tratamiento', style: Theme.of(context).textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          value: tratamientoId,
-                          items: tratamientos.map<DropdownMenuItem<int>>((t) {
-                            final precio = double.tryParse(t['precio'] ?? '0') ?? 0;
-                            return DropdownMenuItem(
-                              value: t['id'],
-                              child: Text('${t['nombreTratamiento']} (Bs $precio)'),
-                            );
-                          }).toList(),
-                          onChanged: (v) {
-                            setState(() {
-                              tratamientoId = v;
-                              final t = tratamientos.firstWhere((e) => e['id'] == v);
-                              cuota = double.tryParse(t['precio'] ?? '0') ?? 0;
-                              pago = cuota;
-                              calcularEstadoPago();
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Color(0x22FFFFFF),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none),
-                            hintText: 'Seleccionar tratamiento',
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        // Cliente
-                        Text('Cliente', style: Theme.of(context).textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          value: clienteId,
-                          items: clientes.map<DropdownMenuItem<int>>((c) {
-                            return DropdownMenuItem(
-                              value: c['id'],
-                              child: Text('${c['nombreCliente']} ${c['apellidoCliente']}'),
-                            );
-                          }).toList(),
-                          onChanged: (v) => setState(() => clienteId = v),
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Color(0x22FFFFFF),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none),
-                            hintText: 'Seleccionar cliente',
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton.icon(
-                          onPressed: () {
-                            // TODO: Registrar nuevo cliente (puede abrir un dialogo o pantalla)
-                          },
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('Registrar nuevo cliente'),
-                        ),
-                        const SizedBox(height: 18),
-                        // Usuario
-                        Text('Usuario', style: Theme.of(context).textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          value: usuarioId,
-                          items: usuarios.map<DropdownMenuItem<int>>((u) {
-                            return DropdownMenuItem(
-                              value: u['id'],
-                              child: Text(u['username'] ?? u['email'] ?? ''),
-                            );
-                          }).toList(),
-                          onChanged: (v) => setState(() => usuarioId = v),
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Color(0x22FFFFFF),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none),
-                            hintText: 'Seleccionar usuario',
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        // Pago
-                        Text('Pago realizado (Bs)', style: Theme.of(context).textTheme.labelLarge),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          initialValue: pago?.toString() ?? '',
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            filled: true,
-                            fillColor: Color(0x22FFFFFF),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide.none),
-                            hintText: 'Monto pagado',
-                          ),
-                          onChanged: (v) {
-                            setState(() {
-                              pago = double.tryParse(v) ?? 0;
-                              calcularEstadoPago();
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 18),
-                        // Estado de pago y saldo
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Estado de pago: $estadoPago', style: TextStyle(color: estadoPago == 'Completo' ? Colors.green : Colors.orange, fontWeight: FontWeight.bold)),
-                            Text('Saldo pendiente: Bs $saldoPendiente', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        if (error != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Text(error!, style: const TextStyle(color: Colors.red)),
-                          ),
-                        ElevatedButton.icon(
-                          onPressed: crearTicket,
-                          icon: const Icon(Icons.save),
-                          label: const Text('Guardar Ticket'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF667eea),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+   void _onSucursalChanged() {
+     _loadClientsForSucursal();
+   }
+
+   Future<void> cargarDatos() async {
+     setState(() { isLoading = true; });
+     try {
+       categorias = await api.getCategorias();
+       // no cargamos clientes globales aquí; se cargan por sucursal
+       usuarios = await api.getUsuarios();
+     } catch (e) {
+       error = 'Error al cargar datos';
+     }
+     setState(() { isLoading = false; });
+   }
+
+   Future<void> _loadClientsForSucursal({String? query}) async {
+     if (_sucursalProvider?.selectedSucursalId == null) {
+       setState(() {
+         clientes = [];
+       });
+       return;
+     }
+     try {
+       final data = await api.getClientes(sucursalId: _sucursalProvider!.selectedSucursalId, query: query);
+       setState(() {
+         clientes = data;
+       });
+     } catch (e) {
+       final msg = e.toString();
+       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar clientes: $msg')));
+     }
+   }
+
+   void calcularEstadoPago() {
+     if (cuota != null && pago != null) {
+       saldoPendiente = cuota! - pago!;
+       if (saldoPendiente <= 0) {
+         estadoPago = 'Completo';
+         saldoPendiente = 0;
+       } else {
+         estadoPago = 'Incompleto';
+       }
+     }
+   }
+
+   Future<void> _showCreateClientDialog() async {
+     final nombreController = TextEditingController();
+     final apellidoController = TextEditingController();
+     final telefonoController = TextEditingController();
+     final formKey = GlobalKey<FormState>();
+
+     final result = await showDialog<int?>(
+       context: context,
+       builder: (context) => AlertDialog(
+         title: const Text('Registrar cliente'),
+         content: Form(
+           key: formKey,
+           child: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               TextFormField(
+                 controller: nombreController,
+                 decoration: const InputDecoration(labelText: 'Nombre'),
+                 validator: (v) => v == null || v.isEmpty ? 'Ingrese nombre' : null,
+               ),
+               TextFormField(
+                 controller: apellidoController,
+                 decoration: const InputDecoration(labelText: 'Apellido'),
+               ),
+               TextFormField(
+                 controller: telefonoController,
+                 decoration: const InputDecoration(labelText: 'Teléfono'),
+                 keyboardType: TextInputType.phone,
+               ),
+             ],
+           ),
+         ),
+         actions: [
+           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+           FilledButton(onPressed: () async {
+             if (!formKey.currentState!.validate()) return;
+             try {
+               final nuevo = {
+                 'nombreCliente': nombreController.text.trim(),
+                 'apellidoCliente': apellidoController.text.trim(),
+                 'telefono': int.tryParse(telefonoController.text) ?? 0,
+                 'estadoCliente': true,
+                 if (_sucursalProvider?.selectedSucursalId != null) 'sucursal': _sucursalProvider!.selectedSucursalId,
+               };
+               final creado = await api.crearCliente(nuevo);
+               Navigator.pop(context, creado['id'] as int?);
+             } catch (e) {
+               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al crear cliente')));
+             }
+           }, child: const Text('Crear')),
+         ],
+       ),
+     );
+
+     if (result != null) {
+       setState(() {
+         clienteId = result;
+       });
+       // Recargar lista de clientes para el dropdown según la sucursal seleccionada
+       await _loadClientsForSucursal();
+       // localizar el cliente creado y guardar su nombre
+       try {
+         final found = clientes.firstWhere((c) => c['id'] == clienteId, orElse: () => null);
+         if (found != null) {
+           setState(() {
+             clienteNombre = '${found['nombreCliente'] ?? ''} ${found['apellidoCliente'] ?? ''}'.trim();
+           });
+         }
+       } catch (_) {}
+     }
+   }
+
+   Future<void> crearTicket() async {
+     if (fecha == null || tratamientoId == null || clienteId == null || (usuarioId == null && widget.currentUserId == null) || cuota == null || pago == null) {
+       setState(() { error = 'Completa todos los campos'; });
+       return;
+     }
+     if (_sucursalProvider?.selectedSucursalId == null) {
+       setState(() { error = 'Selecciona una sucursal en el menú lateral'; });
+       return;
+     }
+     calcularEstadoPago();
+
+     final usuarioFinalId = usuarioId ?? int.tryParse(widget.currentUserId ?? '0');
+
+     final ticket = {
+       'fecha': fecha!.toIso8601String(),
+       'cuota': cuota,
+       'saldoPendiente': saldoPendiente,
+       'estadoTicket': estadoTicket,
+       'tratamiento': tratamientoId,
+       'cliente': clienteId,
+       'users_permissions_user': usuarioFinalId,
+       'estadoPago': estadoPago,
+       'sucursal': _sucursalProvider!.selectedSucursalId,
+     };
+
+     final ok = await api.crearTicket(ticket);
+     if (ok) {
+       if (mounted) Navigator.pop(context, true);
+     } else {
+       setState(() { error = 'Error al crear ticket'; });
+     }
+   }
+
+   @override
+   Widget build(BuildContext context) {
+     final colorScheme = Theme.of(context).colorScheme;
+
+     return Scaffold(
+       appBar: AppBar(
+         title: const Text('Nuevo Ticket'),
+       ),
+       body: isLoading
+           ? const Center(child: CircularProgressIndicator())
+           : SingleChildScrollView(
+               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+               child: ClipRRect(
+                 borderRadius: BorderRadius.circular(28),
+                 child: BackdropFilter(
+                   filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                   child: Container(
+                     decoration: BoxDecoration(
+                       borderRadius: BorderRadius.circular(28),
+                       color: colorScheme.surface.withValues(alpha: 0.12),
+                       boxShadow: [
+                         BoxShadow(
+                           color: Colors.black.withValues(alpha: 0.08),
+                           blurRadius: 30,
+                           offset: const Offset(0, 10),
+                         ),
+                       ],
+                       border: Border.all(color: colorScheme.outline.withValues(alpha: 0.06)),
+                     ),
+                     padding: const EdgeInsets.all(24),
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.stretch,
+                       children: [
+                         // Fecha
+                         Text('Fecha y hora', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         GestureDetector(
+                           onTap: () async {
+                             final picked = await showDatePicker(
+                               context: context,
+                               initialDate: DateTime.now(),
+                               firstDate: DateTime(2020),
+                               lastDate: DateTime(2100),
+                             );
+                             if (picked != null) {
+                               final time = await showTimePicker(
+                                 context: context,
+                                 initialTime: TimeOfDay.now(),
+                               );
+                               if (time != null) {
+                                 setState(() {
+                                   fecha = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
+                                 });
+                               }
+                             }
+                           },
+                           child: Container(
+                             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                             decoration: BoxDecoration(
+                               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                               borderRadius: BorderRadius.circular(14),
+                             ),
+                             child: Text(
+                               fecha == null ? 'Seleccionar fecha y hora' : DateFormat('dd/MM/yyyy HH:mm').format(fecha!),
+                               style: const TextStyle(fontSize: 16),
+                             ),
+                           ),
+                         ),
+                         const SizedBox(height: 18),
+                         // Categoria
+                         Text('Categoría', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         DropdownButtonFormField<int>(
+                           initialValue: categoriaId,
+                           items: categorias.map<DropdownMenuItem<int>>((c) {
+                             return DropdownMenuItem(
+                               value: c['id'],
+                               child: Text(c['nombreCategoria'] ?? c['nombre'] ?? '-'),
+                             );
+                           }).toList(),
+                           onChanged: (v) async {
+                             setState(() {
+                               categoriaId = v;
+                               tratamientoId = null;
+                               tratamientos = [];
+                               cuota = null;
+                               pago = null;
+                             });
+                             if (v != null) {
+                               final tts = await api.getTratamientos(categoriaId: v);
+                               if (tts.isEmpty) {
+                                 // No hay tratamientos filtrados por esta categoria: avisar y cargar todos como fallback
+                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se encontraron tratamientos para esta categoría. Se mostrarán todos los tratamientos.')));
+                                 final all = await api.getTratamientos();
+                                 setState(() {
+                                   tratamientos = all;
+                                 });
+                               } else {
+                                 setState(() {
+                                   tratamientos = tts;
+                                 });
+                               }
+                             }
+                           },
+                           decoration: const InputDecoration(),
+                         ),
+                         const SizedBox(height: 18),
+                         // Tratamiento (habilitado solo si hay categoría seleccionada)
+                         Text('Tratamiento', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         ConstrainedBox(
+                           // Evitar minWidth=double.infinity dentro de un entorno con ancho no acotado
+                           constraints: const BoxConstraints(minWidth: 0, maxWidth: 900),
+                           child: DropdownButtonFormField<int>(
+                             isExpanded: true,
+                             initialValue: tratamientoId,
+                             items: tratamientos.map<DropdownMenuItem<int>>((t) {
+                               final precio = double.tryParse(t['precio'] ?? '0') ?? 0;
+                               return DropdownMenuItem(
+                                 value: t['id'],
+                                 child: Text('${t['nombreTratamiento']} (Bs $precio)'),
+                               );
+                             }).toList(),
+                             onChanged: tratamientos.isEmpty
+                                 ? null
+                                 : (v) {
+                                     setState(() {
+                                       tratamientoId = v;
+                                       final t = tratamientos.firstWhere((e) => e['id'] == v);
+                                       cuota = double.tryParse(t['precio'] ?? '0') ?? 0;
+                                       pago = cuota;
+                                       calcularEstadoPago();
+                                     });
+                                   },
+                             decoration: InputDecoration(
+                               hintText: tratamientos.isEmpty ? 'Seleccione primero una categoría' : 'Seleccionar tratamiento',
+                             ),
+                           ),
+                         ),
+                         const SizedBox(height: 18),
+                         Text('Cliente', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         Row(
+                           children: [
+                             Expanded(
+                               child: FilledButton.icon(
+                                 onPressed: () async {
+                                   // Debug: ver qué sucursal tiene el provider
+                                   print('NewTicketScreen: _sucursalProvider = $_sucursalProvider');
+                                   print('NewTicketScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+                                   print('NewTicketScreen: selectedSucursalName = ${_sucursalProvider?.selectedSucursalName}');
+
+                                   // Validar que haya provider
+                                   if (_sucursalProvider == null) {
+                                     print('NewTicketScreen: ERROR - _sucursalProvider is NULL!');
+                                     ScaffoldMessenger.of(context).showSnackBar(
+                                       const SnackBar(content: Text('Error: Provider no disponible. Intenta reiniciar la app.')),
+                                     );
+                                     return;
+                                   }
+
+                                   // Validar que haya sucursal seleccionada
+                                   if (_sucursalProvider?.selectedSucursalId == null) {
+                                     print('NewTicketScreen: ERROR - selectedSucursalId is NULL!');
+                                     ScaffoldMessenger.of(context).showSnackBar(
+                                       const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de continuar')),
+                                     );
+                                     return;
+                                   }
+
+                                   print('NewTicketScreen: Opening SelectClientScreen with sucursalId=${_sucursalProvider?.selectedSucursalId}');
+                                   final selected = await Navigator.push(
+                                     context,
+                                     MaterialPageRoute(builder: (context) => SelectClientScreen(sucursalId: _sucursalProvider!.selectedSucursalId!)),
+                                   );
+                                   if (selected != null && selected is Map) {
+                                     setState(() {
+                                       clienteId = selected['id'];
+                                       clienteNombre = '${selected['nombreCliente'] ?? ''} ${selected['apellidoCliente'] ?? ''}'.trim();
+                                     });
+                                     // volver automáticamente a la pantalla de crear ticket (ya estamos en ella), no hacemos nada más
+                                   }
+                                 },
+                                 icon: const Icon(Icons.person_search),
+                                 label: Text(clienteNombre == null ? (clienteId == null ? 'Seleccionar cliente' : 'Cliente seleccionado') : clienteNombre!),
+                               ),
+                             ),
+                             const SizedBox(width: 8),
+                             FilledButton(
+                               onPressed: _showCreateClientDialog,
+                               child: const Icon(Icons.person_add),
+                             ),
+                           ],
+                         ),
+                         const SizedBox(height: 8),
+                         // Usuario
+                         Text('Usuario', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         DropdownButtonFormField<int>(
+                           initialValue: usuarioId,
+                           items: usuarios.map<DropdownMenuItem<int>>((u) {
+                             return DropdownMenuItem(
+                               value: u['id'],
+                               child: Text(u['username'] ?? u['email'] ?? ''),
+                             );
+                           }).toList(),
+                           onChanged: (v) => setState(() => usuarioId = v),
+                         ),
+                         const SizedBox(height: 18),
+                         // Pago
+                         Text('Pago realizado (Bs)', style: Theme.of(context).textTheme.labelLarge),
+                         const SizedBox(height: 8),
+                         TextFormField(
+                           initialValue: pago?.toString() ?? '',
+                           keyboardType: TextInputType.number,
+                           decoration: const InputDecoration(
+                             hintText: 'Monto pagado',
+                           ),
+                           onChanged: (v) {
+                             setState(() {
+                               pago = double.tryParse(v) ?? 0;
+                               calcularEstadoPago();
+                             });
+                           },
+                         ),
+                         const SizedBox(height: 18),
+                         // Estado de pago y saldo (responsive)
+                         Wrap(
+                           spacing: 12,
+                           runSpacing: 6,
+                           crossAxisAlignment: WrapCrossAlignment.center,
+                           children: [
+                             Container(
+                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                               decoration: BoxDecoration(
+                                 color: estadoPago == 'Completo' ? Colors.green.withValues(alpha: 0.12) : Colors.orange.withValues(alpha: 0.08),
+                                 borderRadius: BorderRadius.circular(12),
+                               ),
+                               child: Row(
+                                 mainAxisSize: MainAxisSize.min,
+                                 children: [
+                                   Text('Estado de pago: ', style: Theme.of(context).textTheme.bodyMedium),
+                                   Text(estadoPago, style: TextStyle(color: estadoPago == 'Completo' ? Colors.green : Colors.orange, fontWeight: FontWeight.bold)),
+                                 ],
+                               ),
+                             ),
+                             Container(
+                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                               decoration: BoxDecoration(
+                                 color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.08),
+                                 borderRadius: BorderRadius.circular(12),
+                               ),
+                               child: Text('Saldo pendiente: Bs ${saldoPendiente.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                             ),
+                           ],
+                         ),
+                         const SizedBox(height: 24),
+                         if (error != null)
+                           Padding(
+                             padding: const EdgeInsets.only(bottom: 12),
+                             child: Text(error!, style: const TextStyle(color: Colors.red)),
+                           ),
+                         FilledButton.icon(
+                           onPressed: crearTicket,
+                           icon: const Icon(Icons.save),
+                           label: const Text('Guardar Ticket'),
+                           style: FilledButton.styleFrom(
+                             padding: const EdgeInsets.symmetric(vertical: 16),
+                             textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                           ),
+                         ),
+                       ],
+                     ),
+                   ),
+                 ),
+               ),
+             ),
+     );
+   }
 }
 

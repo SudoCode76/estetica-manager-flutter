@@ -4,23 +4,35 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/screens/employee/employee_home_screen.dart';
+import 'package:app_estetica/providers/sucursal_provider.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Provider global para TODA la app
+  final SucursalProvider _globalSucursalProvider = SucursalProvider();
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'App Estetica',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.light,
-      home: const Root(),
+    return SucursalInherited(
+      provider: _globalSucursalProvider,
+      child: MaterialApp(
+        title: 'App Estetica',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.light,
+        home: const Root(),
+      ),
     );
   }
 }
