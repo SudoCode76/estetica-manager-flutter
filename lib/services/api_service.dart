@@ -381,14 +381,94 @@ class ApiService {
     }
   }
 
-  // Obtener todos los usuarios
-  Future<List<dynamic>> getUsuarios() async {
-    final url = Uri.parse('$_baseUrl/users');
+  // Obtener usuarios (opcionalmente filtrados por sucursal)
+  Future<List<dynamic>> getUsuarios({int? sucursalId, String? query}) async {
     final headers = await _getHeaders();
-    final response = await _getWithTimeout(url, headers);
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
+
+    // 1) Intento con filtro+populate si hay sucursalId
+    if (sucursalId != null) {
+      try {
+        String endpoint = '$_baseUrl/users?filters[sucursal][id]=$sucursalId&populate[sucursal]=true';
+        if (query != null && query.isNotEmpty) {
+          endpoint += '&filters[username][\$containsi]=$query';
+        }
+        print('ApiService.getUsuarios: calling filter+populate endpoint: $endpoint');
+        final resp = await _getWithTimeout(Uri.parse(endpoint), headers);
+        if (resp.statusCode == 200) {
+          final data = jsonDecode(resp.body);
+          final list = List<dynamic>.from((data is List) ? data : (data['data'] ?? data));
+          print('ApiService.getUsuarios: filter+populate returned ${list.length} items');
+          return list;
+        } else {
+          print('getUsuarios failed (filter+populate) ${resp.statusCode}: ${resp.body}');
+        }
+      } catch (e) {
+        print('Exception en getUsuarios (filter+populate): $e');
+      }
+    }
+
+    // 2) Directo sin filtros
+    try {
+      final resp = await _getWithTimeout(Uri.parse('$_baseUrl/users'), headers);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final list = List<dynamic>.from((data is List) ? data : (data['data'] ?? []));
+
+        // Filtrar client-side si hay sucursalId
+        if (sucursalId != null) {
+          final filtered = list.where((u) {
+            try {
+              final s = (u['sucursal'] ?? u['attributes']?['sucursal']);
+              if (s == null) return false;
+              if (s is int) return s == sucursalId;
+              if (s is Map) {
+                if (s.containsKey('id')) return s['id'] == sucursalId;
+                if (s.containsKey('data') && s['data'] is Map) return s['data']['id'] == sucursalId;
+              }
+              return false;
+            } catch (_) { return false; }
+          }).toList();
+          print('ApiService.getUsuarios: direct filtered to ${filtered.length} items');
+          return filtered;
+        }
+        return list;
+      } else {
+        print('getUsuarios failed (direct) ${resp.statusCode}: ${resp.body}');
+      }
+    } catch (e) {
+      print('Exception en getUsuarios (direct): $e');
+    }
+
+    // 3) populate sin filtro y filtrar client-side
+    try {
+      final resp = await _getWithTimeout(Uri.parse('$_baseUrl/users?populate[sucursal]=true'), headers);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final list = List<dynamic>.from((data is List) ? data : (data['data'] ?? []));
+
+        if (sucursalId != null) {
+          final filtered = list.where((u) {
+            try {
+              final s = (u['sucursal'] ?? u['attributes']?['sucursal']);
+              if (s == null) return false;
+              if (s is int) return s == sucursalId;
+              if (s is Map) {
+                if (s.containsKey('id')) return s['id'] == sucursalId;
+                if (s.containsKey('data') && s['data'] is Map) return s['data']['id'] == sucursalId;
+              }
+              return false;
+            } catch (_) { return false; }
+          }).toList();
+          print('ApiService.getUsuarios: populate filtered to ${filtered.length} items');
+          return filtered;
+        }
+        return list;
+      } else {
+        print('getUsuarios failed (populate) ${resp.statusCode}: ${resp.body}');
+        throw Exception('Error al obtener usuarios');
+      }
+    } catch (e) {
+      print('Exception en getUsuarios (populate): $e');
       throw Exception('Error al obtener usuarios');
     }
   }

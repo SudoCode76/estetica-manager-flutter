@@ -53,8 +53,9 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        _sucursalProvider?.removeListener(_onSucursalChanged);
        _sucursalProvider = provider;
        _sucursalProvider?.addListener(_onSucursalChanged);
-       // cargar clientes de la sucursal seleccionada
+       // cargar clientes y usuarios de la sucursal seleccionada
        _loadClientsForSucursal();
+       _loadUsuariosForSucursal();
      }
    }
 
@@ -67,18 +68,41 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
    void _onSucursalChanged() {
      _loadClientsForSucursal();
+     _loadUsuariosForSucursal();
    }
 
    Future<void> cargarDatos() async {
      setState(() { isLoading = true; });
      try {
        categorias = await api.getCategorias();
-       // no cargamos clientes globales aquí; se cargan por sucursal
-       usuarios = await api.getUsuarios();
+       // no cargamos clientes ni usuarios aquí; se cargan por sucursal cuando el provider esté listo
      } catch (e) {
        error = 'Error al cargar datos';
      }
      setState(() { isLoading = false; });
+   }
+
+   Future<void> _loadUsuariosForSucursal() async {
+     final sucId = _sucursalProvider?.selectedSucursalId;
+     print('NewTicketScreen: _loadUsuariosForSucursal called with sucursalId=$sucId');
+     try {
+       final data = await api.getUsuarios(sucursalId: sucId);
+       print('NewTicketScreen: Loaded ${data.length} usuarios');
+       setState(() {
+         usuarios = data;
+         // si el usuario seleccionado no pertenece a esta sucursal, limpiarlo
+         if (usuarioId != null && !usuarios.any((u) => u['id'] == usuarioId)) {
+           print('NewTicketScreen: Clearing usuarioId=$usuarioId (not in filtered list)');
+           usuarioId = null;
+         }
+       });
+     } catch (e) {
+       final msg = e.toString();
+       print('NewTicketScreen: Error loading usuarios: $msg');
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar usuarios: $msg')));
+       }
+     }
    }
 
    Future<void> _loadClientsForSucursal({String? query}) async {
@@ -98,6 +122,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar clientes: $msg')));
      }
    }
+
 
    void calcularEstadoPago() {
      if (cuota != null && pago != null) {
