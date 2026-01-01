@@ -27,6 +27,26 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     });
   }
 
+  String? _getCategoriaNombreFromTratamiento(dynamic tratamiento) {
+    final possibleKeys = [
+      'categoria_tratamiento',
+      'categoria-tratamiento',
+      'categoriaTratamiento',
+      'categoria',
+      'categoria_tratamientos',
+      'categoriaTratamientos'
+    ];
+
+    for (final key in possibleKeys) {
+      final catValue = tratamiento[key];
+      if (catValue != null && catValue is Map) {
+        final nombre = catValue['nombreCategoria'] ?? catValue['nombre'];
+        if (nombre != null) return nombre as String;
+      }
+    }
+    return null;
+  }
+
   Future<void> _marcarComoAtendido() async {
     setState(() { isUpdating = true; });
 
@@ -205,6 +225,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   ...tratamientos.asMap().entries.map((entry) {
                     final index = entry.key;
                     final t = entry.value;
+                    final categoriaNombre = _getCategoriaNombreFromTratamiento(t);
+
                     return Padding(
                       padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 12 : 0),
                       child: Container(
@@ -222,11 +244,36 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(
-                                    t['nombreTratamiento'] ?? 'Sin nombre',
-                                    style: textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t['nombreTratamiento'] ?? 'Sin nombre',
+                                        style: textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (categoriaNombre != null) ...[
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.category,
+                                              size: 12,
+                                              color: colorScheme.primary.withValues(alpha: 0.7),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              categoriaNombre,
+                                              style: textTheme.bodySmall?.copyWith(
+                                                color: colorScheme.primary.withValues(alpha: 0.7),
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                                 Container(

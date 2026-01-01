@@ -275,125 +275,54 @@ class ApiService {
   // Obtener todos los tratamientos
   Future<List<dynamic>> getTratamientos({int? categoriaId}) async {
     final headers = await _getHeaders();
-    // Si no se pide filtrar, devolver todos directamente (rápido)
-    if (categoriaId == null) {
-      try {
-        final urlAll = Uri.parse('$_baseUrl/tratamientos');
-        final responseAll = await _getWithTimeout(urlAll, headers);
-        if (responseAll.statusCode == 200) {
-          final dataAll = jsonDecode(responseAll.body);
-          final rawAll = dataAll['data'] ?? [];
-          return _normalizeItems(rawAll);
-        }
-      } catch (_) {}
-    }
-    // 1) Intentar petición directa con filtro (asume relación 'categoria')
-    if (categoriaId != null) {
-      final candidateKeys = ['categoria', 'categoria_tratamiento', 'categoriaTratamiento', 'categoria_tratamientos', 'categoria-tratamientos', 'categoriaTratamientos'];
-      for (final key in candidateKeys) {
-        try {
-          final endpoint = '$_baseUrl/tratamientos?filters[$key][id]=$categoriaId';
-          final url = Uri.parse(endpoint);
-          final response = await _getWithTimeout(url, headers);
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            final raw = data['data'] ?? [];
-            final normalized = _normalizeItems(raw);
-            return normalized;
-          } else {
-            // 400 posible -> seguir con siguiente clave
-            print('getTratamientos filter by $key failed: ${response.statusCode}');
-          }
-        } catch (e) {
-          print('Exception testing filter key $key: $e');
-        }
-      }
-      // 2) Intentar obtener tratamientos con populate=* para ver si la relación de categoría está presente
-      try {
-        final urlPop = Uri.parse('$_baseUrl/tratamientos?populate=*');
-        final respPop = await http.get(urlPop, headers: headers);
-        if (respPop.statusCode == 200) {
-          final dataPop = jsonDecode(respPop.body);
-          final rawPop = dataPop['data'] ?? [];
-          final normalizedPop = _normalizeItems(rawPop);
-          final filtered = normalizedPop.where((item) {
-            final catId = _extractCategoryId(item);
-            return catId != null && catId == categoriaId;
-          }).toList();
-          return filtered;
-        } else {
-          print('populate=* failed: ${respPop.statusCode}');
-          print('Body: ${respPop.body}');
-        }
-      } catch (e) {
-        print('Exception getting tratamientos populate: $e');
-      }
 
-      // 3) Intentar obtener la categoria con populate de tratamientos (si la relación está en el otro sentido)
-      try {
-        final urlCat = Uri.parse('$_baseUrl/categoria-tratamientos/$categoriaId?populate=tratamientos');
-        final respCat = await http.get(urlCat, headers: headers);
-        if (respCat.statusCode == 200) {
-          final dataCat = jsonDecode(respCat.body);
-          final d = dataCat['data'];
-          if (d != null) {
-            // intentar extraer tratamientos desde diferentes estructuras
-            final attrs = d['attributes'] ?? d;
-            dynamic list = attrs['tratamientos'] ?? attrs['tratamientos'];
-            if (list == null && attrs is Map && attrs.containsKey('data')) {
-              list = attrs['data'];
-            }
-            if (list is List && list.isNotEmpty) {
-              return _normalizeItems(list);
-            }
-            // Si viene en formato data.attributes
-            if (d is Map && d.containsKey('attributes') && d['attributes'] is Map) {
-              final possible = d['attributes']['tratamientos'];
-              if (possible is List) return _normalizeItems(possible);
-            }
-          }
-        } else {
-          print('categoria populate failed: ${respCat.statusCode}');
-        }
-      } catch (e) {
-        print('Exception getting category populate: $e');
-      }
-      // 4) último recurso: devolver todos los tratamientos
-      try {
-        final urlAll = Uri.parse('$_baseUrl/tratamientos');
-        final responseAll = await _getWithTimeout(urlAll, headers);
-        if (responseAll.statusCode == 200) {
-          final dataAll = jsonDecode(responseAll.body);
-          final rawAll = dataAll['data'] ?? [];
-          return _normalizeItems(rawAll);
-        }
-      } catch (e) {
-        print('Exception final getTratamientos: $e');
-      }
-      // Si todo falla, devolver lista vacía para evitar excepciones en UI
-      return [];
-    }
-
-    // 2) Fallback: pedir todos los tratamientos sin populate y devolverlos (no siempre habrá relación categoría en el backend)
+    // Intentar con populate=* que es más simple
     try {
+      String endpoint = '$_baseUrl/tratamientos?populate=*';
+
+      if (categoriaId != null) {
+        endpoint += '&filters[categoria_tratamiento][id]=$categoriaId';
+      }
+
+      print('getTratamientos: llamando a $endpoint');
+      final url = Uri.parse(endpoint);
+      final response = await _getWithTimeout(url, headers, seconds: 10);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final raw = data['data'] ?? [];
+        final normalized = _normalizeItems(raw);
+        print('getTratamientos: obtenidos ${normalized.length} tratamientos');
+        return normalized;
+      } else {
+        print('getTratamientos error ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('Exception getTratamientos con populate=*: $e');
+    }
+
+    // Fallback: obtener sin populate
+    try {
+      print('getTratamientos: intentando fallback sin populate');
       final urlAll = Uri.parse('$_baseUrl/tratamientos');
-      final responseAll = await _getWithTimeout(urlAll, headers);
+      final responseAll = await _getWithTimeout(urlAll, headers, seconds: 10);
       if (responseAll.statusCode == 200) {
         final dataAll = jsonDecode(responseAll.body);
         final rawAll = dataAll['data'] ?? [];
         final normalized = _normalizeItems(rawAll);
-        // Si pedían filtrar por categoria pero no fue posible, devolvemos todos (UI mostrará aviso)
+        print('getTratamientos fallback: ${normalized.length} tratamientos');
         return normalized;
       } else {
-        print('getTratamientos failed (all) Status: ${responseAll.statusCode}');
-        print('Body: ${responseAll.body}');
-        throw Exception('Error al obtener tratamientos (all) - ${responseAll.statusCode}');
+        print('getTratamientos fallback error: ${responseAll.statusCode}');
       }
     } catch (e) {
-      print('Exception en getTratamientos (all): $e');
-      throw Exception('Error al obtener tratamientos: $e');
+      print('Exception getTratamientos fallback: $e');
     }
+
+    print('getTratamientos: retornando lista vacía');
+    return [];
   }
+
 
   // Obtener categorias de tratamientos
   Future<List<dynamic>> getCategorias() async {
