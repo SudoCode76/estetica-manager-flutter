@@ -168,7 +168,18 @@ class _ClientsScreenState extends State<ClientsScreen> {
           );
         }
 
-        await api.deleteCliente(cliente['id']);
+        // Preferir documentId (string) si existe; si no, usar id convertido a string
+        final String docIdForDelete = cliente['documentId']?.toString() ?? cliente['id']?.toString() ?? '';
+        if (docIdForDelete.isEmpty) {
+          if (mounted) Navigator.pop(context); // Cerrar loading
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('ID del cliente no disponible, no se puede eliminar.'), backgroundColor: colorScheme.error),
+            );
+          }
+          return;
+        }
+        await api.deleteCliente(docIdForDelete);
 
         if (mounted) Navigator.pop(context); // Cerrar loading
 
@@ -495,7 +506,18 @@ class _EditClientDialogState extends State<_EditClientDialog> {
         'sucursal': widget.sucursalId,
       };
 
-      await _api.updateCliente(widget.cliente['id'], actualizado);
+      // Preferir documentId (string) si existe; si no, usar id convertido a string
+      final String docIdForUpdate = widget.cliente['documentId']?.toString() ?? widget.cliente['id']?.toString() ?? '';
+      if (docIdForUpdate.isEmpty) {
+        if (mounted) Navigator.pop(context); // Cerrar loading
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('ID del cliente no disponible, no se puede actualizar.'), backgroundColor: colorScheme.error),
+          );
+        }
+        return;
+      }
+      await _api.updateCliente(docIdForUpdate, actualizado);
 
       // Cerrar loading
       if (mounted) Navigator.pop(context);

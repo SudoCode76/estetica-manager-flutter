@@ -5,20 +5,15 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Para depuración: si quieres forzar temporalmente la base URL (por ejemplo usar la IP de tu PC), setea esta variable.
-  // Ejemplo: ApiService.debugBaseUrl = 'http://192.168.100.148:1337/api';
+
   static String? debugBaseUrl;
 
-  // Base URL dependiente de la plataforma
   String get _baseUrl {
     if (debugBaseUrl != null && debugBaseUrl!.isNotEmpty) return debugBaseUrl!;
-    // En web y iOS simulador podemos usar localhost si el backend corre en la misma máquina
     if (kIsWeb) return 'http://localhost:1337/api';
     try {
       if (Platform.isAndroid) return 'http://10.0.2.2:1337/api';
-      // iOS simulator or macOS
       if (Platform.isIOS || Platform.isMacOS) return 'http://localhost:1337/api';
-      // Fallback
       return 'http://localhost:1337/api';
     } catch (_) {
       return 'http://localhost:1337/api';
@@ -77,13 +72,11 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        // Imprimir detalles del error para depuración
         print('Failed to login. Status code: ${response.statusCode}');
         print('Response body: ${response.body}');
         throw Exception('Failed to login');
       }
     } catch (e) {
-      // Captura errores de conexión (ej. no se puede conectar al host)
       print('Error connecting to the server: $e');
       throw Exception('Cannot connect to the server');
     }
@@ -91,139 +84,42 @@ class ApiService {
 
   Future<List<dynamic>> getClientes({int? sucursalId, String? query}) async {
     final headers = await _getHeaders();
+    final baseUrl = '$_baseUrl/clientes';
+    
+    final List<String> params = [
+      'populate[sucursal]=true'
+    ];
+
+    if (sucursalId != null) {
+      params.add('filters[sucursal][id][\$eq]=$sucursalId');
+    }
+
+    if (query != null && query.isNotEmpty) {
+      params.add('filters[\$or][0][nombreCliente][\$containsi]=$query');
+      params.add('filters[\$or][1][apellidoCliente][\$containsi]=$query');
+    }
+
+    final endpoint = '$baseUrl?${params.join('&')}';
+    print('ApiService.getClientes: calling endpoint: $endpoint');
+
     try {
-      // Si se pide filtrar por sucursal, preferimos pedir populate[sucursal]=true combinado con el filtro
-      if (sucursalId != null) {
-        final endpoint = '$_baseUrl/clientes?filters[sucursal][id]=$sucursalId&populate[sucursal]=true${query != null && query.isNotEmpty ? '&filters[nombreCliente][contains]=$query' : ''}';
-        print('ApiService.getClientes: calling filter+populate endpoint: $endpoint');
-        final response = await _getWithTimeout(Uri.parse(endpoint), headers);
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final raw = data['data'] ?? [];
-          final normalized = _normalizeItems(List<dynamic>.from(raw));
-          print('ApiService.getClientes: filter+populate returned ${normalized.length} items');
-          return normalized;
-        } else {
-          print('getClientes failed (filter+populate). Status: ${response.statusCode}');
-          print('Body: ${response.body}');
-        }
-      }
-      String endpoint = '$_baseUrl/clientes';
-      List<String> params = [];
-      if (sucursalId != null) params.add('filters[sucursal][id]=$sucursalId');
-      if (query != null && query.isNotEmpty) params.add('filters[nombreCliente][contains]=$query');
-      if (params.isNotEmpty) endpoint += '?${params.join('&')}';
-      final url = Uri.parse(endpoint);
-      print('ApiService.getClientes: calling direct endpoint: $endpoint');
-      final response = await _getWithTimeout(url, headers);
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers);
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final raw = data['data'] ?? [];
         final normalized = _normalizeItems(List<dynamic>.from(raw));
-        print('ApiService.getClientes: direct returned ${normalized.length} items');
-        if (sucursalId != null) {
-          if (normalized.isNotEmpty) {
-            print('ApiService.getClientes: direct returned items for filter sucursal $sucursalId, returning ${normalized.length} items (trusting server filter)');
-            return normalized;
-          }
-          // si no devolvió resultados, intentamos con populate
-        } else {
-          return normalized;
-        }
+        print('ApiService.getClientes: returned ${normalized.length} items');
+        return normalized;
       } else {
-        print('getClientes failed (direct). Status: ${response.statusCode}');
+        print('getClientes failed. Status: ${response.statusCode}');
         print('Body: ${response.body}');
+        throw Exception('Error al obtener clientes: ${response.statusCode}');
       }
     } catch (e) {
-      print('Exception en getClientes (direct/filter+populate): $e');
-    }
-
-    try {
-      String popEndpoint = '$_baseUrl/clientes?populate[sucursal]=true';
-      if (query != null && query.isNotEmpty) popEndpoint += '&filters[nombreCliente][contains]=$query';
-      print('ApiService.getClientes: calling populate endpoint: $popEndpoint');
-      final respPop = await _getWithTimeout(Uri.parse(popEndpoint), headers);
-      if (respPop.statusCode == 200) {
-        final dataPop = jsonDecode(respPop.body);
-        final rawPop = dataPop['data'] ?? [];
-        final normalizedPop = _normalizeItems(List<dynamic>.from(rawPop));
-        print('ApiService.getClientes: populate returned ${normalizedPop.length} items');
-        if (sucursalId != null) {
-          final filtered = normalizedPop.where((c) => _clientMatchesSucursal(c, sucursalId)).toList();
-          print('ApiService.getClientes: populate filtered to ${filtered.length} items by sucursal $sucursalId');
-          return filtered;
-        }
-        return normalizedPop;
-      } else {
-        print('getClientes populate failed: ${respPop.statusCode}');
-        print('Body: ${respPop.body}');
-      }
-    } catch (e) {
-      print('Exception en getClientes (populate): $e');
-    }
-
-    try {
-      final urlAll = Uri.parse('$_baseUrl/clientes');
-      final responseAll = await _getWithTimeout(urlAll, headers);
-      if (responseAll.statusCode == 200) {
-        final dataAll = jsonDecode(responseAll.body);
-        final rawAll = dataAll['data'] ?? [];
-        final normalized = _normalizeItems(List<dynamic>.from(rawAll));
-        print('ApiService.getClientes: fallback returned ${normalized.length} items');
-        List<dynamic> items = normalized;
-        if (query != null && query.isNotEmpty) {
-          final q = query.toLowerCase();
-          items = items.where((c) {
-            try {
-              final nombre = (c['nombreCliente'] ?? '').toString().toLowerCase();
-              final apellido = (c['apellidoCliente'] ?? '').toString().toLowerCase();
-              final tel = (c['telefono'] ?? '').toString().toLowerCase();
-              return nombre.contains(q) || apellido.contains(q) || tel.contains(q);
-            } catch (_) {
-              return false;
-            }
-          }).toList();
-        }
-        if (sucursalId != null) {
-          items = items.where((c) => _clientMatchesSucursal(c, sucursalId)).toList();
-        }
-        return items;
-      } else {
-        throw Exception('Error al obtener clientes (all) - ${responseAll.statusCode}');
-      }
-    } catch (e) {
-      print('Exception en getClientes (all): $e');
+      print('Exception en getClientes: $e');
       throw Exception('Error al obtener clientes: $e');
     }
-  }
-
-  bool _clientHasSucursalInfo(dynamic c) {
-    try {
-      if (c is Map) {
-        if (c.containsKey('sucursal')) return true;
-        if (c.containsKey('attributes') && c['attributes'] is Map && (c['attributes'] as Map).containsKey('sucursal')) return true;
-      }
-    } catch (_) {}
-    return false;
-  }
-
-  bool _clientMatchesSucursal(dynamic c, int sucursalId) {
-    try {
-      if (c == null) return false;
-      // formatos posibles después de _normalizeItems: c is Map with keys, maybe 'sucursal' present as Map or int
-      if (c is Map) {
-        final s = c['sucursal'];
-        if (s == null) return false;
-        if (s is int) return s == sucursalId;
-        if (s is Map) {
-          if (s.containsKey('id') && s['id'] == sucursalId) return true;
-          if (s.containsKey('data') && s['data'] is Map && s['data']['id'] == sucursalId) return true;
-        }
-        // también revisar si existe 'sucursalId' directamente
-        if (c.containsKey('sucursalId') && c['sucursalId'] == sucursalId) return true;
-      }
-    } catch (_) {}
-    return false;
   }
 
   // Crear cliente
@@ -233,7 +129,7 @@ class ApiService {
     final response = await _postWithTimeout(url, headers, jsonEncode({'data': cliente}));
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = jsonDecode(response.body);
-      return data['data'];
+      return _normalizeItems([data['data']]).first;
     } else {
       print('Error al crear cliente: ${response.body}');
       throw Exception('Error al crear cliente');
@@ -241,31 +137,37 @@ class ApiService {
   }
 
   // Actualizar cliente
-  Future<Map<String, dynamic>> updateCliente(int id, Map<String, dynamic> cliente) async {
-    final url = Uri.parse('$_baseUrl/clientes/$id');
+  Future<Map<String, dynamic>> updateCliente(String documentId, Map<String, dynamic> cliente) async {
+    final url = Uri.parse('$_baseUrl/clientes/$documentId');
     final headers = await _getHeaders();
-    final response = await _putWithTimeout(url, headers, jsonEncode({'data': cliente}));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['data'];
-    } else {
-      print('Error al actualizar cliente: ${response.body}');
-      throw Exception('Error al actualizar cliente');
+    try {
+      final response = await _putWithTimeout(url, headers, jsonEncode({'data': cliente}));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        try {
+          final data = jsonDecode(response.body);
+          return _normalizeItems([data['data']]).first;
+        } catch (e) {
+          print('updateCliente: error parsing response body: ${response.body}');
+          throw Exception('Error al actualizar cliente: respuesta inválida del servidor');
+        }
+      } else {
+        print('Error al actualizar cliente. Status: ${response.statusCode}');
+        print('Body: ${response.body}');
+        throw Exception('Error al actualizar cliente: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('Exception en updateCliente: $e');
+      throw Exception('Error al actualizar cliente: $e');
     }
   }
 
   // Eliminar cliente
-  Future<bool> deleteCliente(int id) async {
-    final url = Uri.parse('$_baseUrl/clientes/$id');
+  Future<bool> deleteCliente(String documentId) async {
+    final url = Uri.parse('$_baseUrl/clientes/$documentId');
     final headers = await _getHeaders();
     try {
       final response = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        return true;
-      } else {
-        print('Error al eliminar cliente: ${response.body}');
-        throw Exception('Error al eliminar cliente');
-      }
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       print('Exception al eliminar cliente: $e');
       throw Exception('Error al eliminar cliente: $e');
@@ -275,157 +177,76 @@ class ApiService {
   // Obtener todos los tratamientos
   Future<List<dynamic>> getTratamientos({int? categoriaId}) async {
     final headers = await _getHeaders();
+    final List<String> params = ['populate=*'];
 
-    // Intentar con populate=* que es más simple
+    if (categoriaId != null) {
+      params.add('filters[categoria_tratamiento][id][\$eq]=$categoriaId');
+    }
+
+    final endpoint = '$_baseUrl/tratamientos?${params.join('&')}';
+    print('getTratamientos: llamando a $endpoint');
+
     try {
-      String endpoint = '$_baseUrl/tratamientos?populate=*';
-
-      if (categoriaId != null) {
-        endpoint += '&filters[categoria_tratamiento][id]=$categoriaId';
-      }
-
-      print('getTratamientos: llamando a $endpoint');
-      final url = Uri.parse(endpoint);
-      final response = await _getWithTimeout(url, headers, seconds: 10);
-
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers, seconds: 10);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final raw = data['data'] ?? [];
-        final normalized = _normalizeItems(raw);
-        print('getTratamientos: obtenidos ${normalized.length} tratamientos');
-        return normalized;
+        return _normalizeItems(raw);
       } else {
         print('getTratamientos error ${response.statusCode}: ${response.body}');
+        throw Exception('Failed to load tratamientos');
       }
     } catch (e) {
-      print('Exception getTratamientos con populate=*: $e');
+      print('Exception getTratamientos: $e');
+      throw Exception('Failed to load tratamientos: $e');
     }
-
-    // Fallback: obtener sin populate
-    try {
-      print('getTratamientos: intentando fallback sin populate');
-      final urlAll = Uri.parse('$_baseUrl/tratamientos');
-      final responseAll = await _getWithTimeout(urlAll, headers, seconds: 10);
-      if (responseAll.statusCode == 200) {
-        final dataAll = jsonDecode(responseAll.body);
-        final rawAll = dataAll['data'] ?? [];
-        final normalized = _normalizeItems(rawAll);
-        print('getTratamientos fallback: ${normalized.length} tratamientos');
-        return normalized;
-      } else {
-        print('getTratamientos fallback error: ${responseAll.statusCode}');
-      }
-    } catch (e) {
-      print('Exception getTratamientos fallback: $e');
-    }
-
-    print('getTratamientos: retornando lista vacía');
-    return [];
   }
-
 
   // Obtener categorias de tratamientos
   Future<List<dynamic>> getCategorias() async {
     final url = Uri.parse('$_baseUrl/categoria-tratamientos');
     final headers = await _getHeaders();
-    final response = await _getWithTimeout(url, headers);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['data'];
-    } else {
-      throw Exception('Error al obtener categorias de tratamientos');
+    try {
+      final response = await _getWithTimeout(url, headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return _normalizeItems(data['data'] ?? []);
+      } else {
+        throw Exception('Error al obtener categorias de tratamientos');
+      }
+    } catch (e) {
+      throw Exception('Error al obtener categorias de tratamientos: $e');
     }
   }
 
-  // Obtener usuarios (opcionalmente filtrados por sucursal)
+  // Obtener usuarios
   Future<List<dynamic>> getUsuarios({int? sucursalId, String? query}) async {
     final headers = await _getHeaders();
+    final List<String> params = ['populate[sucursal]=true'];
 
-    // 1) Intento con filtro+populate si hay sucursalId
     if (sucursalId != null) {
-      try {
-        String endpoint = '$_baseUrl/users?filters[sucursal][id]=$sucursalId&populate[sucursal]=true';
-        if (query != null && query.isNotEmpty) {
-          endpoint += '&filters[username][\$containsi]=$query';
-        }
-        print('ApiService.getUsuarios: calling filter+populate endpoint: $endpoint');
-        final resp = await _getWithTimeout(Uri.parse(endpoint), headers);
-        if (resp.statusCode == 200) {
-          final data = jsonDecode(resp.body);
-          final list = List<dynamic>.from((data is List) ? data : (data['data'] ?? data));
-          print('ApiService.getUsuarios: filter+populate returned ${list.length} items');
-          return list;
-        } else {
-          print('getUsuarios failed (filter+populate) ${resp.statusCode}: ${resp.body}');
-        }
-      } catch (e) {
-        print('Exception en getUsuarios (filter+populate): $e');
-      }
+      params.add('filters[sucursal][id][\$eq]=$sucursalId');
+    }
+    if (query != null && query.isNotEmpty) {
+      params.add('filters[username][\$containsi]=$query');
     }
 
-    // 2) Directo sin filtros
+    final endpoint = '$_baseUrl/users?${params.join('&')}';
+    print('ApiService.getUsuarios: calling endpoint: $endpoint');
+
     try {
-      final resp = await _getWithTimeout(Uri.parse('$_baseUrl/users'), headers);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        final list = List<dynamic>.from((data is List) ? data : (data['data'] ?? []));
-
-        // Filtrar client-side si hay sucursalId
-        if (sucursalId != null) {
-          final filtered = list.where((u) {
-            try {
-              final s = (u['sucursal'] ?? u['attributes']?['sucursal']);
-              if (s == null) return false;
-              if (s is int) return s == sucursalId;
-              if (s is Map) {
-                if (s.containsKey('id')) return s['id'] == sucursalId;
-                if (s.containsKey('data') && s['data'] is Map) return s['data']['id'] == sucursalId;
-              }
-              return false;
-            } catch (_) { return false; }
-          }).toList();
-          print('ApiService.getUsuarios: direct filtered to ${filtered.length} items');
-          return filtered;
-        }
-        return list;
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers);
+      if (response.statusCode == 200) {
+        // Strapi /users endpoint returns a list directly
+        final data = jsonDecode(response.body);
+        return List<dynamic>.from(data);
       } else {
-        print('getUsuarios failed (direct) ${resp.statusCode}: ${resp.body}');
-      }
-    } catch (e) {
-      print('Exception en getUsuarios (direct): $e');
-    }
-
-    // 3) populate sin filtro y filtrar client-side
-    try {
-      final resp = await _getWithTimeout(Uri.parse('$_baseUrl/users?populate[sucursal]=true'), headers);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        final list = List<dynamic>.from((data is List) ? data : (data['data'] ?? []));
-
-        if (sucursalId != null) {
-          final filtered = list.where((u) {
-            try {
-              final s = (u['sucursal'] ?? u['attributes']?['sucursal']);
-              if (s == null) return false;
-              if (s is int) return s == sucursalId;
-              if (s is Map) {
-                if (s.containsKey('id')) return s['id'] == sucursalId;
-                if (s.containsKey('data') && s['data'] is Map) return s['data']['id'] == sucursalId;
-              }
-              return false;
-            } catch (_) { return false; }
-          }).toList();
-          print('ApiService.getUsuarios: populate filtered to ${filtered.length} items');
-          return filtered;
-        }
-        return list;
-      } else {
-        print('getUsuarios failed (populate) ${resp.statusCode}: ${resp.body}');
+        print('getUsuarios failed ${response.statusCode}: ${response.body}');
         throw Exception('Error al obtener usuarios');
       }
     } catch (e) {
-      print('Exception en getUsuarios (populate): $e');
-      throw Exception('Error al obtener usuarios');
+      print('Exception en getUsuarios: $e');
+      throw Exception('Error al obtener usuarios: $e');
     }
   }
 
@@ -446,48 +267,53 @@ class ApiService {
   Future<List<dynamic>> getSucursales() async {
     final url = Uri.parse('$_baseUrl/sucursals');
     final headers = await _getHeaders();
-    final response = await _getWithTimeout(url, headers);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['data'];
-    } else {
-      throw Exception('Error al obtener sucursales');
+    try {
+      final response = await _getWithTimeout(url, headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return _normalizeItems(data['data'] ?? []);
+      } else {
+        throw Exception('Error al obtener sucursales');
+      }
+    } catch(e) {
+      throw Exception('Error al obtener sucursales: $e');
     }
   }
 
-  // Obtener tickets filtrados por sucursal (estructura directa o por cliente)
+  // Obtener tickets
   Future<List<dynamic>> getTickets({int? sucursalId, bool? estadoTicket}) async {
-    // 1. Intentar con relación directa - ahora usando tratamientos (plural) ya que un ticket puede tener múltiples tratamientos
-    String url = '$_baseUrl/tickets?populate[cliente]=true&populate[tratamientos]=true&populate[sucursal]=true&populate[users_permissions_user]=true';
+    final headers = await _getHeaders();
+    final List<String> params = [
+      'populate[cliente][populate][sucursal]=true',
+      'populate[tratamientos]=true',
+      'populate[users_permissions_user]=true',
+      'populate[sucursal]=true'
+    ];
+
     if (sucursalId != null) {
-      url += '&filters[sucursal][id]=$sucursalId';
+      params.add('filters[sucursal][id][\$eq]=$sucursalId');
     }
     if (estadoTicket != null) {
-      url += '&filters[estadoTicket]=$estadoTicket';
+      params.add('filters[estadoTicket][\$eq]=$estadoTicket');
     }
-    final headers = await _getHeaders();
-    final response = await _getWithTimeout(Uri.parse(url), headers);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      // Si hay resultados o no se filtró por sucursal, devolverlos
-      if ((data['data'] != null && (data['data'] as List).isNotEmpty) || sucursalId == null) {
-        return data['data'] ?? [];
-      }
+
+    final endpoint = '$_baseUrl/tickets?${params.join('&')}';
+    print('ApiService.getTickets: calling endpoint: $endpoint');
+    
+    try {
+        final response = await _getWithTimeout(Uri.parse(endpoint), headers);
+        if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            return _normalizeItems(data['data'] ?? []);
+        } else {
+            print('getTickets failed. Status: ${response.statusCode}');
+            print('Body: ${response.body}');
+            throw Exception('Error al obtener tickets: ${response.statusCode}');
+        }
+    } catch (e) {
+        print('Exception en getTickets: $e');
+        throw Exception('Error al obtener tickets: $e');
     }
-    // 2. Si no hay resultados y se filtró por sucursal, intentar por cliente.sucursal
-    if (sucursalId != null) {
-      String urlCliente = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamientos]=true&populate[users_permissions_user]=true';
-      urlCliente += '&filters[cliente][sucursal][id]=$sucursalId';
-      if (estadoTicket != null) {
-        urlCliente += '&filters[estadoTicket]=$estadoTicket';
-      }
-      final responseCliente = await _getWithTimeout(Uri.parse(urlCliente), headers);
-      if (responseCliente.statusCode == 200) {
-        final dataCliente = jsonDecode(responseCliente.body);
-        return dataCliente['data'] ?? [];
-      }
-    }
-    return [];
   }
 
   // Actualizar estado del ticket
@@ -503,46 +329,35 @@ class ApiService {
     }
   }
 
-  // Helper: normaliza items que pueden venir como {id, attributes: {...}} o directamente como map plano
-  List<dynamic> _normalizeItems(List<dynamic> raw) {
-    List<dynamic> result = [];
-    for (final item in raw) {
-      if (item == null) continue;
-      if (item is Map && item.containsKey('attributes') && item.containsKey('id')) {
-        final attrs = Map<String, dynamic>.from(item['attributes'] ?? {});
+  List<dynamic> _normalizeItems(List<dynamic> items) {
+    return items.map((item) {
+      if (item is Map && item.containsKey('attributes')) {
+        final attrs = Map<String, dynamic>.from(item['attributes']);
         attrs['id'] = item['id'];
-        // intentar normalizar category si viene poblada
-        if (attrs.containsKey('categoria')) {
-          attrs['categoria'] = item['attributes']['categoria'];
-        }
-        result.add(attrs);
-      } else {
-        result.add(item);
-      }
-    }
-    return result;
-  }
 
-  // Helper: extrae posible category id de un item normalizado (int) o nulo
-  int? _extractCategoryId(dynamic item) {
-    if (item == null) return null;
-    try {
-      if (item is Map) {
-        // varios formatos posibles
-        if (item.containsKey('categoria')) {
-          final cat = item['categoria'];
-          if (cat == null) return null;
-          if (cat is int) return cat;
-          if (cat is Map && cat.containsKey('id')) return cat['id'] as int?;
-          if (cat is Map && cat.containsKey('data')) {
-            final d = cat['data'];
-            if (d is Map && d.containsKey('id')) return d['id'] as int?;
+        // Copiar campos de primer nivel (p. ej. documentId) si existen y no están en attributes
+        item.forEach((key, value) {
+          if (key != 'attributes' && key != 'id' && !attrs.containsKey(key)) {
+            attrs[key] = value;
           }
-        }
-        // intentar buscar dentro de atributos anidados
-        if (item.containsKey('categoriaId')) return item['categoriaId'] as int?;
+        });
+
+        // Deeply normalize relations like 'sucursal' or 'categoria'
+        attrs.forEach((key, value) {
+          if (value is Map && value.containsKey('data')) {
+            final relationData = value['data'];
+            if (relationData == null) {
+               attrs[key] = null;
+            } else if (relationData is Map) {
+              attrs[key] = _normalizeItems([relationData]).first;
+            } else if (relationData is List) {
+              attrs[key] = _normalizeItems(relationData);
+            }
+          }
+        });
+        return attrs;
       }
-    } catch (_) {}
-    return null;
+      return item;
+    }).toList();
   }
 }
