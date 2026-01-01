@@ -34,6 +34,8 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    List<dynamic> usuarios = [];
    bool isLoading = true;
    String? error;
+   final Map<int, bool> _expansionState = {}; // Para el estado de expansión de categorías
+
 
    SucursalProvider? _sucursalProvider;
    Timer? _clientSearchDebounce;
@@ -52,7 +54,6 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        _sucursalProvider?.removeListener(_onSucursalChanged);
        _sucursalProvider = provider;
        _sucursalProvider?.addListener(_onSucursalChanged);
-       // cargar clientes y usuarios de la sucursal seleccionada
        _loadClientsForSucursal();
        _loadUsuariosForSucursal();
      }
@@ -94,165 +95,127 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      return null;
    }
 
-   Widget _buildTratamientosList(ColorScheme colorScheme) {
-     final tratamientosSinCategoria = tratamientos.where((t) {
-       return _getCategoriaIdFromTratamiento(t) == null;
-     }).toList();
+  Widget _buildTratamientosList(ColorScheme colorScheme) {
+    final tratamientosSinCategoria = tratamientos.where((t) {
+      return _getCategoriaIdFromTratamiento(t) == null;
+    }).toList();
 
-     final itemCount = categorias.length + (tratamientosSinCategoria.isNotEmpty ? 1 : 0);
+    final itemCount = categorias.length + (tratamientosSinCategoria.isNotEmpty ? 1 : 0);
 
-     return ListView.builder(
-       shrinkWrap: true,
-       itemCount: itemCount,
-       itemBuilder: (context, index) {
-         if (index == categorias.length && tratamientosSinCategoria.isNotEmpty) {
-           return Column(
-             crossAxisAlignment: CrossAxisAlignment.start,
-             children: [
-               Container(
-                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                 decoration: BoxDecoration(
-                   color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                   border: Border(
-                     bottom: BorderSide(
-                       color: colorScheme.outline.withValues(alpha: 0.1),
-                     ),
-                   ),
-                 ),
-                 child: Row(
-                   children: [
-                     Icon(
-                       Icons.category_outlined,
-                       size: 20,
-                       color: colorScheme.onSurfaceVariant,
-                     ),
-                     const SizedBox(width: 8),
-                     Expanded(
-                       child: Text(
-                         'Otros tratamientos',
-                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                           fontWeight: FontWeight.bold,
-                           color: colorScheme.onSurfaceVariant,
-                         ),
-                       ),
-                     ),
-                   ],
-                 ),
-               ),
-               ...tratamientosSinCategoria.map((t) {
-                 final id = t['id'] as int;
-                 final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
-                 final isSelected = tratamientosSeleccionados.contains(id);
+    return ListView.builder(
+      shrinkWrap: true,
+      itemCount: itemCount,
+      itemBuilder: (context, index) {
+        // Handle "Otros tratamientos"
+        if (index == categorias.length && tratamientosSinCategoria.isNotEmpty) {
+          final categoriaId = -1; // Special ID for this group
+          return ExpansionTile(
+            key: ValueKey('cat_$categoriaId'),
+            title: Text(
+              'Otros tratamientos',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            initiallyExpanded: _expansionState[categoriaId] ?? false,
+            onExpansionChanged: (isExpanded) {
+              setState(() {
+                _expansionState[categoriaId] = isExpanded;
+              });
+            },
+            children: tratamientosSinCategoria.map<Widget>((t) {
+              final id = t['id'] as int;
+              final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
+              final isSelected = tratamientosSeleccionados.contains(id);
 
-                 return CheckboxListTile(
-                   key: ValueKey('tratamiento_sin_cat_$id'),
-                   title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
-                   subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
-                   value: isSelected,
-                   onChanged: (bool? value) {
-                     setState(() {
-                       if (value == true) {
-                         tratamientosSeleccionados.add(id);
-                         print('✅ Tratamiento $id agregado. Total: ${tratamientosSeleccionados.length}');
-                       } else {
-                         tratamientosSeleccionados.remove(id);
-                         print('❌ Tratamiento $id removido. Total: ${tratamientosSeleccionados.length}');
-                       }
-                       print('📋 Lista actual: $tratamientosSeleccionados');
-                       final total = calcularPrecioTotal();
-                       pago = total;
-                       calcularEstadoPago();
-                     });
-                   },
-                   controlAffinity: ListTileControlAffinity.leading,
-                 );
-               }).toList(),
-             ],
-           );
-         }
+              return CheckboxListTile(
+                key: ValueKey('tratamiento_sin_cat_$id'),
+                title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
+                subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
+                value: isSelected,
+                onChanged: (bool? value) {
+                  setState(() {
+                    if (value == true) {
+                      tratamientosSeleccionados.add(id);
+                    } else {
+                      tratamientosSeleccionados.remove(id);
+                    }
+                    final total = calcularPrecioTotal();
+                    pago = total;
+                    calcularEstadoPago();
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+              );
+            }).toList(),
+          );
+        }
+        
+        if (index >= categorias.length) return const SizedBox.shrink();
 
-         // Categorías normales
-         final categoria = categorias[index];
-         final categoriaId = categoria['id'];
-         final categoriaNombre = categoria['nombreCategoria'] ?? 'Sin categoría';
+        // Categorías normales
+        final categoria = categorias[index];
+        final categoriaId = categoria['id'];
+        final categoriaNombre = categoria['nombreCategoria'] ?? 'Sin categoría';
 
-         // Filtrar tratamientos de esta categoría usando la función helper
-         final tratamientosDeCat = tratamientos.where((t) {
-           final catId = _getCategoriaIdFromTratamiento(t);
-           return catId != null && catId == categoriaId;
-         }).toList();
+        // Filtrar tratamientos de esta categoría usando la función helper
+        final tratamientosDeCat = tratamientos.where((t) {
+          final catId = _getCategoriaIdFromTratamiento(t);
+          return catId != null && catId == categoriaId;
+        }).toList();
 
-         if (tratamientosDeCat.isEmpty) return const SizedBox.shrink();
+        if (tratamientosDeCat.isEmpty) return const SizedBox.shrink();
 
-         return Column(
-           crossAxisAlignment: CrossAxisAlignment.start,
-           children: [
-             // Header de categoría
-             Container(
-               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-               decoration: BoxDecoration(
-                 color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                 border: Border(
-                   bottom: BorderSide(
-                     color: colorScheme.outline.withValues(alpha: 0.1),
-                   ),
-                 ),
-               ),
-               child: Row(
-                 children: [
-                   Icon(
-                     Icons.spa,
-                     size: 20,
-                     color: colorScheme.primary,
-                   ),
-                   const SizedBox(width: 8),
-                   Expanded(
-                     child: Text(
-                       categoriaNombre,
-                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                         fontWeight: FontWeight.bold,
-                         color: colorScheme.primary,
-                       ),
-                     ),
-                   ),
-                 ],
-               ),
-             ),
-             // Lista de tratamientos de esta categoría
-             ...tratamientosDeCat.map((t) {
-               final id = t['id'] as int;
-               final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
-               final isSelected = tratamientosSeleccionados.contains(id);
+        return ExpansionTile(
+          key: ValueKey('cat_$categoriaId'),
+          leading: Icon(
+            Icons.spa,
+            color: colorScheme.primary,
+          ),
+          title: Text(
+            categoriaNombre,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+          ),
+          initiallyExpanded: _expansionState[categoriaId] ?? false,
+          onExpansionChanged: (isExpanded) {
+            setState(() {
+              _expansionState[categoriaId] = isExpanded;
+            });
+          },
+          children: tratamientosDeCat.map<Widget>((t) {
+            final id = t['id'] as int;
+            final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
+            final isSelected = tratamientosSeleccionados.contains(id);
 
-               return CheckboxListTile(
-                 key: ValueKey('tratamiento_cat_${categoriaId}_$id'),
-                 title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
-                 subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
-                 value: isSelected,
-                 onChanged: (bool? value) {
-                   setState(() {
-                     if (value == true) {
-                       tratamientosSeleccionados.add(id);
-                       print('✅ Tratamiento $id (categoría $categoriaId) agregado. Total: ${tratamientosSeleccionados.length}');
-                     } else {
-                       tratamientosSeleccionados.remove(id);
-                       print('❌ Tratamiento $id (categoría $categoriaId) removido. Total: ${tratamientosSeleccionados.length}');
-                     }
-                     print('📋 Lista actual: $tratamientosSeleccionados');
-                     // Recalcular el pago y estado
-                     final total = calcularPrecioTotal();
-                     pago = total;
-                     calcularEstadoPago();
-                   });
-                 },
-                 controlAffinity: ListTileControlAffinity.leading,
-               );
-             }).toList(),
-           ],
-         );
-       },
-     );
-   }
+            return CheckboxListTile(
+              key: ValueKey('tratamiento_cat_${categoriaId}_$id'),
+              title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
+              subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
+              value: isSelected,
+              onChanged: (bool? value) {
+                setState(() {
+                  if (value == true) {
+                    tratamientosSeleccionados.add(id);
+                  } else {
+                    tratamientosSeleccionados.remove(id);
+                  }
+                  // Recalcular el pago y estado
+                  final total = calcularPrecioTotal();
+                  pago = total;
+                  calcularEstadoPago();
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
 
    Future<void> cargarDatos() async {
      setState(() {
@@ -778,4 +741,3 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      );
    }
 }
-
