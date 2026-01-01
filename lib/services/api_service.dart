@@ -528,8 +528,8 @@ class ApiService {
 
   // Obtener tickets filtrados por sucursal (estructura directa o por cliente)
   Future<List<dynamic>> getTickets({int? sucursalId, bool? estadoTicket}) async {
-    // 1. Intentar con relación directa
-    String url = '$_baseUrl/tickets?populate[cliente]=true&populate[tratamiento]=true&populate[sucursal]=true';
+    // 1. Intentar con relación directa - ahora usando tratamientos (plural) ya que un ticket puede tener múltiples tratamientos
+    String url = '$_baseUrl/tickets?populate[cliente]=true&populate[tratamientos]=true&populate[sucursal]=true&populate[users_permissions_user]=true';
     if (sucursalId != null) {
       url += '&filters[sucursal][id]=$sucursalId';
     }
@@ -547,7 +547,7 @@ class ApiService {
     }
     // 2. Si no hay resultados y se filtró por sucursal, intentar por cliente.sucursal
     if (sucursalId != null) {
-      String urlCliente = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamiento]=true';
+      String urlCliente = '$_baseUrl/tickets?populate[cliente][populate][sucursal]=true&populate[tratamientos]=true&populate[users_permissions_user]=true';
       urlCliente += '&filters[cliente][sucursal][id]=$sucursalId';
       if (estadoTicket != null) {
         urlCliente += '&filters[estadoTicket]=$estadoTicket';

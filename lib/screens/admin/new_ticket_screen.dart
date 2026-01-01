@@ -18,7 +18,7 @@ class NewTicketScreen extends StatefulWidget {
 class _NewTicketScreenState extends State<NewTicketScreen> {
    final ApiService api = ApiService();
    DateTime? fecha;
-   int? tratamientoId;
+   List<int> tratamientosSeleccionados = []; // Ahora soporta múltiples tratamientos
    int? categoriaId;
    int? clienteId;
    String? clienteNombre;
@@ -124,8 +124,21 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    }
 
 
+   double calcularPrecioTotal() {
+     double total = 0;
+     for (var id in tratamientosSeleccionados) {
+       final trat = tratamientos.firstWhere((t) => t['id'] == id, orElse: () => null);
+       if (trat != null) {
+         total += double.tryParse(trat['precio']?.toString() ?? '0') ?? 0;
+       }
+     }
+     return total;
+   }
+
    void calcularEstadoPago() {
-     if (cuota != null && pago != null) {
+     final precioTotal = calcularPrecioTotal();
+     if (pago != null) {
+       cuota = precioTotal;
        saldoPendiente = cuota! - pago!;
        if (saldoPendiente <= 0) {
          estadoPago = 'Completo';
@@ -165,8 +178,11 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    }
 
    Future<void> crearTicket() async {
-     if (fecha == null || tratamientoId == null || clienteId == null || (usuarioId == null && widget.currentUserId == null) || cuota == null || pago == null) {
+     if (fecha == null || tratamientosSeleccionados.isEmpty || clienteId == null || (usuarioId == null && widget.currentUserId == null) || pago == null) {
        setState(() { error = 'Completa todos los campos'; });
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text('Completa todos los campos requeridos')),
+       );
        return;
      }
      if (_sucursalProvider?.selectedSucursalId == null) {
@@ -182,7 +198,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        'cuota': cuota,
        'saldoPendiente': saldoPendiente,
        'estadoTicket': estadoTicket,
-       'tratamiento': tratamientoId,
+       'tratamientos': tratamientosSeleccionados, // Array de IDs de tratamientos
        'cliente': clienteId,
        'users_permissions_user': usuarioFinalId,
        'estadoPago': estadoPago,
@@ -191,9 +207,23 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
      final ok = await api.crearTicket(ticket);
      if (ok) {
-       if (mounted) Navigator.pop(context, true);
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+             content: Text('Ticket creado exitosamente'),
+             backgroundColor: Colors.green,
+           ),
+         );
+         Navigator.pop(context, true);
+       }
      } else {
        setState(() { error = 'Error al crear ticket'; });
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(
+           content: Text('Error al crear el ticket'),
+           backgroundColor: Colors.red,
+         ),
+       );
      }
    }
 
@@ -280,7 +310,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                            onChanged: (v) async {
                              setState(() {
                                categoriaId = v;
-                               tratamientoId = null;
+                               tratamientosSeleccionados.clear();
                                tratamientos = [];
                                cuota = null;
                                pago = null;
@@ -304,38 +334,78 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                            decoration: const InputDecoration(),
                          ),
                          const SizedBox(height: 18),
-                         // Tratamiento (habilitado solo si hay categoría seleccionada)
-                         Text('Tratamiento', style: Theme.of(context).textTheme.labelLarge),
+                         // Tratamientos (ahora permite seleccionar múltiples)
+                         Row(
+                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                           children: [
+                             Text('Tratamientos', style: Theme.of(context).textTheme.labelLarge),
+                             if (tratamientosSeleccionados.isNotEmpty)
+                               Text(
+                                 '${tratamientosSeleccionados.length} seleccionado(s) - Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                   color: colorScheme.primary,
+                                   fontWeight: FontWeight.bold,
+                                 ),
+                               ),
+                           ],
+                         ),
                          const SizedBox(height: 8),
-                         ConstrainedBox(
-                           // Evitar minWidth=double.infinity dentro de un entorno con ancho no acotado
-                           constraints: const BoxConstraints(minWidth: 0, maxWidth: 900),
-                           child: DropdownButtonFormField<int>(
-                             isExpanded: true,
-                             initialValue: tratamientoId,
-                             items: tratamientos.map<DropdownMenuItem<int>>((t) {
-                               final precio = double.tryParse(t['precio'] ?? '0') ?? 0;
-                               return DropdownMenuItem(
-                                 value: t['id'],
-                                 child: Text('${t['nombreTratamiento']} (Bs $precio)'),
-                               );
-                             }).toList(),
-                             onChanged: tratamientos.isEmpty
-                                 ? null
-                                 : (v) {
+                         if (tratamientos.isEmpty)
+                           Container(
+                             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                             decoration: BoxDecoration(
+                               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                               borderRadius: BorderRadius.circular(14),
+                             ),
+                             child: Text(
+                               'Seleccione primero una categoría',
+                               style: TextStyle(
+                                 fontSize: 16,
+                                 color: colorScheme.onSurfaceVariant,
+                               ),
+                             ),
+                           )
+                         else
+                           Container(
+                             constraints: const BoxConstraints(maxHeight: 300),
+                             decoration: BoxDecoration(
+                               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                               borderRadius: BorderRadius.circular(14),
+                               border: Border.all(
+                                 color: colorScheme.outline.withValues(alpha: 0.2),
+                               ),
+                             ),
+                             child: ListView.builder(
+                               shrinkWrap: true,
+                               itemCount: tratamientos.length,
+                               itemBuilder: (context, index) {
+                                 final t = tratamientos[index];
+                                 final id = t['id'] as int;
+                                 final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
+                                 final isSelected = tratamientosSeleccionados.contains(id);
+
+                                 return CheckboxListTile(
+                                   title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
+                                   subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
+                                   value: isSelected,
+                                   onChanged: (bool? value) {
                                      setState(() {
-                                       tratamientoId = v;
-                                       final t = tratamientos.firstWhere((e) => e['id'] == v);
-                                       cuota = double.tryParse(t['precio'] ?? '0') ?? 0;
-                                       pago = cuota;
+                                       if (value == true) {
+                                         tratamientosSeleccionados.add(id);
+                                       } else {
+                                         tratamientosSeleccionados.remove(id);
+                                       }
+                                       // Recalcular el pago y estado
+                                       final total = calcularPrecioTotal();
+                                       pago = total;
                                        calcularEstadoPago();
                                      });
                                    },
-                             decoration: InputDecoration(
-                               hintText: tratamientos.isEmpty ? 'Seleccione primero una categoría' : 'Seleccionar tratamiento',
+                                   controlAffinity: ListTileControlAffinity.leading,
+                                 );
+                               },
                              ),
                            ),
-                         ),
                          const SizedBox(height: 18),
                          Text('Cliente', style: Theme.of(context).textTheme.labelLarge),
                          const SizedBox(height: 8),
@@ -406,6 +476,37 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                            onChanged: (v) => setState(() => usuarioId = v),
                          ),
                          const SizedBox(height: 18),
+                         // Mostrar precio total de tratamientos
+                         if (tratamientosSeleccionados.isNotEmpty)
+                           Container(
+                             padding: const EdgeInsets.all(16),
+                             decoration: BoxDecoration(
+                               color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                               borderRadius: BorderRadius.circular(14),
+                               border: Border.all(
+                                 color: colorScheme.primary.withValues(alpha: 0.2),
+                               ),
+                             ),
+                             child: Row(
+                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                               children: [
+                                 Text(
+                                   'Total de tratamientos:',
+                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                     fontWeight: FontWeight.bold,
+                                   ),
+                                 ),
+                                 Text(
+                                   'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                     color: colorScheme.primary,
+                                     fontWeight: FontWeight.bold,
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           ),
+                         if (tratamientosSeleccionados.isNotEmpty) const SizedBox(height: 18),
                          // Pago
                          Text('Pago realizado (Bs)', style: Theme.of(context).textTheme.labelLarge),
                          const SizedBox(height: 8),

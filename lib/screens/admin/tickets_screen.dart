@@ -77,10 +77,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
       filteredTickets = tickets.where((t) {
         final cliente = t['cliente']?['nombreCliente'] ?? '';
         final apellido = t['cliente']?['apellidoCliente'] ?? '';
-        final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '';
+        // Buscar en todos los tratamientos del ticket
+        final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
+        final tratamientosMatch = tratamientos.any((tr) =>
+          (tr['nombreTratamiento'] ?? '').toLowerCase().contains(value.toLowerCase())
+        );
         return cliente.toLowerCase().contains(value.toLowerCase()) ||
             apellido.toLowerCase().contains(value.toLowerCase()) ||
-            tratamiento.toLowerCase().contains(value.toLowerCase());
+            tratamientosMatch;
       }).toList();
     });
   }
@@ -206,7 +210,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                       ? '${t['cliente']['nombreCliente'] ?? '-'} ${t['cliente']['apellidoCliente'] ?? ''}'
                                       : t['cliente']['nombreCliente'] ?? '-')
                                   : '-';
-                              final tratamiento = t['tratamiento']?['nombreTratamiento'] ?? '-';
+                              // Obtener lista de tratamientos
+                              final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
+                              final tratamientoTexto = tratamientos.isEmpty
+                                  ? 'Sin tratamientos'
+                                  : tratamientos.length == 1
+                                      ? tratamientos[0]['nombreTratamiento'] ?? '-'
+                                      : '${tratamientos.length} tratamientos';
                               final saldoPendiente = t['saldoPendiente']?.toDouble() ?? 0.0;
                               final tieneSaldo = saldoPendiente > 0;
                               final estadoTicket = t['estadoTicket'] == true;
@@ -269,7 +279,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                     ),
                                                     const SizedBox(height: 4),
                                                     Text(
-                                                      tratamiento,
+                                                      tratamientoTexto,
                                                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                                         color: Theme.of(context).colorScheme.primary,
                                                       ),

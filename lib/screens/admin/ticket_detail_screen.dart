@@ -84,12 +84,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         ? DateTime.parse(widget.ticket['fecha'])
         : null;
     final cliente = widget.ticket['cliente'];
-    final tratamiento = widget.ticket['tratamiento'];
+    final tratamientos = widget.ticket['tratamientos'] as List<dynamic>? ?? [];
     final sucursal = widget.ticket['sucursal'];
+    final usuario = widget.ticket['users_permissions_user'];
     final cuota = widget.ticket['cuota']?.toString() ?? '-';
     final saldo = widget.ticket['saldoPendiente']?.toString() ?? '0';
     final estadoPago = widget.ticket['estadoPago'] ?? '-';
     final estadoTicket = widget.ticket['estadoTicket'] == true;
+
+    // Calcular precio total de tratamientos
+    double precioTotal = 0;
+    for (var t in tratamientos) {
+      precioTotal += double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
+    }
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -184,24 +191,101 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Tratamiento
+            // Tratamientos (ahora puede haber múltiples)
             _SectionCard(
-              title: 'Tratamiento',
+              title: 'Tratamientos',
               icon: Icons.spa,
               children: [
-                _DetailRow(
-                  label: 'Servicio',
-                  value: tratamiento?['nombreTratamiento'] ?? '-',
-                ),
-                _DetailRow(
-                  label: 'Precio del tratamiento',
-                  value: tratamiento?['precio'] != null
-                      ? 'Bs ${tratamiento['precio']}'
-                      : '-',
-                ),
+                if (tratamientos.isEmpty)
+                  const _DetailRow(
+                    label: 'Servicios',
+                    value: 'Sin tratamientos',
+                  )
+                else
+                  ...tratamientos.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final t = entry.value;
+                    return Padding(
+                      padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 12 : 0),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colorScheme.outline.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    t['nombreTratamiento'] ?? 'Sin nombre',
+                                    style: textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Bs ${t['precio'] ?? '0'}',
+                                    style: textTheme.labelMedium?.copyWith(
+                                      color: colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                if (tratamientos.length > 1) ...[
+                  const SizedBox(height: 12),
+                  Divider(color: colorScheme.outline.withValues(alpha: 0.2)),
+                  const SizedBox(height: 8),
+                  _DetailRow(
+                    label: 'Total de tratamientos',
+                    value: 'Bs ${precioTotal.toStringAsFixed(2)}',
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
+
+            // Usuario que creó el ticket
+            if (usuario != null)
+              _SectionCard(
+                title: 'Usuario',
+                icon: Icons.person_outline,
+                children: [
+                  _DetailRow(
+                    label: 'Nombre',
+                    value: usuario['username'] ?? '-',
+                  ),
+                  if (usuario['email'] != null)
+                    _DetailRow(
+                      label: 'Email',
+                      value: usuario['email'],
+                    ),
+                  if (usuario['tipoUsuario'] != null)
+                    _DetailRow(
+                      label: 'Tipo',
+                      value: usuario['tipoUsuario'],
+                    ),
+                ],
+              ),
+            if (usuario != null) const SizedBox(height: 16),
 
             // Fecha y hora
             _SectionCard(
