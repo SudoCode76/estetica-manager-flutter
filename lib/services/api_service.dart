@@ -89,7 +89,6 @@ class ApiService {
     }
   }
 
-  // Obtener clientes, con opción de filtrar por sucursal o buscar por texto. Usa servidor si soportado, si no, devuelve todo y UI hará fallback.
   Future<List<dynamic>> getClientes({int? sucursalId, String? query}) async {
     final headers = await _getHeaders();
     try {
@@ -109,7 +108,6 @@ class ApiService {
           print('Body: ${response.body}');
         }
       }
-      // 1b) Si no se pasó sucursal, o el filter+populate falló, intentar petición con filtros directos (sin populate)
       String endpoint = '$_baseUrl/clientes';
       List<String> params = [];
       if (sucursalId != null) params.add('filters[sucursal][id]=$sucursalId');
@@ -123,7 +121,6 @@ class ApiService {
         final raw = data['data'] ?? [];
         final normalized = _normalizeItems(List<dynamic>.from(raw));
         print('ApiService.getClientes: direct returned ${normalized.length} items');
-        // Si se solicitó filtrar por sucursal y el servidor devolvió resultados, confiar en el filtro del servidor
         if (sucursalId != null) {
           if (normalized.isNotEmpty) {
             print('ApiService.getClientes: direct returned items for filter sucursal $sucursalId, returning ${normalized.length} items (trusting server filter)');
@@ -141,7 +138,6 @@ class ApiService {
       print('Exception en getClientes (direct/filter+populate): $e');
     }
 
-    // 2) Si no fue posible filtrar en servidor (o no venía sucursal), intentar pedir con populate[sucursal]=true y filtrar client-side
     try {
       String popEndpoint = '$_baseUrl/clientes?populate[sucursal]=true';
       if (query != null && query.isNotEmpty) popEndpoint += '&filters[nombreCliente][contains]=$query';
@@ -166,7 +162,6 @@ class ApiService {
       print('Exception en getClientes (populate): $e');
     }
 
-    // 3) Último recurso: traer todos y filtrar client-side por nombre/sucursal si es posible
     try {
       final urlAll = Uri.parse('$_baseUrl/clientes');
       final responseAll = await _getWithTimeout(urlAll, headers);
@@ -242,6 +237,38 @@ class ApiService {
     } else {
       print('Error al crear cliente: ${response.body}');
       throw Exception('Error al crear cliente');
+    }
+  }
+
+  // Actualizar cliente
+  Future<Map<String, dynamic>> updateCliente(int id, Map<String, dynamic> cliente) async {
+    final url = Uri.parse('$_baseUrl/clientes/$id');
+    final headers = await _getHeaders();
+    final response = await _putWithTimeout(url, headers, jsonEncode({'data': cliente}));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data'];
+    } else {
+      print('Error al actualizar cliente: ${response.body}');
+      throw Exception('Error al actualizar cliente');
+    }
+  }
+
+  // Eliminar cliente
+  Future<bool> deleteCliente(int id) async {
+    final url = Uri.parse('$_baseUrl/clientes/$id');
+    final headers = await _getHeaders();
+    try {
+      final response = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return true;
+      } else {
+        print('Error al eliminar cliente: ${response.body}');
+        throw Exception('Error al eliminar cliente');
+      }
+    } catch (e) {
+      print('Exception al eliminar cliente: $e');
+      throw Exception('Error al eliminar cliente: $e');
     }
   }
 

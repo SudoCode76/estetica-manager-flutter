@@ -8,6 +8,7 @@ import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -133,172 +134,172 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
-                        const SizedBox(width: 12),
-                        Text(
-                          'App Estética',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
+                      const SizedBox(width: 12),
+                      Text(
+                        'App Estética',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Selector de sucursal
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: _isLoadingSucursales
-                          ? Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.onPrimary,
-                                  ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Selector de sucursal
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: _isLoadingSucursales
+                        ? Row(
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.onPrimary,
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Cargando...',
-                                  style: TextStyle(color: colorScheme.onPrimary),
-                                ),
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<int>(
-                                      value: _sucursalProvider?.selectedSucursalId,
-                                      isExpanded: true,
-                                      dropdownColor: colorScheme.surface,
-                                      icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-                                      style: TextStyle(
-                                        color: colorScheme.onSurface,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      items: _sucursales.map((s) {
-                                        return DropdownMenuItem<int>(
-                                          value: s['id'],
-                                          child: Text(s['nombreSucursal'] ?? '-'),
-                                        );
-                                      }).toList(),
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
-                                          setState(() {
-                                            _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
-                                          });
-                                        }
-                                      },
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Cargando...',
+                                style: TextStyle(color: colorScheme.onPrimary),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<int>(
+                                    value: _sucursalProvider?.selectedSucursalId,
+                                    isExpanded: true,
+                                    dropdownColor: colorScheme.surface,
+                                    icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
+                                    items: _sucursales.map((s) {
+                                      return DropdownMenuItem<int>(
+                                        value: s['id'],
+                                        child: Text(s['nombreSucursal'] ?? '-'),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
+                                        setState(() {
+                                          _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
+                                        });
+                                      }
+                                    },
                                   ),
                                 ),
-                              ],
-                            ),
-                    ),
-                  ],
-                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ],
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    _DrawerItem(
-                      icon: Icons.receipt_long_outlined,
-                      selectedIcon: Icons.receipt_long,
-                      label: 'Tickets',
-                      selected: _selectedIndex == 0,
-                      onTap: () {
-                        setState(() { _selectedIndex = 0; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.people_outline,
-                      selectedIcon: Icons.people,
-                      label: 'Clientes',
-                      selected: _selectedIndex == 1,
-                      onTap: () {
-                        setState(() { _selectedIndex = 1; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.spa_outlined,
-                      selectedIcon: Icons.spa,
-                      label: 'Tratamientos',
-                      selected: _selectedIndex == 2,
-                      onTap: () {
-                        setState(() { _selectedIndex = 2; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.bar_chart_outlined,
-                      selectedIcon: Icons.bar_chart,
-                      label: 'Reportes',
-                      selected: _selectedIndex == 3,
-                      onTap: () {
-                        setState(() { _selectedIndex = 3; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings,
-                      label: 'Configuración',
-                      selected: _selectedIndex == 4,
-                      onTap: () {
-                        setState(() { _selectedIndex = 4; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ],
-                ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _DrawerItem(
+                    icon: Icons.receipt_long_outlined,
+                    selectedIcon: Icons.receipt_long,
+                    label: 'Tickets',
+                    selected: _selectedIndex == 0,
+                    onTap: () {
+                      setState(() { _selectedIndex = 0; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.people_outline,
+                    selectedIcon: Icons.people,
+                    label: 'Clientes',
+                    selected: _selectedIndex == 1,
+                    onTap: () {
+                      setState(() { _selectedIndex = 1; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.spa_outlined,
+                    selectedIcon: Icons.spa,
+                    label: 'Tratamientos',
+                    selected: _selectedIndex == 2,
+                    onTap: () {
+                      setState(() { _selectedIndex = 2; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.bar_chart_outlined,
+                    selectedIcon: Icons.bar_chart,
+                    label: 'Reportes',
+                    selected: _selectedIndex == 3,
+                    onTap: () {
+                      setState(() { _selectedIndex = 3; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.settings_outlined,
+                    selectedIcon: Icons.settings,
+                    label: 'Configuración',
+                    selected: _selectedIndex == 4,
+                    onTap: () {
+                      setState(() { _selectedIndex = 4; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
               ),
-              // Cerrar sesión al final
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.errorContainer,
+            ),
+            // Cerrar sesión al final
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: Icon(Icons.logout_rounded, color: colorScheme.error),
+                  title: Text(
+                    'Cerrar Sesión',
+                    style: TextStyle(
+                      color: colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _logout();
+                  },
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: ListTile(
-                    leading: Icon(Icons.logout_rounded, color: colorScheme.error),
-                    title: Text(
-                      'Cerrar Sesión',
-                      style: TextStyle(
-                        color: colorScheme.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _logout();
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
         body: ScaffoldKeyInherited(
           scaffoldKey: _scaffoldKey,
           child: Column(
@@ -339,36 +340,64 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ],
           ),
         ),
-        floatingActionButton: _selectedIndex == 0 ? FloatingActionButton.extended(
-          onPressed: () async {
-            // obtener user id desde prefs y pasarlo a NewTicketScreen
-            final prefs = await SharedPreferences.getInstance();
-            final userJson = prefs.getString('user');
-            String? userIdStr;
-            if (userJson != null && userJson.isNotEmpty) {
-              try {
-                final Map<String, dynamic> userMap = jsonDecode(userJson);
-                userIdStr = userMap['id']?.toString();
-              } catch (_) {
-                userIdStr = null;
-              }
-            }
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => NewTicketScreen(currentUserId: userIdStr)),
-            );
-            if (result == true) {
-              // refrescar tickets si se creó uno
-              // crear nueva instancia de TicketsScreen para forzar refresh
-              setState(() {
-                _screens[0] = const TicketsScreen();
-              });
-            }
-          },
-          icon: const Icon(Icons.add),
-          label: const Text('Nuevo Ticket'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-        ) : null,
+        floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                // obtener user id desde prefs y pasarlo a NewTicketScreen
+                final prefs = await SharedPreferences.getInstance();
+                final userJson = prefs.getString('user');
+                String? userIdStr;
+                if (userJson != null && userJson.isNotEmpty) {
+                  try {
+                    final Map<String, dynamic> userMap = jsonDecode(userJson);
+                    userIdStr = userMap['id']?.toString();
+                  } catch (_) {
+                    userIdStr = null;
+                  }
+                }
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => NewTicketScreen(currentUserId: userIdStr)),
+                );
+                if (result == true) {
+                  // refrescar tickets si se creó uno
+                  // crear nueva instancia de TicketsScreen para forzar refresh
+                  setState(() {
+                    _screens[0] = const TicketsScreen();
+                  });
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo Ticket'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            )
+          : _selectedIndex == 1
+            ? FloatingActionButton.extended(
+                onPressed: () async {
+                  if (_sucursalProvider?.selectedSucursalId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
+                  final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+
+                  if (result != null) {
+                    // refrescar clientes
+                    setState(() {
+                      _screens[1] = const ClientsScreen();
+                    });
+                  }
+                },
+                icon: const Icon(Icons.person_add),
+                label: const Text('Nuevo Cliente'),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+              )
+            : null,
     );
   }
 }

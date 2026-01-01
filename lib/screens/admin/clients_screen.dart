@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:ui';
+import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/widgets/create_client_dialog.dart';
+import 'package:app_estetica/providers/sucursal_provider.dart';
 
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({Key? key}) : super(key: key);
@@ -8,12 +13,753 @@ class ClientsScreen extends StatefulWidget {
 }
 
 class _ClientsScreenState extends State<ClientsScreen> {
+  final ApiService api = ApiService();
+  List<dynamic> clients = [];
+  List<dynamic> filteredClients = [];
+  bool isLoading = true;
+  String search = '';
+  String? errorMsg;
+  SucursalProvider? _sucursalProvider;
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = SucursalInherited.of(context);
+    if (provider != _sucursalProvider) {
+      _sucursalProvider?.removeListener(_onSucursalChanged);
+      _sucursalProvider = provider;
+      _sucursalProvider?.addListener(_onSucursalChanged);
+      fetchClients();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sucursalProvider?.removeListener(_onSucursalChanged);
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSucursalChanged() {
+    fetchClients();
+  }
+
+  Future<void> fetchClients() async {
+    if (_sucursalProvider?.selectedSucursalId == null) return;
+
+    setState(() {
+      isLoading = true;
+      errorMsg = null;
+    });
+    try {
+      final data = await api.getClientes(
+        sucursalId: _sucursalProvider!.selectedSucursalId,
+        query: search.isEmpty ? null : search,
+      );
+      clients = data;
+      filteredClients = clients;
+    } catch (e) {
+      errorMsg = 'No se pudo conectar al servidor.';
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  void filterClients(String value) {
+    search = value;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      fetchClients();
+    });
+  }
+
+  Future<void> _showCreateClientDialog() async {
+    if (_sucursalProvider?.selectedSucursalId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+
+    if (result != null) {
+      // Recargar lista
+      await fetchClients();
+    }
+  }
+
+  Future<void> _showEditClientDialog(Map<String, dynamic> cliente) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _EditClientDialog(
+        cliente: cliente,
+        sucursalId: _sucursalProvider!.selectedSucursalId!,
+      ),
+    );
+
+    if (result != null) {
+      await fetchClients();
+    }
+  }
+
+  Future<void> _deleteClient(Map<String, dynamic> cliente) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(Icons.warning_rounded, color: colorScheme.error, size: 48),
+        title: const Text('Eliminar Cliente'),
+        content: Text(
+          '¿Estás seguro que deseas eliminar a ${cliente['nombreCliente']} ${cliente['apellidoCliente']}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Mostrar loading
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: colorScheme.primary),
+                    const SizedBox(height: 16),
+                    const Text('Eliminando cliente...'),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        await api.deleteCliente(cliente['id']);
+
+        if (mounted) Navigator.pop(context); // Cerrar loading
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: colorScheme.onPrimary),
+                  const SizedBox(width: 12),
+                  const Text('Cliente eliminado exitosamente'),
+                ],
+              ),
+              backgroundColor: colorScheme.primary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+
+        await fetchClients();
+      } catch (e) {
+        if (mounted) Navigator.pop(context); // Cerrar loading
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error, color: colorScheme.onError),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Error: ${e.toString()}')),
+                ],
+              ),
+              backgroundColor: colorScheme.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Pantalla de Clientes - En desarrollo',
-        style: TextStyle(fontSize: 18),
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SafeArea(
+      child: Column(
+        children: [
+          // Barra de búsqueda y acciones
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SearchBar(
+                        controller: _searchController,
+                        hintText: 'Buscar por nombre, apellido o teléfono',
+                        leading: const Icon(Icons.search),
+                        trailing: [
+                          if (_searchController.text.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                search = '';
+                                _debounce?.cancel();
+                                fetchClients();
+                              },
+                            ),
+                        ],
+                        onChanged: filterClients,
+                        elevation: const WidgetStatePropertyAll(1),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton.icon(
+                      onPressed: fetchClients,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text(''),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(56, 56),
+                        padding: const EdgeInsets.all(16),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+
+          // Lista de clientes
+          Expanded(
+            child: isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      color: colorScheme.primary,
+                    ),
+                  )
+                : errorMsg != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+                            const SizedBox(height: 16),
+                            Text(
+                              errorMsg!,
+                              style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
+                            ),
+                          ],
+                        ),
+                      )
+                    : filteredClients.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.person_search_rounded,
+                                  size: 64,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  search.isEmpty
+                                      ? 'No hay clientes en esta sucursal'
+                                      : 'No se encontraron clientes',
+                                  style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  search.isEmpty
+                                      ? 'Registra el primer cliente'
+                                      : 'Intenta con otro término de búsqueda',
+                                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            itemCount: filteredClients.length,
+                            itemBuilder: (context, i) {
+                              final c = filteredClients[i];
+                              final nombre = '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim();
+                              final telefono = c['telefono']?.toString() ?? 'Sin teléfono';
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  leading: Container(
+                                    width: 56,
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          colorScheme.primaryContainer,
+                                          colorScheme.secondaryContainer,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+                                        style: textTheme.headlineSmall?.copyWith(
+                                          color: colorScheme.onPrimaryContainer,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    nombre,
+                                    style: textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  subtitle: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.phone,
+                                        size: 14,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        telefono,
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton(
+                                    icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        onTap: () {
+                                          Future.delayed(Duration.zero, () => _showEditClientDialog(c));
+                                        },
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 20, color: colorScheme.primary),
+                                            const SizedBox(width: 12),
+                                            const Text('Editar'),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        onTap: () {
+                                          Future.delayed(Duration.zero, () => _deleteClient(c));
+                                        },
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, size: 20, color: colorScheme.error),
+                                            const SizedBox(width: 12),
+                                            const Text('Eliminar'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Diálogo de editar cliente
+class _EditClientDialog extends StatefulWidget {
+  final Map<String, dynamic> cliente;
+  final int sucursalId;
+
+  const _EditClientDialog({
+    required this.cliente,
+    required this.sucursalId,
+  });
+
+  @override
+  State<_EditClientDialog> createState() => _EditClientDialogState();
+}
+
+class _EditClientDialogState extends State<_EditClientDialog> {
+  late final TextEditingController _nombreController;
+  late final TextEditingController _apellidoController;
+  late final TextEditingController _telefonoController;
+  final _formKey = GlobalKey<FormState>();
+  final _api = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    _nombreController = TextEditingController(text: widget.cliente['nombreCliente'] ?? '');
+    _apellidoController = TextEditingController(text: widget.cliente['apellidoCliente'] ?? '');
+    _telefonoController = TextEditingController(text: widget.cliente['telefono']?.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nombreController.dispose();
+    _apellidoController.dispose();
+    _telefonoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _editarCliente() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: colorScheme.primary),
+              const SizedBox(height: 16),
+              Text('Actualizando cliente...', style: textTheme.bodyLarge),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final Map<String, dynamic> actualizado = {
+        'nombreCliente': _nombreController.text.trim(),
+        'apellidoCliente': _apellidoController.text.trim(),
+        'telefono': int.tryParse(_telefonoController.text) ?? 0,
+        'estadoCliente': widget.cliente['estadoCliente'] ?? true,
+        'sucursal': widget.sucursalId,
+      };
+
+      await _api.updateCliente(widget.cliente['id'], actualizado);
+
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+      // Cerrar diálogo con resultado
+      if (mounted) Navigator.pop(context, actualizado);
+
+      // Mostrar confirmación
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: colorScheme.onPrimary),
+                const SizedBox(width: 12),
+                const Text('Cliente actualizado exitosamente'),
+              ],
+            ),
+            backgroundColor: colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      // Cerrar loading
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: colorScheme.onError),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Error: ${e.toString()}')),
+              ],
+            ),
+            backgroundColor: colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: colorScheme.surface.withValues(alpha: 0.95),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: colorScheme.outline.withValues(alpha: 0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header con gradiente
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primaryContainer,
+                        colorScheme.secondaryContainer,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.edit_rounded,
+                          size: 32,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Editar Cliente',
+                              style: textTheme.headlineSmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Actualizar información del cliente',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Formulario
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Campo Nombre
+                        TextFormField(
+                          controller: _nombreController,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            labelText: 'Nombre *',
+                            hintText: 'Ej: María',
+                            prefixIcon: Container(
+                              margin: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.person_outline,
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'El nombre es requerido' : null,
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Campo Apellido
+                        TextFormField(
+                          controller: _apellidoController,
+                          decoration: InputDecoration(
+                            labelText: 'Apellido',
+                            hintText: 'Ej: González',
+                            prefixIcon: Container(
+                              margin: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.badge_outlined,
+                                color: colorScheme.secondary,
+                                size: 20,
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Campo Teléfono
+                        TextFormField(
+                          controller: _telefonoController,
+                          decoration: InputDecoration(
+                            labelText: 'Teléfono',
+                            hintText: 'Ej: 71234567',
+                            prefixIcon: Container(
+                              margin: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.phone_outlined,
+                                color: colorScheme.tertiary,
+                                size: 20,
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          ),
+                          keyboardType: TextInputType.phone,
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Botones
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text('Cancelar'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: _editarCliente,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text('Guardar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
