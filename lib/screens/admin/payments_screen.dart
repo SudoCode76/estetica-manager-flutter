@@ -71,7 +71,8 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-     return SafeArea(
+    final theme = Theme.of(context);
+    return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
@@ -80,7 +81,16 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               children: [
                 Text('Pagos', style: Theme.of(context).textTheme.titleLarge),
                 const Spacer(),
-                FilledButton.icon(onPressed: _loadClientsWithDebt, icon: const Icon(Icons.refresh), label: const Text('Refrescar')),
+                FilledButton.icon(
+                  onPressed: _loadClientsWithDebt,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refrescar'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    backgroundColor: theme.colorScheme.primary,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -91,19 +101,59 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                       ? Center(child: Text('No hay clientes con deuda', style: Theme.of(context).textTheme.bodyLarge))
                       : ListView.separated(
                           itemCount: _clients.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final c = _clients[index];
-                            return ListTile(
-                              title: Text('${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim()),
-                              subtitle: Text('Deuda: Bs ${ (c['deudaTotal'] as double).toStringAsFixed(2) }'),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () async {
-                                final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => pd.PaymentDetailScreen(cliente: c)));
-                                if (res == true) {
-                                  await _loadClientsWithDebt();
-                                }
-                              },
+                            final nombre = '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim();
+                            final deuda = (c['deudaTotal'] as double).toStringAsFixed(2);
+                            return Card(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () async {
+                                  final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => pd.PaymentDetailScreen(cliente: c)));
+                                  if (res == true) await _loadClientsWithDebt();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: theme.colorScheme.primary.withAlpha(30),
+                                        child: Icon(Icons.person, color: theme.colorScheme.primary, size: 20),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(nombre, style: theme.textTheme.titleMedium),
+                                            const SizedBox(height: 6),
+                                            Text('Deuda: Bs $deuda', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(160))),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: IconButton(
+                                          onPressed: () async {
+                                            final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => pd.PaymentDetailScreen(cliente: c)));
+                                            if (res == true) await _loadClientsWithDebt();
+                                          },
+                                          icon: const Icon(Icons.chevron_right, color: Colors.white),
+                                          splashRadius: 20,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             );
                           },
                         ),
