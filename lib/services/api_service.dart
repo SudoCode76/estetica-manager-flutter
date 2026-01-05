@@ -136,19 +136,53 @@ class ApiService {
     }
   }
 
-  // Actualizar cliente
+  // Actualizar cliente (robusto ante respuestas sin body y diferentes shapes)
   Future<Map<String, dynamic>> updateCliente(String documentId, Map<String, dynamic> cliente) async {
     final url = Uri.parse('$_baseUrl/clientes/$documentId');
     final headers = await _getHeaders();
     try {
       final response = await _putWithTimeout(url, headers, jsonEncode({'data': cliente}));
-      if (response.statusCode == 200 || response.statusCode == 201) {
+
+      print('updateCliente: status=${response.statusCode} body=${response.body}');
+
+      // Aceptar 200/201/204 como éxito
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        // Si no hay body (204 o body vacío), devolver una representación usando los datos enviados
+        if (response.body.trim().isEmpty) {
+          // Construir objeto consistente: incluir documentId si lo tenemos
+          final result = Map<String, dynamic>.from(cliente);
+          result['documentId'] = documentId;
+          // Si el cliente no tiene un id numérico, intentaremos conservar el campo 'id' si existe
+          return result;
+        }
+
+        // Intentar parsear body JSON seguro
         try {
           final data = jsonDecode(response.body);
-          return _normalizeItems([data['data']]).first;
+
+          // El backend puede devolver { data: {...} } o directamente el objeto de datos
+          dynamic payload = data;
+          if (data is Map && data.containsKey('data')) {
+            payload = data['data'];
+          }
+
+          // Si payload es un Map y ya contiene 'attributes' lo normalizamos
+          if (payload is Map) {
+            final normalizedList = _normalizeItems([payload]);
+            if (normalizedList.isNotEmpty) return normalizedList.first as Map<String, dynamic>;
+          }
+
+          // Si no es el formato esperado, devolver payload si es Map
+          if (payload is Map<String, dynamic>) return payload;
+
+          // Fallback: devolver una mezcla del cliente enviado y algunos campos del response si es posible
+          return Map<String, dynamic>.from(cliente);
         } catch (e) {
-          print('updateCliente: error parsing response body: ${response.body}');
-          throw Exception('Error al actualizar cliente: respuesta inválida del servidor');
+          print('updateCliente: error parsing response body: ${response.body}  error: $e');
+          // No fallamos duro; devolvemos una representación basada en lo enviado
+          final fallback = Map<String, dynamic>.from(cliente);
+          fallback['documentId'] = documentId;
+          return fallback;
         }
       } else {
         print('Error al actualizar cliente. Status: ${response.statusCode}');
@@ -216,6 +250,44 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Error al obtener categorias de tratamientos: $e');
+    }
+  }
+
+  // Crear categoria de tratamiento
+  Future<Map<String, dynamic>> crearCategoria(Map<String, dynamic> categoria) async {
+    final url = Uri.parse('$_baseUrl/categoria-tratamientos');
+    final headers = await _getHeaders();
+    try {
+      final response = await _postWithTimeout(url, headers, jsonEncode({'data': categoria}));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return _normalizeItems([data['data']]).first;
+      } else {
+        print('Error al crear categoria: ${response.statusCode} ${response.body}');
+        throw Exception('Error al crear categoria');
+      }
+    } catch (e) {
+      print('Exception crearCategoria: $e');
+      throw Exception('Error al crear categoria: $e');
+    }
+  }
+
+  // Crear tratamiento
+  Future<Map<String, dynamic>> crearTratamiento(Map<String, dynamic> tratamiento) async {
+    final url = Uri.parse('$_baseUrl/tratamientos');
+    final headers = await _getHeaders();
+    try {
+      final response = await _postWithTimeout(url, headers, jsonEncode({'data': tratamiento}), seconds: 10);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return _normalizeItems([data['data']]).first;
+      } else {
+        print('Error al crear tratamiento: ${response.statusCode} ${response.body}');
+        throw Exception('Error al crear tratamiento');
+      }
+    } catch (e) {
+      print('Exception crearTratamiento: $e');
+      throw Exception('Error al crear tratamiento: $e');
     }
   }
 
