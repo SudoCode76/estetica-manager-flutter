@@ -291,6 +291,84 @@ class ApiService {
     }
   }
 
+  // Actualizar categoria de tratamiento
+  Future<Map<String, dynamic>> updateCategoria(String documentId, Map<String, dynamic> categoria) async {
+    final url = Uri.parse('$_baseUrl/categoria-tratamientos/$documentId');
+    final headers = await _getHeaders();
+    try {
+      final response = await _putWithTimeout(url, headers, jsonEncode({'data': categoria}));
+      print('updateCategoria: status=${response.statusCode} body=${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        if (response.body.trim().isEmpty) {
+          final result = Map<String, dynamic>.from(categoria);
+          result['documentId'] = documentId;
+          return result;
+        }
+        try {
+          final data = jsonDecode(response.body);
+          dynamic payload = data;
+          if (data is Map && data.containsKey('data')) payload = data['data'];
+          if (payload is Map) {
+            final normalizedList = _normalizeItems([payload]);
+            if (normalizedList.isNotEmpty) return normalizedList.first as Map<String, dynamic>;
+          }
+          if (payload is Map<String, dynamic>) return payload;
+          return Map<String, dynamic>.from(categoria);
+        } catch (e) {
+          print('updateCategoria: error parsing response body: ${response.body} error: $e');
+          final fallback = Map<String, dynamic>.from(categoria);
+          fallback['documentId'] = documentId;
+          return fallback;
+        }
+      } else {
+        print('Error updateCategoria: ${response.statusCode} ${response.body}');
+        throw Exception('Error al actualizar categoria: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('Exception en updateCategoria: $e');
+      throw Exception('Error al actualizar categoria: $e');
+    }
+  }
+
+  // Actualizar tratamiento
+  Future<Map<String, dynamic>> updateTratamiento(String documentId, Map<String, dynamic> tratamiento) async {
+    final url = Uri.parse('$_baseUrl/tratamientos/$documentId');
+    final headers = await _getHeaders();
+    try {
+      final response = await _putWithTimeout(url, headers, jsonEncode({'data': tratamiento}), seconds: 10);
+      print('updateTratamiento: status=${response.statusCode} body=${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        if (response.body.trim().isEmpty) {
+          final result = Map<String, dynamic>.from(tratamiento);
+          result['documentId'] = documentId;
+          return result;
+        }
+        try {
+          final data = jsonDecode(response.body);
+          dynamic payload = data;
+          if (data is Map && data.containsKey('data')) payload = data['data'];
+          if (payload is Map) {
+            final normalizedList = _normalizeItems([payload]);
+            if (normalizedList.isNotEmpty) return normalizedList.first as Map<String, dynamic>;
+          }
+          if (payload is Map<String, dynamic>) return payload;
+          return Map<String, dynamic>.from(tratamiento);
+        } catch (e) {
+          print('updateTratamiento: error parsing response body: ${response.body} error: $e');
+          final fallback = Map<String, dynamic>.from(tratamiento);
+          fallback['documentId'] = documentId;
+          return fallback;
+        }
+      } else {
+        print('Error updateTratamiento: ${response.statusCode} ${response.body}');
+        throw Exception('Error al actualizar tratamiento: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('Exception en updateTratamiento: $e');
+      throw Exception('Error al actualizar tratamiento: $e');
+    }
+  }
+
   // Obtener usuarios
   Future<List<dynamic>> getUsuarios({int? sucursalId, String? query}) async {
     final headers = await _getHeaders();

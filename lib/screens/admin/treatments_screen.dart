@@ -12,9 +12,12 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
   final ApiService _api = ApiService();
   List<dynamic> _categorias = [];
   List<dynamic> _tratamientos = [];
+  List<dynamic> _categoriasAll = [];
+  List<dynamic> _tratamientosAll = [];
   bool _loading = true;
   bool _loadingCreate = false;
   int? _selectedCategoriaId;
+  bool _showDisabled = false;
 
   @override
   void initState() {
@@ -27,14 +30,25 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     try {
       final cats = await _api.getCategorias();
       final trats = await _api.getTratamientos();
-      setState(() {
-        _categorias = cats;
-        _tratamientos = trats;
-        _loading = false;
-      });
+      // Guardar listas originales
+      _categoriasAll = cats;
+      _tratamientosAll = trats;
+      // Aplicar filtro por estado (por defecto true)
+      _applyFilters(_showDisabled);
+      setState(() => _loading = false);
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando tratamientos: $e')));
+    }
+  }
+
+  void _applyFilters(bool showDisabled) {
+    if (showDisabled) {
+      _categorias = List<dynamic>.from(_categoriasAll);
+      _tratamientos = List<dynamic>.from(_tratamientosAll);
+    } else {
+      _categorias = _categoriasAll.where((c) => c['estadoCategoria'] == true || c['estadoCategoria'] == null).toList();
+      _tratamientos = _tratamientosAll.where((t) => t['estadoTratamiento'] == true || t['estadoTratamiento'] == null).toList();
     }
   }
 
@@ -53,14 +67,41 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
             onPressed: () async {
               final nombre = nombreCtrl.text.trim();
               if (nombre.isEmpty) return;
+              // buscar existencia (case-insensitive)
+              final existing = _categoriasAll.firstWhere(
+                (c) => (c['nombreCategoria']?.toString().trim().toLowerCase() ?? '') == nombre.toLowerCase(),
+                orElse: () => null,
+              );
               Navigator.pop(context, true);
               setState(() => _loadingCreate = true);
               try {
-                await _api.crearCategoria({'nombreCategoria': nombre});
-                await _loadAll();
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoría creada')));
+                if (existing != null) {
+                  final bool estado = existing['estadoCategoria'] == true;
+                  if (estado) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La categoría ya existe')));
+                  } else {
+                    // ofrecer reactivar
+                    final react = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                      title: const Text('Categoría desactivada'),
+                      content: const Text('La categoría ya existe pero está desactivada. ¿Deseas reactivarla?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+                        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sí')),
+                      ],
+                    ));
+                    if (react == true) {
+                      await _api.updateCategoria(existing['documentId'] ?? existing['id'].toString(), {'estadoCategoria': true});
+                      await _loadAll();
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoría reactivada')));
+                    }
+                  }
+                } else {
+                  await _api.crearCategoria({'nombreCategoria': nombre});
+                  await _loadAll();
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoría creada')));
+                }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando categoría: $e')));
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando/activando categoría: $e')));
               } finally {
                 setState(() => _loadingCreate = false);
               }
@@ -143,15 +184,47 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                         Navigator.pop(context, true);
                         setState(() => _loadingCreate = true);
                         try {
-                          final Map<String, dynamic> payload = {
-                            'nombreTratamiento': nombre,
-                            'precio': precio,
-                            'estadoTratamiento': true,
-                          };
-                          if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
-                          await _api.crearTratamiento(payload);
-                          await _loadAll();
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
+                          // comprobar existencia (name + categoria)
+                          final nombreLower = nombre.toLowerCase();
+                          final existing = _tratamientosAll.firstWhere(
+                            (t) {
+                              final tname = (t['nombreTratamiento']?.toString().trim().toLowerCase()) ?? '';
+                              final tcat = (t['categoria_tratamiento'] is Map) ? t['categoria_tratamiento']['id'] : t['categoria_tratamiento'];
+                              return tname == nombreLower && (selectedCatId == null ? true : (tcat == selectedCatId));
+                            },
+                            orElse: () => null,
+                          );
+                          if (existing != null) {
+                            final bool estado = existing['estadoTratamiento'] == true;
+                            if (estado) {
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El tratamiento ya existe')));
+                            } else {
+                              // ofrecer reactivar
+                              final react = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                                title: const Text('Tratamiento desactivado'),
+                                content: const Text('El tratamiento ya existe pero está desactivado. ¿Deseas reactivarlo?'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+                                  FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sí')),
+                                ],
+                              ));
+                              if (react == true) {
+                                await _api.updateTratamiento(existing['documentId'] ?? existing['id'].toString(), {'estadoTratamiento': true});
+                                await _loadAll();
+                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento reactivado')));
+                              }
+                            }
+                          } else {
+                            final Map<String, dynamic> payload = {
+                              'nombreTratamiento': nombre,
+                              'precio': precio,
+                              'estadoTratamiento': true,
+                            };
+                            if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
+                            await _api.crearTratamiento(payload);
+                            await _loadAll();
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
+                          }
                         } catch (e) {
                           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando tratamiento: $e')));
                         } finally {
@@ -172,15 +245,47 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                       Navigator.pop(context, true);
                       setState(() => _loadingCreate = true);
                       try {
-                        final Map<String, dynamic> payload = {
-                          'nombreTratamiento': nombre,
-                          'precio': precio,
-                          'estadoTratamiento': true,
-                        };
-                        if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
-                        await _api.crearTratamiento(payload);
-                        await _loadAll();
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
+                        // comprobar existencia (name + categoria)
+                        final nombreLower = nombre.toLowerCase();
+                        final existing = _tratamientosAll.firstWhere(
+                          (t) {
+                            final tname = (t['nombreTratamiento']?.toString().trim().toLowerCase()) ?? '';
+                            final tcat = (t['categoria_tratamiento'] is Map) ? t['categoria_tratamiento']['id'] : t['categoria_tratamiento'];
+                            return tname == nombreLower && (selectedCatId == null ? true : (tcat == selectedCatId));
+                          },
+                          orElse: () => null,
+                        );
+                        if (existing != null) {
+                          final bool estado = existing['estadoTratamiento'] == true;
+                          if (estado) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El tratamiento ya existe')));
+                          } else {
+                            // ofrecer reactivar
+                            final react = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                              title: const Text('Tratamiento desactivado'),
+                              content: const Text('El tratamiento ya existe pero está desactivado. ¿Deseas reactivarlo?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+                                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sí')),
+                              ],
+                            ));
+                            if (react == true) {
+                              await _api.updateTratamiento(existing['documentId'] ?? existing['id'].toString(), {'estadoTratamiento': true});
+                              await _loadAll();
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento reactivado')));
+                            }
+                          }
+                        } else {
+                          final Map<String, dynamic> payload = {
+                            'nombreTratamiento': nombre,
+                            'precio': precio,
+                            'estadoTratamiento': true,
+                          };
+                          if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
+                          await _api.crearTratamiento(payload);
+                          await _loadAll();
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
+                        }
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando tratamiento: $e')));
                       } finally {
@@ -224,7 +329,10 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           itemCount: _categorias.length,
-          itemBuilder: (context, index) => _buildCategoryChip(_categorias[index] as Map<String, dynamic>, cs, tt),
+          itemBuilder: (context, index) {
+            final c = _categorias[index] as Map<String, dynamic>;
+            return _buildCategoryChip(c, cs, tt);
+          },
         ),
       );
     }
@@ -237,24 +345,15 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
         itemCount: _categorias.length,
         separatorBuilder: (_, __) => const Divider(height: 0.5),
         itemBuilder: (context, index) {
-          final c = _categorias[index];
+          final c = _categorias[index] as Map<String, dynamic>;
           final selected = _selectedCategoriaId == c['id'];
-          return ListTile(
-            title: Text(c['nombreCategoria'] ?? '-', style: tt.bodyMedium),
-            selected: selected,
-            selectedColor: cs.primary,
-            onTap: () async {
-              setState(() => _selectedCategoriaId = c['id']);
-              final tr = await _api.getTratamientos(categoriaId: c['id']);
-              setState(() => _tratamientos = tr);
-            },
-          );
+          return _buildCategoryListItem(c, tt, selected);
         },
       ),
     );
   }
 
-  Widget _buildTratamientoItem(Map<String, dynamic> t, ColorScheme cs, TextTheme tt) {
+  Widget _buildTratamientoItem(Map<String, dynamic> t, ColorScheme cs, TextTheme tt, int index) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Padding(
@@ -281,12 +380,181 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                   color: t['estadoTratamiento'] == true ? Colors.green : cs.error,
                   size: 22,
                 ),
+                const SizedBox(height: 8),
+                PopupMenuButton<String>(
+                  onSelected: (value) async {
+                    if (value == 'editar') {
+                      await _showEditTratamientoDialog(t);
+                    } else if (value == 'toggle') {
+                      await _toggleTratamientoEstado(t);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'editar', child: Text('Editar')),
+                    PopupMenuItem(value: 'toggle', child: Text((t['estadoTratamiento'] == true) ? 'Desactivar' : 'Activar')),
+                  ],
+                ),
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _showEditTratamientoDialog(Map<String, dynamic> t) async {
+    final TextEditingController nombreCtrl = TextEditingController(text: t['nombreTratamiento'] ?? '');
+    final TextEditingController precioCtrl = TextEditingController(text: t['precio']?.toString() ?? '');
+    int? selectedCatId = (t['categoria_tratamiento'] is Map) ? t['categoria_tratamiento']['id'] : t['categoria_tratamiento'];
+
+    await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final screenW = MediaQuery.of(context).size.width;
+        final isNarrowDialog = screenW < 420;
+        final maxDialogWidth = isNarrowDialog ? screenW - 32 : 520.0;
+        return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: isNarrowDialog ? 16 : 48, vertical: 24),
+          title: const Text('Editar tratamiento'),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxDialogWidth),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
+                  const SizedBox(height: 12),
+                  TextField(controller: precioCtrl, decoration: const InputDecoration(labelText: 'Precio'), keyboardType: TextInputType.number),
+                  const SizedBox(height: 12),
+                  if (_categoriasAll.isNotEmpty)
+                    SizedBox(
+                      width: double.infinity,
+                      child: DropdownButtonFormField<int>(
+                        initialValue: selectedCatId,
+                        decoration: const InputDecoration(labelText: 'Categoría'),
+                        items: _categoriasAll.map((c) => DropdownMenuItem<int>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))).toList(),
+                        onChanged: (v) => selectedCatId = v,
+                      ),
+                    )
+                  else
+                    const Align(alignment: Alignment.centerLeft, child: Text('No hay categorías')),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () async {
+              final nombre = nombreCtrl.text.trim();
+              final precio = precioCtrl.text.trim();
+              if (nombre.isEmpty || precio.isEmpty) return;
+              Navigator.pop(context, true);
+              setState(() => _loadingCreate = true);
+              try {
+                final payload = {'nombreTratamiento': nombre, 'precio': precio, 'categoria_tratamiento': selectedCatId, 'estadoTratamiento': t['estadoTratamiento'] ?? true};
+                await _api.updateTratamiento(t['documentId'] ?? t['id'].toString(), payload);
+                await _loadAll();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento actualizado')));
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error actualizando tratamiento: $e')));
+              } finally {
+                setState(() => _loadingCreate = false);
+              }
+            }, child: const Text('Guardar')),
+          ],
+        );
+      }
+    );
+  }
+
+  Future<void> _toggleTratamientoEstado(Map<String, dynamic> t) async {
+    final bool newEstado = !(t['estadoTratamiento'] == true);
+    final docId = t['documentId'] ?? t['id']?.toString();
+    if (docId == null) return;
+    try {
+      setState(() => _loadingCreate = true);
+      final payload = {'estadoTratamiento': newEstado};
+      await _api.updateTratamiento(docId, payload);
+      await _loadAll();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(newEstado ? 'Tratamiento activado' : 'Tratamiento desactivado')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error actualizando estado: $e')));
+    } finally {
+      setState(() => _loadingCreate = false);
+    }
+  }
+
+  // Similar actions for categories: build list items with popup menu
+  Widget _buildCategoryListItem(Map<String, dynamic> c, TextTheme tt, bool selected) {
+    return ListTile(
+      title: Text(c['nombreCategoria'] ?? '-', style: tt.bodyMedium),
+      selected: selected,
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) async {
+          if (v == 'editar') {
+            await _showEditCategoriaDialog(c);
+          } else if (v == 'toggle') {
+            await _toggleCategoriaEstado(c);
+          }
+        },
+        itemBuilder: (_) => [
+          const PopupMenuItem(value: 'editar', child: Text('Editar')),
+          PopupMenuItem(value: 'toggle', child: Text((c['estadoCategoria'] == true) ? 'Desactivar' : 'Activar')),
+        ],
+      ),
+      onTap: () async {
+        setState(() => _selectedCategoriaId = c['id']);
+        final tr = await _api.getTratamientos(categoriaId: c['id']);
+        setState(() => _tratamientos = tr);
+      },
+    );
+  }
+
+  Future<void> _showEditCategoriaDialog(Map<String, dynamic> c) async {
+    final TextEditingController nombreCtrl = TextEditingController(text: c['nombreCategoria'] ?? '');
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar categoría'),
+        content: TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () async {
+            final nombre = nombreCtrl.text.trim();
+            if (nombre.isEmpty) return;
+            Navigator.pop(context, true);
+            setState(() => _loadingCreate = true);
+            try {
+              final payload = {'nombreCategoria': nombre, 'estadoCategoria': c['estadoCategoria'] ?? true};
+              await _api.updateCategoria(c['documentId'] ?? c['id'].toString(), payload);
+              await _loadAll();
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Categoría actualizada')));
+            } catch (e) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error actualizando categoría: $e')));
+            } finally {
+              setState(() => _loadingCreate = false);
+            }
+          }, child: const Text('Guardar')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleCategoriaEstado(Map<String, dynamic> c) async {
+    final bool newEstado = !(c['estadoCategoria'] == true);
+    final docId = c['documentId'] ?? c['id']?.toString();
+    if (docId == null) return;
+    try {
+      setState(() => _loadingCreate = true);
+      final payload = {'estadoCategoria': newEstado};
+      await _api.updateCategoria(docId, payload);
+      await _loadAll();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(newEstado ? 'Categoría activada' : 'Categoría desactivada')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error actualizando estado: $e')));
+    } finally {
+      setState(() => _loadingCreate = false);
+    }
   }
 
   @override
@@ -390,7 +658,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                                       : ListView.builder(
                                           padding: const EdgeInsets.symmetric(vertical: 8),
                                           itemCount: _tratamientos.length,
-                                          itemBuilder: (context, index) => _buildTratamientoItem(_tratamientos[index] as Map<String, dynamic>, cs, tt),
+                                          itemBuilder: (context, index) => _buildTratamientoItem(_tratamientos[index] as Map<String, dynamic>, cs, tt, index),
                                         ),
                                 ),
                               ),
@@ -416,7 +684,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                                       : ListView.builder(
                                           padding: const EdgeInsets.symmetric(vertical: 8),
                                           itemCount: _tratamientos.length,
-                                          itemBuilder: (context, index) => _buildTratamientoItem(_tratamientos[index] as Map<String, dynamic>, cs, tt),
+                                          itemBuilder: (context, index) => _buildTratamientoItem(_tratamientos[index] as Map<String, dynamic>, cs, tt, index),
                                         ),
                                 ),
                               ),
