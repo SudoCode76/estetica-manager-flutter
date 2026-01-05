@@ -86,43 +86,123 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
       return;
     }
 
-    final TextEditingController montoCtrl = TextEditingController(text: defaultAmount.toStringAsFixed(2));
-    final formKey = GlobalKey<FormState>();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Registrar pago'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: montoCtrl,
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Monto a pagar'),
-            validator: (v) {
-              final val = double.tryParse(v ?? '0') ?? 0;
-              if (val <= 0) return 'Ingresa un monto válido';
-              if (val > defaultAmount) return 'El monto no puede ser mayor al total de los tickets seleccionados';
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () async {
-            if (!formKey.currentState!.validate()) return;
-            Navigator.pop(context, true);
-            final monto = double.tryParse(montoCtrl.text.trim()) ?? 0;
-            await _processPaymentOnTickets(monto, targetTickets);
-          }, child: const Text('Pagar')),
-        ],
-      ),
-    );
-
-    if (result == true) {
+    // Mostrar modal bottom sheet custom
+    final didPay = await _showPaymentModal(targetTickets, defaultAmount);
+    if (didPay == true) {
       await _loadTickets();
       // indicar al screen padre que hubo cambios
       Navigator.pop(context, true);
     }
+  }
+
+  // Modal bottom sheet personalizado para registrar pagos
+  Future<bool?> _showPaymentModal(List<dynamic> tickets, double defaultAmount) async {
+    final montoCtrl = TextEditingController(text: defaultAmount.toStringAsFixed(2));
+    final formKey = GlobalKey<FormState>();
+    final screenW = MediaQuery.of(context).size.width;
+    final isNarrow = screenW < 420;
+
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(30),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text('Crear pago', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Form(
+                key: formKey,
+                child: Column(children: [
+                  TextFormField(
+                    controller: montoCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Monto a pagar',
+                      prefixIcon: Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
+                    ),
+                    validator: (v) {
+                      final val = double.tryParse(v ?? '0') ?? 0;
+                      if (val <= 0) return 'Ingresa un monto válido';
+                      if (val > defaultAmount) return 'El monto no puede ser mayor al total de los tickets seleccionados';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  // Resumen de tickets incluidos (compacto)
+                  Align(alignment: Alignment.centerLeft, child: Text('Tickets a aplicar', style: Theme.of(context).textTheme.titleMedium)),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 80,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: tickets.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final t = tickets[i];
+                        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
+                        return Chip(
+                          avatar: const Icon(Icons.receipt_long, size: 18),
+                          label: Text('${t['documentId'] ?? t['id']} | Bs ${saldo.toStringAsFixed(0)}'),
+                          backgroundColor: Theme.of(context).colorScheme.primary.withAlpha(20),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: isNarrow ? 140 : 180,
+                      child: FilledButton(
+                        onPressed: () async {
+                          if (!formKey.currentState!.validate()) return;
+                          final monto = double.tryParse(montoCtrl.text.trim()) ?? 0;
+                          Navigator.of(context).pop(true);
+                          await _processPaymentOnTickets(monto, tickets);
+                        },
+                        child: const Text('Pagar'),
+                      ),
+                    ),
+                  ])
+                ]),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _processPaymentOnTickets(double monto, List<dynamic> ticketsToApply) async {
@@ -203,88 +283,218 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.cliente['nombreCliente'] ?? ''} ${widget.cliente['apellidoCliente'] ?? ''}')),
+      appBar: AppBar(
+        title: Text('${widget.cliente['nombreCliente'] ?? ''} ${widget.cliente['apellidoCliente'] ?? ''}'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                  Text('Deuda total: Bs ${_totalDeuda.toStringAsFixed(2)}', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 12),
-                  // Controls: select all, pay selected
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _tickets.isNotEmpty && _selected.values.every((v) => v),
-                        onChanged: (v) {
-                          setState(() {
-                            for (final k in _selected.keys) _selected[k] = v == true;
-                          });
-                        },
+          : LayoutBuilder(builder: (context, constraints) {
+              final screenW = constraints.maxWidth;
+              final isNarrow = screenW < 420;
+              final isWide = screenW > 700;
+
+              return Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12.0 : 20.0, vertical: isNarrow ? 10.0 : 14.0),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text('Deuda total', style: theme.textTheme.titleMedium)),
+                            Text('Bs ${_totalDeuda.toStringAsFixed(2)}', style: theme.textTheme.titleLarge),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      const Text('Seleccionar todos'),
-                      const Spacer(),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Controls responsive
+                    if (isNarrow) ...[
+                      Row(children: [
+                        Checkbox(
+                          value: _tickets.isNotEmpty && _selected.values.every((v) => v),
+                          onChanged: (v) {
+                            setState(() {
+                              for (final k in _selected.keys) _selected[k] = v == true;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Seleccionar todos'),
+                      ]),
+
+                      const SizedBox(height: 8),
+
                       FilledButton.icon(
                         onPressed: _tickets.where((t) => _selected[t['id']] == true).isEmpty ? null : () => _makePaymentForSelected(),
                         icon: const Icon(Icons.payments),
                         label: const Text('Pagar seleccionados'),
                       ),
+
+                      const SizedBox(height: 8),
+
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          setState(() => _loading = true);
+                          await _loadTickets();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Refrescar'),
+                      ),
+                    ] else ...[
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            Checkbox(
+                              value: _tickets.isNotEmpty && _selected.values.every((v) => v),
+                              onChanged: (v) {
+                                setState(() {
+                                  for (final k in _selected.keys) _selected[k] = v == true;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('Seleccionar todos'),
+                          ]),
+
+                          FilledButton.icon(
+                            onPressed: _tickets.where((t) => _selected[t['id']] == true).isEmpty ? null : () => _makePaymentForSelected(),
+                            icon: const Icon(Icons.payments),
+                            label: const Text('Pagar seleccionados'),
+                          ),
+
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              setState(() => _loading = true);
+                              await _loadTickets();
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Refrescar'),
+                          ),
+                        ],
+                      ),
                     ],
-                  ),
 
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 12),
 
-                  Expanded(
-                    child: _tickets.isEmpty
-                        ? Center(child: Text('No hay tickets con deuda', style: Theme.of(context).textTheme.bodyLarge))
-                        : ListView.separated(
-                            itemCount: _tickets.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final t = _tickets[index];
-                              final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
-                              final tid = t['id'] as int;
-                              return ListTile(
-                                leading: Checkbox(
-                                  value: _selected[tid] ?? false,
-                                  onChanged: (v) => setState(() => _selected[tid] = v == true),
+                    // Main content
+                    Expanded(
+                      child: isWide
+                          ? Row(
+                              children: [
+                                Expanded(child: _buildTicketsCard(context)),
+                                const SizedBox(width: 12),
+                                Expanded(child: _buildPagosCard(context)),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                Expanded(child: _buildTicketsCard(context)),
+                                const SizedBox(height: 12),
+                                Expanded(child: _buildPagosCard(context)),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+    );
+  }
+
+  Widget _buildTicketsCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tickets con deuda', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _tickets.isEmpty
+                  ? Center(child: Text('No hay tickets con deuda', style: Theme.of(context).textTheme.bodyLarge))
+                  : ListView.separated(
+                      itemCount: _tickets.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final t = _tickets[index];
+                        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
+                        final tid = t['id'] as int;
+                        return Card(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                            child: Row(
+                              children: [
+                                Checkbox(value: _selected[tid] ?? false, onChanged: (v) => setState(() => _selected[tid] = v == true)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text('${t['documentId'] ?? t['id']}  •  ${t['fecha'] ?? ''}', style: Theme.of(context).textTheme.titleSmall),
+                                    const SizedBox(height: 6),
+                                    Text('Saldo pendiente: Bs ${saldo.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodyMedium),
+                                  ]),
                                 ),
-                                title: Text('Ticket ${t['documentId'] ?? t['id']} - Fecha: ${t['fecha'] ?? ''}'),
-                                subtitle: Text('Saldo pendiente: Bs ${saldo.toStringAsFixed(2)}'),
-                                trailing: FilledButton(onPressed: () => _makePaymentForSelected(singleTicketId: tid), child: const Text('Pagar')),
-                              );
-                            },
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  onPressed: () => _makePaymentForSelected(singleTicketId: tid),
+                                  child: const Text('Pagar'),
+                                ),
+                              ],
+                            ),
                           ),
-                  ),
-
-                  const SizedBox(height: 12),
-                  // Historial de pagos
-                  Align(alignment: Alignment.centerLeft, child: Text('Historial de pagos', style: Theme.of(context).textTheme.titleMedium)),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: _pagos.isEmpty
-                        ? Center(child: Text('No hay registros de pago', style: Theme.of(context).textTheme.bodyLarge))
-                        : ListView.separated(
-                            itemCount: _pagos.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final p = _pagos[index];
-                              final monto = double.tryParse(p['montoPagado']?.toString() ?? '0') ?? 0;
-                              final fecha = p['fechaPago'] ?? p['createdAt'] ?? '';
-                              return ListTile(
-                                title: Text('Bs ${monto.toStringAsFixed(2)}'),
-                                subtitle: Text('Fecha: ${fecha.toString()}'),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
+                        );
+                      },
+                    ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPagosCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Historial de pagos', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _pagos.isEmpty
+                ? Center(child: Text('No hay registros de pago', style: Theme.of(context).textTheme.bodyLarge))
+                : ListView.separated(
+                    itemCount: _pagos.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final p = _pagos[index];
+                      final monto = double.tryParse(p['montoPagado']?.toString() ?? '0') ?? 0;
+                      final fecha = p['fechaPago'] ?? p['createdAt'] ?? '';
+                      final ticket = p['ticket'] is Map ? (p['ticket']['documentId'] ?? p['ticket']['id']) : p['ticket'];
+                      return Card(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                        child: ListTile(
+                          title: Text('Bs ${monto.toStringAsFixed(2)}', style: Theme.of(context).textTheme.titleSmall),
+                          subtitle: Text('Fecha: ${fecha.toString()}\nTicket: ${ticket ?? '-'}', style: Theme.of(context).textTheme.bodySmall),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
     );
   }
 }
-
