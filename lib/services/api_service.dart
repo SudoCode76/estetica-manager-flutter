@@ -479,6 +479,99 @@ class ApiService {
     }
   }
 
+  // Obtener pagos
+  Future<List<dynamic>> getPagos() async {
+    final url = Uri.parse('$_baseUrl/pagos');
+    final headers = await _getHeaders();
+    try {
+      final response = await _getWithTimeout(url, headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return _normalizeItems(data['data'] ?? []);
+      } else {
+        print('getPagos failed ${response.statusCode}: ${response.body}');
+        throw Exception('Error al obtener pagos');
+      }
+    } catch (e) {
+      print('Exception getPagos: $e');
+      throw Exception('Error al obtener pagos: $e');
+    }
+  }
+
+  // Crear pago
+  Future<Map<String, dynamic>> crearPago(Map<String, dynamic> pago) async {
+    final url = Uri.parse('$_baseUrl/pagos');
+    final headers = await _getHeaders();
+    try {
+      final body = jsonEncode({'data': pago});
+      print('crearPago: POST $url body=$body');
+      final response = await _postWithTimeout(url, headers, body, seconds: 10);
+      print('crearPago: status=${response.statusCode} body=${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('data')) {
+          return _normalizeItems([data['data']]).first;
+        }
+        // fallback
+        if (data is Map) return data.cast<String, dynamic>();
+        throw Exception('Respuesta inesperada al crear pago');
+      } else {
+        // Intentar parsear body para dar más contexto
+        String msg = 'Error al crear pago: ${response.statusCode}';
+        try {
+          final parsed = jsonDecode(response.body);
+          msg += ' - ${parsed.toString()}';
+        } catch (_) {
+          msg += ' - ${response.body}';
+        }
+        print(msg);
+        throw Exception(msg);
+      }
+    } catch (e) {
+      print('Exception crearPago: $e');
+      rethrow;
+    }
+  }
+
+  // Actualizar ticket (cuota, saldoPendiente, estadoPago)
+  Future<Map<String, dynamic>> updateTicket(String documentId, Map<String, dynamic> ticket) async {
+    final url = Uri.parse('$_baseUrl/tickets/$documentId');
+    final headers = await _getHeaders();
+    try {
+      final response = await _putWithTimeout(url, headers, jsonEncode({'data': ticket}), seconds: 10);
+      print('updateTicket: status=${response.statusCode} body=${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        if (response.body.trim().isEmpty) {
+          final result = Map<String, dynamic>.from(ticket);
+          result['documentId'] = documentId;
+          return result;
+        }
+        try {
+          final data = jsonDecode(response.body);
+          dynamic payload = data;
+          if (data is Map && data.containsKey('data')) payload = data['data'];
+          if (payload is Map) {
+            final normalizedList = _normalizeItems([payload]);
+            if (normalizedList.isNotEmpty) return normalizedList.first as Map<String, dynamic>;
+          }
+          if (payload is Map<String, dynamic>) return payload;
+          return Map<String, dynamic>.from(ticket);
+        } catch (e) {
+          print('updateTicket: error parsing response body: ${response.body} error: $e');
+          final fallback = Map<String, dynamic>.from(ticket);
+          fallback['documentId'] = documentId;
+          return fallback;
+        }
+      } else {
+        print('Error updateTicket: ${response.statusCode} ${response.body}');
+        throw Exception('Error al actualizar ticket: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('Exception en updateTicket: $e');
+      throw Exception('Error al actualizar ticket: $e');
+    }
+  }
+
   List<dynamic> _normalizeItems(List<dynamic> items) {
     return items.map((item) {
       if (item is Map && item.containsKey('attributes')) {

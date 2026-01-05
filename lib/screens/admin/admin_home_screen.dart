@@ -4,6 +4,7 @@ import 'package:app_estetica/screens/admin/reports_screen.dart';
 import 'package:app_estetica/screens/admin/settings_screen.dart';
 import 'package:app_estetica/screens/admin/tickets_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
+import 'package:app_estetica/screens/admin/payments_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
@@ -31,6 +32,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const TicketsScreen(),
     const ClientsScreen(),
     const TreatmentsScreen(),
+    const PaymentsScreen(),
     const ReportsScreen(),
     const SettingsScreen(),
   ];
@@ -238,7 +240,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.spa_outlined,
+                    icon: Icons.spa,
                     selectedIcon: Icons.spa,
                     label: 'Tratamientos',
                     selected: _selectedIndex == 2,
@@ -248,9 +250,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.bar_chart_outlined,
-                    selectedIcon: Icons.bar_chart,
-                    label: 'Reportes',
+                    icon: Icons.payments,
+                    selectedIcon: Icons.payments_outlined,
+                    label: 'Pagos',
                     selected: _selectedIndex == 3,
                     onTap: () {
                       setState(() { _selectedIndex = 3; });
@@ -258,12 +260,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.settings_outlined,
-                    selectedIcon: Icons.settings,
-                    label: 'Configuración',
+                    icon: Icons.insights_outlined,
+                    selectedIcon: Icons.bar_chart,
+                    label: 'Reportes',
                     selected: _selectedIndex == 4,
                     onTap: () {
                       setState(() { _selectedIndex = 4; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.settings_outlined,
+                    selectedIcon: Icons.settings,
+                    label: 'Configuración',
+                    selected: _selectedIndex == 5,
+                    onTap: () {
+                      setState(() { _selectedIndex = 5; });
                       Navigator.pop(context);
                     },
                   ),
