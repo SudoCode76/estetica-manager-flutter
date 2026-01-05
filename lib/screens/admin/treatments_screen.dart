@@ -79,59 +79,119 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
 
     await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Crear tratamiento'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nombreCtrl, decoration: const InputDecoration(labelText: 'Nombre')),
-              const SizedBox(height: 8),
-              TextField(controller: precioCtrl, decoration: const InputDecoration(labelText: 'Precio'), keyboardType: TextInputType.number),
-              const SizedBox(height: 12),
-              if (_categorias.isNotEmpty)
-                DropdownButtonFormField<int>(
-                  initialValue: selectedCatId,
-                  decoration: const InputDecoration(labelText: 'Categoría'),
-                  items: _categorias.map((c) => DropdownMenuItem<int>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))).toList(),
-                  onChanged: (v) {
-                    selectedCatId = v;
-                  },
-                )
-              else
-                const Text('Crea primero una categoría'),
-            ],
+      builder: (context) {
+        final screenW = MediaQuery.of(context).size.width;
+        final isNarrowDialog = screenW < 420;
+        final maxDialogWidth = isNarrowDialog ? screenW - 32 : 520.0;
+
+        return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(horizontal: isNarrowDialog ? 16 : 48, vertical: 24),
+          title: const Text('Crear tratamiento'),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxDialogWidth),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nombreCtrl,
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: precioCtrl,
+                    decoration: const InputDecoration(labelText: 'Precio'),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 12),
+                  if (_categorias.isNotEmpty)
+                    // Wrap dropdown in SizedBox to avoid weird overflow inside dialog
+                    SizedBox(
+                      width: double.infinity,
+                      child: DropdownButtonFormField<int>(
+                        initialValue: selectedCatId,
+                        decoration: const InputDecoration(labelText: 'Categoría'),
+                        items: _categorias
+                            .map((c) => DropdownMenuItem<int>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-')))
+                            .toList(),
+                        onChanged: (v) {
+                          selectedCatId = v;
+                        },
+                      ),
+                    )
+                  else
+                    const Align(alignment: Alignment.centerLeft, child: Text('Crea primero una categoría')),
+                ],
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () async {
-              final nombre = nombreCtrl.text.trim();
-              final precio = precioCtrl.text.trim();
-              if (nombre.isEmpty || precio.isEmpty) return;
-              Navigator.pop(context, true);
-              setState(() => _loadingCreate = true);
-              try {
-                final Map<String, dynamic> payload = {
-                  'nombreTratamiento': nombre,
-                  'precio': precio,
-                  'estadoTratamiento': true,
-                };
-                if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
-                await _api.crearTratamiento(payload);
-                await _loadAll();
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando tratamiento: $e')));
-              } finally {
-                setState(() => _loadingCreate = false);
-              }
-            },
-            child: const Text('Crear'),
-          ),
-        ],
-      ),
+          actionsPadding: EdgeInsets.symmetric(horizontal: isNarrowDialog ? 16 : 8, vertical: 8),
+          actions: isNarrowDialog
+              ? [
+                  // For narrow screens show stacked full-width buttons
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () async {
+                        final nombre = nombreCtrl.text.trim();
+                        final precio = precioCtrl.text.trim();
+                        if (nombre.isEmpty || precio.isEmpty) return;
+                        Navigator.pop(context, true);
+                        setState(() => _loadingCreate = true);
+                        try {
+                          final Map<String, dynamic> payload = {
+                            'nombreTratamiento': nombre,
+                            'precio': precio,
+                            'estadoTratamiento': true,
+                          };
+                          if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
+                          await _api.crearTratamiento(payload);
+                          await _loadAll();
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando tratamiento: $e')));
+                        } finally {
+                          setState(() => _loadingCreate = false);
+                        }
+                      },
+                      child: const Text('Crear'),
+                    ),
+                  ),
+                ]
+              : [
+                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                  FilledButton(
+                    onPressed: () async {
+                      final nombre = nombreCtrl.text.trim();
+                      final precio = precioCtrl.text.trim();
+                      if (nombre.isEmpty || precio.isEmpty) return;
+                      Navigator.pop(context, true);
+                      setState(() => _loadingCreate = true);
+                      try {
+                        final Map<String, dynamic> payload = {
+                          'nombreTratamiento': nombre,
+                          'precio': precio,
+                          'estadoTratamiento': true,
+                        };
+                        if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
+                        await _api.crearTratamiento(payload);
+                        await _loadAll();
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tratamiento creado')));
+                      } catch (e) {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error creando tratamiento: $e')));
+                      } finally {
+                        setState(() => _loadingCreate = false);
+                      }
+                    },
+                    child: const Text('Crear'),
+                  ),
+                ],
+        );
+      },
     );
   }
 
