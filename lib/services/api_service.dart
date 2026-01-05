@@ -479,15 +479,16 @@ class ApiService {
     }
   }
 
-  // Obtener pagos
-  Future<List<dynamic>> getPagos() async {
-    final url = Uri.parse('$_baseUrl/pagos');
+    // Obtener pagos
+    Future<List<dynamic>> getPagos() async {
     final headers = await _getHeaders();
+    final endpoint = '$_baseUrl/pagos?populate=*';
     try {
-      final response = await _getWithTimeout(url, headers);
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return _normalizeItems(data['data'] ?? []);
+        final raw = data['data'] ?? [];
+        return _normalizeItems(raw);
       } else {
         print('getPagos failed ${response.statusCode}: ${response.body}');
         throw Exception('Error al obtener pagos');
@@ -496,21 +497,66 @@ class ApiService {
       print('Exception getPagos: $e');
       throw Exception('Error al obtener pagos: $e');
     }
-  }
+    }
 
   // Crear pago
   Future<Map<String, dynamic>> crearPago(Map<String, dynamic> pago) async {
     final url = Uri.parse('$_baseUrl/pagos');
     final headers = await _getHeaders();
     try {
-      final body = jsonEncode({'data': pago});
+      // Si pago.ticket es un documentId (string), intentar resolver a id numérico antes de crear
+      final payload = Map<String, dynamic>.from(pago);
+      if (payload.containsKey('ticket') && payload['ticket'] is String) {
+        final resolved = await getTicketByDocumentId(payload['ticket']);
+        if (resolved != null) {
+          payload['ticket'] = resolved['id'];
+        }
+      }
+      final body = jsonEncode({'data': payload});
       print('crearPago: POST $url body=$body');
       final response = await _postWithTimeout(url, headers, body, seconds: 10);
       print('crearPago: status=${response.statusCode} body=${response.body}');
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         if (data is Map && data.containsKey('data')) {
-          return _normalizeItems([data['data']]).first;
+          final created = _normalizeItems([data['data']]).first as Map<String, dynamic>;
+          // Si enviamos 'ticket' en el payload pero la respuesta no contiene la relación, intentar update para enlazar
+          if (payload.containsKey('ticket') && (created['ticket'] == null || created['ticket'] == 0)) {
+            try {
+              // Preferir el id numérico para la ruta PUT; si no existe, intentar documentId -> resolver numeric id
+              String? recordId = created['id']?.toString();
+              if (recordId == null && created['documentId'] != null) {
+                // intentar resolver por documentId
+                final maybe = await getPagoByDocumentId(created['documentId'].toString());
+                if (maybe != null) recordId = maybe['id']?.toString();
+              }
+              if (recordId != null) {
+                final ticketVal = payload['ticket'];
+                // Intentar varios formatos para enlazar la relación
+                final candidates = <Map<String, dynamic>>[];
+                candidates.add({'ticket': ticketVal});
+                // si ticketVal es numérico, intentar como objeto {id: num}
+                if (ticketVal is int) candidates.add({'ticket': {'id': ticketVal}});
+                // si teníamos documentId original en pago, intentar también con ese string
+                if (pago.containsKey('ticket') && pago['ticket'] is String) candidates.add({'ticket': pago['ticket']});
+
+                for (final upd in candidates) {
+                  try {
+                    await updatePago(recordId.toString(), upd);
+                    // Si no lanza, asumimos éxito y refetch
+                    final refreshed = await getPagos();
+                    return refreshed.firstWhere((p) => p['documentId'] == recordId || p['id'].toString() == recordId, orElse: () => created) as Map<String, dynamic>;
+                  } catch (e) {
+                    print('crearPago: intento de enlace con payload $upd falló: $e');
+                    // seguir al siguiente
+                  }
+                }
+              }
+            } catch (e) {
+              print('crearPago: intento de enlazar ticket falló: $e');
+            }
+          }
+          return created;
         }
         // fallback
         if (data is Map) return data.cast<String, dynamic>();
@@ -530,6 +576,45 @@ class ApiService {
     } catch (e) {
       print('Exception crearPago: $e');
       rethrow;
+    }
+  }
+
+  // Actualizar pago (por si hay que enlazar relaciones después)
+  Future<Map<String, dynamic>> updatePago(String documentId, Map<String, dynamic> pago) async {
+    final url = Uri.parse('$_baseUrl/pagos/$documentId');
+    final headers = await _getHeaders();
+    try {
+      final response = await _putWithTimeout(url, headers, jsonEncode({'data': pago}), seconds: 10);
+      print('updatePago: status=${response.statusCode} body=${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204) {
+        if (response.body.trim().isEmpty) {
+          final result = Map<String, dynamic>.from(pago);
+          result['documentId'] = documentId;
+          return result;
+        }
+        try {
+          final data = jsonDecode(response.body);
+          dynamic payload = data;
+          if (data is Map && data.containsKey('data')) payload = data['data'];
+          if (payload is Map) {
+            final normalizedList = _normalizeItems([payload]);
+            if (normalizedList.isNotEmpty) return normalizedList.first as Map<String, dynamic>;
+          }
+          if (payload is Map<String, dynamic>) return payload;
+          return Map<String, dynamic>.from(pago);
+        } catch (e) {
+          print('updatePago: error parsing response body: ${response.body} error: $e');
+          final fallback = Map<String, dynamic>.from(pago);
+          fallback['documentId'] = documentId;
+          return fallback;
+        }
+      } else {
+        print('Error updatePago: ${response.statusCode} ${response.body}');
+        throw Exception('Error al actualizar pago: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      print('Exception en updatePago: $e');
+      throw Exception('Error al actualizar pago: $e');
     }
   }
 
@@ -572,6 +657,102 @@ class ApiService {
     }
   }
 
+  // Obtener todos los pagos
+  Future<List<dynamic>> getTodosLosPagos() async {
+    final headers = await _getHeaders();
+    final endpoint = '$_baseUrl/pagos';
+    try {
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final raw = data['data'] ?? [];
+        return _normalizeItems(raw);
+      } else {
+        print('getTodosLosPagos failed ${response.statusCode}: ${response.body}');
+        throw Exception('Error al obtener pagos');
+      }
+    } catch (e) {
+      print('Exception getTodosLosPagos: $e');
+      throw Exception('Error al obtener pagos: $e');
+    }
+  }
+
+  // Crear pago en bloque
+  Future<List<dynamic>> crearPagosEnBloque(List<Map<String, dynamic>> pagos) async {
+    final url = Uri.parse('$_baseUrl/pagos/bulk');
+    final headers = await _getHeaders();
+    try {
+      final response = await _postWithTimeout(url, headers, jsonEncode({'data': pagos}), seconds: 10);
+      print('crearPagosEnBloque: status=${response.statusCode} body=${response.body}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('data')) {
+          return _normalizeItems(data['data']);
+        }
+        // fallback
+        if (data is List) return _normalizeItems(data);
+        throw Exception('Respuesta inesperada al crear pagos en bloque');
+      } else {
+        // Intentar parsear body para dar más contexto
+        String msg = 'Error al crear pagos en bloque: ${response.statusCode}';
+        try {
+          final parsed = jsonDecode(response.body);
+          msg += ' - ${parsed.toString()}';
+        } catch (_) {
+          msg += ' - ${response.body}';
+        }
+        print(msg);
+        throw Exception(msg);
+      }
+    } catch (e) {
+      print('Exception crearPagosEnBloque: $e');
+      rethrow;
+    }
+  }
+
+  // Obtener ticket por documentId
+  Future<Map<String, dynamic>?> getTicketByDocumentId(String documentId) async {
+    final headers = await _getHeaders();
+    final endpoint = '$_baseUrl/tickets?filters[documentId][\$eq]=$documentId&pagination[pageSize]=1';
+    try {
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final items = _normalizeItems(data['data'] ?? []);
+        if (items.isNotEmpty) return items.first as Map<String, dynamic>;
+        return null;
+      } else {
+        print('getTicketByDocumentId failed ${response.statusCode}: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception getTicketByDocumentId: $e');
+      return null;
+    }
+  }
+
+  // Obtener pago por documentId
+  Future<Map<String, dynamic>?> getPagoByDocumentId(String documentId) async {
+    final headers = await _getHeaders();
+    final endpoint = '$_baseUrl/pagos?filters[documentId][\$eq]=$documentId&pagination[pageSize]=1&populate=*';
+    try {
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final items = _normalizeItems(data['data'] ?? []);
+        if (items.isNotEmpty) return items.first as Map<String, dynamic>;
+        return null;
+      } else {
+        print('getPagoByDocumentId failed ${response.statusCode}: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Exception getPagoByDocumentId: $e');
+      return null;
+    }
+  }
+
+  // Normalizar items de respuesta
   List<dynamic> _normalizeItems(List<dynamic> items) {
     return items.map((item) {
       if (item is Map && item.containsKey('attributes')) {

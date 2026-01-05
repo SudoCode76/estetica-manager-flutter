@@ -141,10 +141,12 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
         if (saldo <= 0) continue;
         final apply = remaining >= saldo ? saldo : remaining;
-        // Crear pago con payload mínimo: algunos backends no esperan relaciones en el content-type 'pagos'
+        // Crear pago incluyendo relación a ticket. Usamos documentId si está disponible (algunos backends esperan documentId)
+        final ticketRef = t['documentId'] ?? t['id'];
         final pagoPayload = {
           'montoPagado': apply,
           'fechaPago': DateTime.now().toIso8601String(),
+          'ticket': ticketRef,
         };
         try {
           await _api.crearPago(pagoPayload);
@@ -162,7 +164,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
           'estadoPago': nuevoEstado,
         };
         try {
-          await _api.updateTicket(t['documentId'] ?? t['id'].toString(), ticketPayload);
+          await (_api as dynamic).updateTicket(t['documentId'] ?? t['id'].toString(), ticketPayload);
         } catch (e) {
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pago registrado pero error al actualizar ticket: $e')));
         }
@@ -173,13 +175,23 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
       // refresh pagos list
       try {
         final refreshedPagos = await _api.getPagos();
-        setState(() { _pagos = refreshedPagos.where((p) {
-          final pc = p['cliente'] is Map ? p['cliente']['id'] : p['cliente'];
-          if (pc != null && pc == widget.cliente['id']) return true;
-          final pt = p['ticket'] is Map ? p['ticket']['id'] : p['ticket'];
-          if (pt != null) return _tickets.any((t) => t['id'] == pt);
-          return false;
-        }).toList(); });
+        setState(() {
+          _pagos = refreshedPagos.where((p) {
+            // Some payments may include a 'ticket' relation as Map with 'id' or 'documentId', or as primitive
+            final ptRaw = p['ticket'];
+            if (ptRaw == null) return false;
+            if (ptRaw is Map) {
+              final tid = ptRaw['id'];
+              final tdoc = ptRaw['documentId'];
+              if (tid != null && _tickets.any((t) => t['id'] == tid)) return true;
+              if (tdoc != null && _tickets.any((t) => (t['documentId'] ?? '').toString() == tdoc.toString())) return true;
+            } else {
+              // primitive: could be numeric id or documentId string
+              if (_tickets.any((t) => t['id'] == ptRaw || (t['documentId'] ?? '').toString() == ptRaw.toString())) return true;
+            }
+            return false;
+          }).toList();
+        });
       } catch (_) {}
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pago registrado')));
     } catch (e) {
