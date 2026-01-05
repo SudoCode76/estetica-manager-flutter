@@ -304,17 +304,52 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     final bool selected = _selectedCategoriaId == c['id'];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6.0),
-      child: ChoiceChip(
-        label: Text(c['nombreCategoria'] ?? '-', style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
-        selected: selected,
-        onSelected: (v) async {
-          setState(() => _selectedCategoriaId = v ? c['id'] : null);
-          final tr = await _api.getTratamientos(categoriaId: v ? c['id'] : null);
-          setState(() => _tratamientos = tr);
+      child: GestureDetector(
+        onLongPress: () async {
+          // Show options for this category on mobile (editar / toggle estado)
+          final action = await showModalBottomSheet<String?>(
+            context: context,
+            builder: (ctx) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.edit),
+                    title: const Text('Editar'),
+                    onTap: () => Navigator.pop(ctx, 'editar'),
+                  ),
+                  ListTile(
+                    leading: Icon(c['estadoCategoria'] == true ? Icons.toggle_off : Icons.toggle_on),
+                    title: Text(c['estadoCategoria'] == true ? 'Desactivar' : 'Activar'),
+                    onTap: () => Navigator.pop(ctx, 'toggle'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.close),
+                    title: const Text('Cancelar'),
+                    onTap: () => Navigator.pop(ctx, null),
+                  ),
+                ],
+              ),
+            ),
+          );
+          if (action == 'editar') {
+            await _showEditCategoriaDialog(c);
+          } else if (action == 'toggle') {
+            await _toggleCategoriaEstado(c);
+          }
         },
-        selectedColor: cs.primaryContainer,
-        backgroundColor: cs.surface,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: ChoiceChip(
+          label: Text(c['nombreCategoria'] ?? '-', style: tt.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
+          selected: selected,
+          onSelected: (v) async {
+            setState(() => _selectedCategoriaId = v ? c['id'] : null);
+            final tr = await _api.getTratamientos(categoriaId: v ? c['id'] : null);
+            setState(() => _tratamientos = tr);
+          },
+          selectedColor: cs.primaryContainer,
+          backgroundColor: cs.surface,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
       ),
     );
   }
@@ -331,7 +366,61 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
           itemCount: _categorias.length,
           itemBuilder: (context, index) {
             final c = _categorias[index] as Map<String, dynamic>;
-            return _buildCategoryChip(c, cs, tt);
+            // Show chip plus an explicit menu button for mobile
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildCategoryChip(c, cs, tt),
+                  const SizedBox(width: 4),
+                  // Small menu button visible on mobile for discoverability
+                  Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: IconButton(
+                      padding: const EdgeInsets.all(4),
+                      icon: const Icon(Icons.more_vert, size: 18),
+                      onPressed: () async {
+                        final action = await showModalBottomSheet<String?>(
+                          context: context,
+                          builder: (ctx) => SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.edit),
+                                  title: const Text('Editar'),
+                                  onTap: () => Navigator.pop(ctx, 'editar'),
+                                ),
+                                ListTile(
+                                  leading: Icon(c['estadoCategoria'] == true ? Icons.toggle_off : Icons.toggle_on),
+                                  title: Text(c['estadoCategoria'] == true ? 'Desactivar' : 'Activar'),
+                                  onTap: () => Navigator.pop(ctx, 'toggle'),
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.close),
+                                  title: const Text('Cancelar'),
+                                  onTap: () => Navigator.pop(ctx, null),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                        if (action == 'editar') {
+                          await _showEditCategoriaDialog(c);
+                        } else if (action == 'toggle') {
+                          await _toggleCategoriaEstado(c);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
           },
         ),
       );
@@ -581,11 +670,27 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                   );
 
                   if (isVeryNarrow) {
-                    // Mobile: stack title and full-width buttons
+                    // Mobile: stack title, toggle and full-width buttons
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('Categorías', style: tt.titleMedium),
+                        Row(
+                          children: [
+                            Expanded(child: Text('Categorías', style: tt.titleMedium)),
+                            Tooltip(
+                              message: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
+                              child: IconButton(
+                                icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
+                                onPressed: () {
+                                  setState(() {
+                                    _showDisabled = !_showDisabled;
+                                    _applyFilters(_showDisabled);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
@@ -610,10 +715,27 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                     );
                   }
 
-                  // Wider screens: show title left and compact buttons to the right
+                  // Wider screens: show title left, toggle, and compact buttons to the right
                   return Row(
                     children: [
                       Text('Categorías', style: tt.titleMedium),
+                      const SizedBox(width: 12),
+                      // Toggle show disabled visible on the header
+                      Row(
+                        children: [
+                          Text('Mostrar desactivados', style: tt.bodySmall),
+                          const SizedBox(width: 6),
+                          Switch(
+                            value: _showDisabled,
+                            onChanged: (v) {
+                              setState(() {
+                                _showDisabled = v;
+                                _applyFilters(_showDisabled);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
                       const Spacer(),
                       ConstrainedBox(
                         constraints: const BoxConstraints(minHeight: 40),

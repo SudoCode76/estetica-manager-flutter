@@ -193,7 +193,12 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
             return CheckboxListTile(
               key: ValueKey('tratamiento_cat_${categoriaId}_$id'),
-              title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
+              title: Text(t['nombreTratamiento'] ?? 'Sin nombre',
+                style: TextStyle(
+                  color: isSelected ? colorScheme.primary : null,
+                  fontWeight: isSelected ? FontWeight.bold : null,
+                ),
+              ),
               subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
               value: isSelected,
               onChanged: (bool? value) {
@@ -224,12 +229,16 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      });
      try {
        print('NewTicketScreen: Cargando categorías...');
-       categorias = await api.getCategorias();
-       print('NewTicketScreen: ${categorias.length} categorías cargadas');
+       final cats = await api.getCategorias();
+       // Filtrar solo categorías activas (estadoCategoria == true o null->assume active)
+       categorias = List<dynamic>.from(cats.where((c) => c['estadoCategoria'] == true || c['estadoCategoria'] == null));
+       print('NewTicketScreen: ${categorias.length} categorías activas cargadas (de ${cats.length})');
 
        print('NewTicketScreen: Cargando tratamientos...');
-       tratamientos = await api.getTratamientos(); // Cargar TODOS los tratamientos
-       print('NewTicketScreen: ${tratamientos.length} tratamientos cargados');
+       final tr = await api.getTratamientos(); // Cargar tratamientos
+       // Filtrar solo tratamientos activos
+       tratamientos = List<dynamic>.from(tr.where((t) => t['estadoTratamiento'] == true || t['estadoTratamiento'] == null));
+       print('NewTicketScreen: ${tratamientos.length} tratamientos activos cargados (de ${tr.length})');
 
        // no cargamos clientes ni usuarios aquí; se cargan por sucursal cuando el provider esté listo
      } catch (e) {
