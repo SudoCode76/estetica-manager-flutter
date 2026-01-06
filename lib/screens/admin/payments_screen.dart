@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/payment_detail_screen.dart' as pd;
+import 'package:app_estetica/screens/admin/payments_history_screen.dart';
 
 class PaymentsScreen extends StatefulWidget {
   const PaymentsScreen({Key? key}) : super(key: key);
@@ -89,6 +90,20 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                     backgroundColor: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentsHistoryScreen()));
+                    await _loadClientsWithDebt();
+                  },
+                  icon: const Icon(Icons.history),
+                  label: const Text('Historial'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    backgroundColor: theme.colorScheme.secondary,
                   ),
                 ),
               ],

@@ -30,10 +30,18 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
       final sucursalId = SucursalInherited.of(context)?.selectedSucursalId;
       final allTickets = await _api.getTickets(sucursalId: sucursalId);
       final cid = widget.cliente['id'];
+
+      // Tickets con deuda (solo para mostrar en la columna de tickets)
       final List<dynamic> deudaTickets = allTickets.where((t) {
         final tclient = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
         final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
         return tclient == cid && saldo > 0;
+      }).toList();
+
+      // Todos los tickets del cliente (para relacionar pagos históricos aunque el ticket ya no tenga deuda)
+      final List<dynamic> allClientTickets = allTickets.where((t) {
+        final tclient = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
+        return tclient == cid;
       }).toList();
 
       double total = 0;
@@ -49,7 +57,8 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         final pt = p['ticket'] is Map ? p['ticket']['id'] : p['ticket'];
         if (pt != null) {
           // si el pago referencia un ticket, comprobar que ese ticket pertenece al cliente actual
-          return deudaTickets.any((t) => t['id'] == pt);
+          // Ahora comprobamos contra TODOS los tickets del cliente (no solo los que tienen deuda)
+          return allClientTickets.any((t) => t['id'] == pt || (t['documentId'] ?? '').toString() == pt.toString());
         }
         return false;
       }).toList();
