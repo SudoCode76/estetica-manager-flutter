@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ticket;
@@ -48,7 +49,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   Future<void> _marcarComoAtendido() async {
-    setState(() { isUpdating = true; });
+    setState(() {
+      isUpdating = true;
+    });
 
     try {
       final documentId = widget.ticket['documentId'];
@@ -82,8 +85,112 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() { isUpdating = false; });
+        setState(() {
+          isUpdating = false;
+        });
       }
+    }
+  }
+
+  // Construye el texto del ticket (sin lanzar)
+  String _buildWhatsAppMessage() {
+    final cliente = widget.ticket['cliente'];
+    final fecha = widget.ticket['fecha'] != null ? DateTime.tryParse(widget.ticket['fecha']) : null;
+    final nombreCliente = cliente?['nombreCliente'] ?? '';
+    final apellidoCliente = cliente?['apellidoCliente'] ?? '';
+    final tratamientos = widget.ticket['tratamientos'] as List<dynamic>? ?? [];
+
+    final buffer = StringBuffer();
+    buffer.writeln('Hola ${nombreCliente.toString()} ${apellidoCliente.toString()},');
+    buffer.writeln('Aquí están los detalles de su turno:');
+    if (fecha != null) buffer.writeln('- Fecha: ${DateFormat('EEEE, d MMMM yyyy', 'es').format(fecha)}');
+    if (widget.ticket['fecha'] != null) buffer.writeln('- Hora: ${DateFormat('HH:mm').format(fecha!)}');
+    buffer.writeln('- Ticket: ${widget.ticket['documentId'] ?? widget.ticket['id']}');
+    if (tratamientos.isNotEmpty) {
+      buffer.writeln('- Tratamientos:');
+      for (final t in tratamientos) {
+        buffer.writeln('  • ${t['nombreTratamiento'] ?? 'Sin nombre'} - Bs ${t['precio'] ?? '0'}');
+      }
+    }
+    buffer.writeln('- Total: Bs ${tratamientos.fold<double>(0, (p, e) => p + (double.tryParse(e['precio']?.toString() ?? '0') ?? 0)).toStringAsFixed(2)}');
+    buffer.writeln('Por favor confirme su asistencia o contáctenos si necesita reprogramar.');
+
+    return buffer.toString();
+  }
+
+  // Construye el texto del ticket y abre WhatsApp (wa.me) con el número del cliente
+  Future<void> _sendTicketByWhatsApp() async {
+    final cliente = widget.ticket['cliente'];
+    if (cliente == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay cliente asociado')));
+      return;
+    }
+
+    final telefonoRaw = cliente['telefono']?.toString();
+    if (telefonoRaw == null || telefonoRaw.trim().isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El cliente no tiene teléfono')));
+      return;
+    }
+
+    // Normalizar número: quitar espacios, paréntesis, signos + y guiones
+    String digits = telefonoRaw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Número inválido')));
+      return;
+    }
+
+    // Si el número no tiene código de país asumimos prefijo (ej. '591' para Bolivia) - no puedo asumir en todos los casos.
+    // Si ya empieza con prefijo internacional (ej 591) lo dejamos.
+    if (digits.length <= 8) {
+      // asunción razonable: usar 591 (Bolivia) si el número tiene 8 dígitos o menos
+      digits = '591$digits';
+    }
+
+    final message = _buildWhatsAppMessage();
+
+    // Mostrar diálogo de confirmación con preview
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('Enviar por WhatsApp'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Número: +$digits', style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 12),
+                  Text('Mensaje:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(message, style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Enviar')),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final encoded = Uri.encodeComponent(message);
+    final waUrl = Uri.parse('https://wa.me/$digits?text=$encoded');
+
+    // Intent: abrir URL
+    try {
+      if (!await launchUrl(waUrl, mode: LaunchMode.externalApplication)) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir WhatsApp')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error abriendo WhatsApp: $e')));
     }
   }
 
@@ -132,6 +239,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               );
             },
             icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            onPressed: _sendTicketByWhatsApp,
+            icon: const Icon(Icons.send_to_mobile),
+            tooltip: 'Enviar por WhatsApp',
           ),
         ],
       ),
