@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:app_estetica/services/share_service.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ticket;
@@ -15,6 +16,7 @@ class TicketDetailScreen extends StatefulWidget {
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final ApiService api = ApiService();
+  final GlobalKey _ticketKey = GlobalKey();
   bool isUpdating = false;
   bool localeReady = false;
 
@@ -118,79 +120,90 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return buffer.toString();
   }
 
-  // Construye el texto del ticket y abre WhatsApp (wa.me) con el número del cliente
-  Future<void> _sendTicketByWhatsApp() async {
-    final cliente = widget.ticket['cliente'];
-    if (cliente == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay cliente asociado')));
-      return;
-    }
-
-    final telefonoRaw = cliente['telefono']?.toString();
-    if (telefonoRaw == null || telefonoRaw.trim().isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El cliente no tiene teléfono')));
-      return;
-    }
-
-    // Normalizar número: quitar espacios, paréntesis, signos + y guiones
-    String digits = telefonoRaw.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Número inválido')));
-      return;
-    }
-
-    // Si el número no tiene código de país asumimos prefijo (ej. '591' para Bolivia) - no puedo asumir en todos los casos.
-    // Si ya empieza con prefijo internacional (ej 591) lo dejamos.
-    if (digits.length <= 8) {
-      // asunción razonable: usar 591 (Bolivia) si el número tiene 8 dígitos o menos
-      digits = '591$digits';
-    }
-
-    final message = _buildWhatsAppMessage();
-
-    // Mostrar diálogo de confirmación con preview
-    final confirmed = await showDialog<bool>(
+  Future<void> _chooseAndSendToWhatsApp() async {
+    // Seleccionar formato (texto o PDF)
+    final format = await showModalBottomSheet<String>(
       context: context,
       builder: (context) {
-        final theme = Theme.of(context);
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Enviar por WhatsApp'),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 320),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Número: +$digits', style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 12),
-                  Text('Mensaje:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(message, style: theme.textTheme.bodySmall),
-                ],
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.text_snippet),
+                title: const Text('Enviar como texto'),
+                onTap: () => Navigator.of(context).pop('text'),
               ),
-            ),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf),
+                title: const Text('Enviar como PDF'),
+                onTap: () => Navigator.of(context).pop('pdf'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Enviar')),
-          ],
         );
       },
     );
 
-    if (confirmed != true) return;
+    if (format == null) return;
 
-    final encoded = Uri.encodeComponent(message);
-    final waUrl = Uri.parse('https://wa.me/$digits?text=$encoded');
+    final cliente = widget.ticket['cliente'];
+    final telefonoRaw = cliente?['telefono']?.toString();
+    String digits = telefonoRaw != null ? telefonoRaw.replaceAll(RegExp(r'[^0-9]'), '') : '';
+    if (digits.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El cliente no tiene teléfono')));
+      return;
+    }
+    if (digits.length <= 8) digits = '591$digits';
 
-    // Intent: abrir URL
-    try {
+    final message = _buildWhatsAppMessage();
+
+    // Elegir app (WhatsApp o WhatsApp Business)
+    final appChoice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Image.asset('assets/whatsapp.png', width: 28, height: 28, errorBuilder: (_, __, ___) => Icon(Icons.chat)),
+                title: const Text('WhatsApp'),
+                onTap: () => Navigator.of(context).pop('com.whatsapp'),
+              ),
+              ListTile(
+                leading: Image.asset('assets/whatsapp_business.png', width: 28, height: 28, errorBuilder: (_, __, ___) => Icon(Icons.business)),
+                title: const Text('WhatsApp Business'),
+                onTap: () => Navigator.of(context).pop('com.whatsapp.w4b'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (appChoice == null) return; // usuario canceló
+
+    if (format == 'text') {
+      final encoded = Uri.encodeComponent(message);
+      final waUrl = Uri.parse('https://wa.me/$digits?text=$encoded');
       if (!await launchUrl(waUrl, mode: LaunchMode.externalApplication)) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir WhatsApp')));
       }
+      return;
+    }
+
+    // Si es PDF, generarlo y enviarlo
+    try {
+      final pdfBytes = await ShareService.buildTicketPdf(widget.ticket);
+      final nameBase = (widget.ticket['documentId'] ?? widget.ticket['id'] ?? DateTime.now().millisecondsSinceEpoch.toString()).toString();
+      final file = await ShareService.writeTempFile(pdfBytes, '${ShareService.sanitizeFileName(nameBase)}_ticket.pdf');
+      final sent = await ShareService.shareFileToWhatsAppNative(file, caption: message, package: appChoice, phone: digits);
+      if (!sent) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo enviar directamente a la app seleccionada, se abrió el share sheet.')));
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error abriendo WhatsApp: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error preparando archivo: $e')));
     }
   }
 
@@ -240,324 +253,333 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             },
             icon: const Icon(Icons.edit_outlined),
           ),
+          // Botón único para enviar ticket por WhatsApp (texto o PDF). Usa asset si existe, si no fallback a icono.
           IconButton(
-            onPressed: _sendTicketByWhatsApp,
-            icon: const Icon(Icons.send_to_mobile),
-            tooltip: 'Enviar por WhatsApp',
+            onPressed: _chooseAndSendToWhatsApp,
+            tooltip: 'Enviar ticket por WhatsApp',
+            icon: Image.asset(
+              'assets/whatsapp.png',
+              width: 24,
+              height: 24,
+              errorBuilder: (_, __, ___) => const Icon(Icons.send),
+            ),
           ),
         ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Estado del ticket
-            Card(
-              elevation: 0,
-              color: estadoTicket
-                  ? colorScheme.primaryContainer
-                  : colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Icon(
-                      estadoTicket ? Icons.check_circle : Icons.pending_actions,
-                      color: estadoTicket
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onErrorContainer,
-                      size: 48,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            estadoTicket ? 'Atendido' : 'Pendiente',
-                            style: textTheme.headlineSmall?.copyWith(
-                              color: estadoTicket
-                                  ? colorScheme.onPrimaryContainer
-                                  : colorScheme.onErrorContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            estadoTicket
-                                ? 'Este ticket ya fue atendido'
-                                : 'Este ticket está pendiente de atención',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: estadoTicket
-                                  ? colorScheme.onPrimaryContainer
-                                  : colorScheme.onErrorContainer,
-                            ),
-                          ),
-                        ],
+        child: RepaintBoundary(
+          key: _ticketKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Estado del ticket
+              Card(
+                elevation: 0,
+                color: estadoTicket
+                    ? colorScheme.primaryContainer
+                    : colorScheme.errorContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Icon(
+                        estadoTicket ? Icons.check_circle : Icons.pending_actions,
+                        color: estadoTicket
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onErrorContainer,
+                        size: 48,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Cliente
-            _SectionCard(
-              title: 'Cliente',
-              icon: Icons.person,
-              children: [
-                _DetailRow(
-                  label: 'Nombre',
-                  value: cliente != null
-                      ? '${cliente['nombreCliente'] ?? ''} ${cliente['apellidoCliente'] ?? ''}'
-                      : '-',
-                ),
-                if (cliente?['telefono'] != null)
-                  _DetailRow(
-                    label: 'Teléfono',
-                    value: cliente['telefono'].toString(),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Tratamientos (ahora puede haber múltiples)
-            _SectionCard(
-              title: 'Tratamientos',
-              icon: Icons.spa,
-              children: [
-                if (tratamientos.isEmpty)
-                  const _DetailRow(
-                    label: 'Servicios',
-                    value: 'Sin tratamientos',
-                  )
-                else
-                  ...tratamientos.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final t = entry.value;
-                    final categoriaNombre = _getCategoriaNombreFromTratamiento(t);
-
-                    return Padding(
-                      padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 12 : 0),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: colorScheme.outline.withValues(alpha: 0.1),
-                          ),
-                        ),
+                      const SizedBox(width: 16),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        t['nombreTratamiento'] ?? 'Sin nombre',
-                                        style: textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (categoriaNombre != null) ...[
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.category,
-                                              size: 12,
-                                              color: colorScheme.primary.withValues(alpha: 0.7),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              categoriaNombre,
-                                              style: textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.primary.withValues(alpha: 0.7),
-                                                fontStyle: FontStyle.italic,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'Bs ${t['precio'] ?? '0'}',
-                                    style: textTheme.labelMedium?.copyWith(
-                                      color: colorScheme.onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              estadoTicket ? 'Atendido' : 'Pendiente',
+                              style: textTheme.headlineSmall?.copyWith(
+                                color: estadoTicket
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              estadoTicket
+                                  ? 'Este ticket ya fue atendido'
+                                  : 'Este ticket está pendiente de atención',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: estadoTicket
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onErrorContainer,
+                              ),
                             ),
                           ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                if (tratamientos.length > 1) ...[
-                  const SizedBox(height: 12),
-                  Divider(color: colorScheme.outline.withValues(alpha: 0.2)),
-                  const SizedBox(height: 8),
-                  _DetailRow(
-                    label: 'Total de tratamientos',
-                    value: 'Bs ${precioTotal.toStringAsFixed(2)}',
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Usuario que creó el ticket
-            if (usuario != null)
-              _SectionCard(
-                title: 'Usuario',
-                icon: Icons.person_outline,
-                children: [
-                  _DetailRow(
-                    label: 'Nombre',
-                    value: usuario['username'] ?? '-',
-                  ),
-                  if (usuario['email'] != null)
-                    _DetailRow(
-                      label: 'Email',
-                      value: usuario['email'],
-                    ),
-                  if (usuario['tipoUsuario'] != null)
-                    _DetailRow(
-                      label: 'Tipo',
-                      value: usuario['tipoUsuario'],
-                    ),
-                ],
-              ),
-            if (usuario != null) const SizedBox(height: 16),
-
-            // Fecha y hora
-            _SectionCard(
-              title: 'Fecha y Hora',
-              icon: Icons.calendar_today,
-              children: [
-                _DetailRow(
-                  label: 'Fecha',
-                  value: fecha != null
-                      ? DateFormat('EEEE, d MMMM yyyy', 'es').format(fecha)
-                      : '-',
-                ),
-                _DetailRow(
-                  label: 'Hora',
-                  value: fecha != null ? DateFormat('HH:mm').format(fecha) : '-',
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Sucursal
-            _SectionCard(
-              title: 'Sucursal',
-              icon: Icons.location_on,
-              children: [
-                _DetailRow(
-                  label: 'Nombre',
-                  value: sucursal?['nombreSucursal'] ?? '-',
-                ),
-                if (sucursal?['direccion'] != null)
-                  _DetailRow(
-                    label: 'Dirección',
-                    value: sucursal['direccion'],
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Información de pago
-            _SectionCard(
-              title: 'Información de Pago',
-              icon: Icons.payments,
-              children: [
-                _DetailRow(
-                  label: 'Cuota pagada',
-                  value: 'Bs $cuota',
-                ),
-                _DetailRow(
-                  label: 'Saldo pendiente',
-                  value: 'Bs $saldo',
-                  valueColor: saldo != '0' ? colorScheme.error : null,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: estadoPago == 'Completo'
-                        ? colorScheme.primaryContainer
-                        : colorScheme.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        estadoPago == 'Completo'
-                            ? Icons.check_circle_outline
-                            : Icons.warning_amber_outlined,
-                        size: 20,
-                        color: estadoPago == 'Completo'
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onErrorContainer,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Estado: $estadoPago',
-                        style: textTheme.titleSmall?.copyWith(
-                          color: estadoPago == 'Completo'
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onErrorContainer,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 24),
 
-            // Botones de acción
-            if (!estadoTicket)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: isUpdating ? null : _marcarComoAtendido,
-                  icon: isUpdating
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              // Cliente
+              _SectionCard(
+                title: 'Cliente',
+                icon: Icons.person,
+                children: [
+                  _DetailRow(
+                    label: 'Nombre',
+                    value: cliente != null
+                        ? '${cliente['nombreCliente'] ?? ''} ${cliente['apellidoCliente'] ?? ''}'
+                        : '-',
+                  ),
+                  if (cliente?['telefono'] != null)
+                    _DetailRow(
+                      label: 'Teléfono',
+                      value: cliente['telefono'].toString(),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Tratamientos (ahora puede haber múltiples)
+              _SectionCard(
+                title: 'Tratamientos',
+                icon: Icons.spa,
+                children: [
+                  if (tratamientos.isEmpty)
+                    const _DetailRow(
+                      label: 'Servicios',
+                      value: 'Sin tratamientos',
+                    )
+                  else
+                    ...tratamientos.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final t = entry.value;
+                      final categoriaNombre = _getCategoriaNombreFromTratamiento(t);
+
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 12 : 0),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outline.withValues(alpha: 0.1),
+                            ),
                           ),
-                        )
-                      : const Icon(Icons.check),
-                  label: Text(isUpdating ? 'Actualizando...' : 'Marcar como Atendido'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          t['nombreTratamiento'] ?? 'Sin nombre',
+                                          style: textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (categoriaNombre != null) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.category,
+                                                size: 12,
+                                                color: colorScheme.primary.withValues(alpha: 0.7),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                categoriaNombre,
+                                                style: textTheme.bodySmall?.copyWith(
+                                                  color: colorScheme.primary.withValues(alpha: 0.7),
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Bs ${t['precio'] ?? '0'}',
+                                      style: textTheme.labelMedium?.copyWith(
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  if (tratamientos.length > 1) ...[
+                    const SizedBox(height: 12),
+                    Divider(color: colorScheme.outline.withValues(alpha: 0.2)),
+                    const SizedBox(height: 8),
+                    _DetailRow(
+                      label: 'Total de tratamientos',
+                      value: 'Bs ${precioTotal.toStringAsFixed(2)}',
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Usuario que creó el ticket
+              if (usuario != null)
+                _SectionCard(
+                  title: 'Usuario',
+                  icon: Icons.person_outline,
+                  children: [
+                    _DetailRow(
+                      label: 'Nombre',
+                      value: usuario['username'] ?? '-',
+                    ),
+                    if (usuario['email'] != null)
+                      _DetailRow(
+                        label: 'Email',
+                        value: usuario['email'],
+                      ),
+                    if (usuario['tipoUsuario'] != null)
+                      _DetailRow(
+                        label: 'Tipo',
+                        value: usuario['tipoUsuario'],
+                      ),
+                  ],
+                ),
+              if (usuario != null) const SizedBox(height: 16),
+
+              // Fecha y hora
+              _SectionCard(
+                title: 'Fecha y Hora',
+                icon: Icons.calendar_today,
+                children: [
+                  _DetailRow(
+                    label: 'Fecha',
+                    value: fecha != null
+                        ? DateFormat('EEEE, d MMMM yyyy', 'es').format(fecha)
+                        : '-',
+                  ),
+                  _DetailRow(
+                    label: 'Hora',
+                    value: fecha != null ? DateFormat('HH:mm').format(fecha) : '-',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Sucursal
+              _SectionCard(
+                title: 'Sucursal',
+                icon: Icons.location_on,
+                children: [
+                  _DetailRow(
+                    label: 'Nombre',
+                    value: sucursal?['nombreSucursal'] ?? '-',
+                  ),
+                  if (sucursal?['direccion'] != null)
+                    _DetailRow(
+                      label: 'Dirección',
+                      value: sucursal['direccion'],
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Información de pago
+              _SectionCard(
+                title: 'Información de Pago',
+                icon: Icons.payments,
+                children: [
+                  _DetailRow(
+                    label: 'Cuota pagada',
+                    value: 'Bs $cuota',
+                  ),
+                  _DetailRow(
+                    label: 'Saldo pendiente',
+                    value: 'Bs $saldo',
+                    valueColor: saldo != '0' ? colorScheme.error : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: estadoPago == 'Completo'
+                          ? colorScheme.primaryContainer
+                          : colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          estadoPago == 'Completo'
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_outlined,
+                          size: 20,
+                          color: estadoPago == 'Completo'
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onErrorContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Estado: $estadoPago',
+                          style: textTheme.titleSmall?.copyWith(
+                            color: estadoPago == 'Completo'
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Botones de acción
+              if (!estadoTicket)
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: isUpdating ? null : _marcarComoAtendido,
+                    icon: isUpdating
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.check),
+                    label: Text(isUpdating ? 'Actualizando...' : 'Marcar como Atendido'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
