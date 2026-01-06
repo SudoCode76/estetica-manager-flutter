@@ -60,9 +60,9 @@ class ShareService {
                   else
                     pw.Center(child: pw.Text('🎉', style: pw.TextStyle(fontSize: 28))),
                   pw.SizedBox(height: 8),
-                  pw.Center(child: pw.Text('Thank you!', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
+                  pw.Center(child: pw.Text('Gracias!', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
                   pw.SizedBox(height: 6),
-                  pw.Center(child: pw.Text('Your ticket has been issued successfully', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600))),
+                  pw.Center(child: pw.Text('Su ticket ha sido emitido con éxito', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600))),
 
                   pw.SizedBox(height: 12),
                   // ID y amount
@@ -74,7 +74,7 @@ class ShareService {
                         pw.Text(id.toString(), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                       ]),
                       pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                        pw.Text('Amount', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                        pw.Text('Cantidad', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
                         pw.Text('Bs ${total.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
                       ])
                     ],
@@ -84,7 +84,7 @@ class ShareService {
                   // Fecha y hora y cliente
                   pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                     pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text('DATE & TIME', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                      pw.Text('FECHA Y HORA', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
                       pw.Text('$fechaStr • $horaStr', style: pw.TextStyle(fontSize: 10)),
                     ]),
                     pw.Container(width: 120),
@@ -176,22 +176,26 @@ class ShareService {
     return file;
   }
 
-  // Compartir archivo usando share_plus
+  // Compartir archivo usando la API moderna de share_plus (SharePlus.instance.share)
   static Future<void> shareFile(File file, {String? text}) async {
     final xfile = XFile(file.path);
     try {
-      // Usar la API pública de share_plus
-      await Share.shareXFiles([xfile], text: text ?? '');
+      final params = ShareParams(files: [xfile], text: text ?? '');
+      await SharePlus.instance.share(params);
     } catch (e) {
-      // Si algo falla, intentar con share (fallback)
+      // Fallback: intentar con la API estática por compatibilidad
       try {
-        await Share.share(text ?? '');
+        // ignore: deprecated_member_use
+        await Share.shareXFiles([xfile], text: text ?? '');
       } catch (_) {
-        // ignorar
+        try {
+          // último recurso: compartir solo texto
+          // ignore: deprecated_member_use
+          await Share.share(text ?? '');
+        } catch (_) {}
       }
     }
   }
-
 
   static Future<bool> shareFileToWhatsAppNative(File file, {String caption = '', String? package, String? phone}) async {
     try {
