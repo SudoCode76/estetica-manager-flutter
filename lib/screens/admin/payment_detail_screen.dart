@@ -95,8 +95,8 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
       return;
     }
 
-    // Mostrar modal bottom sheet custom
-    final didPay = await _showPaymentModal(targetTickets, defaultAmount);
+    // Mostrar modal centrado personalizado
+    final didPay = await _showPaymentDialog(targetTickets, defaultAmount);
     if (didPay == true) {
       await _loadTickets();
       // indicar al screen padre que hubo cambios
@@ -104,110 +104,102 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
     }
   }
 
-  // Modal bottom sheet personalizado para registrar pagos
-  Future<bool?> _showPaymentModal(List<dynamic> tickets, double defaultAmount) async {
+  // Dialog centered personalizado para registrar pagos
+  Future<bool?> _showPaymentDialog(List<dynamic> tickets, double defaultAmount) async {
     final montoCtrl = TextEditingController(text: defaultAmount.toStringAsFixed(2));
     final formKey = GlobalKey<FormState>();
-    final screenW = MediaQuery.of(context).size.width;
-    final isNarrow = screenW < 420;
 
-    return showModalBottomSheet<bool>(
+    return showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      barrierDismissible: false,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(30),
-                    borderRadius: BorderRadius.circular(4),
+        final theme = Theme.of(context);
+        final screenW = MediaQuery.of(context).size.width;
+        final isNarrow = screenW < 420;
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isNarrow ? screenW - 32 : 640),
+            child: Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text('Crear pago', style: theme.textTheme.titleLarge)),
+                      IconButton(onPressed: () => Navigator.of(context).pop(false), icon: Icon(Icons.close, color: theme.colorScheme.onSurface.withAlpha(160))),
+                    ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text('Crear pago', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              Form(
-                key: formKey,
-                child: Column(children: [
-                  TextFormField(
-                    controller: montoCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'Monto a pagar',
-                      prefixIcon: Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
-                    ),
-                    validator: (v) {
-                      final val = double.tryParse(v ?? '0') ?? 0;
-                      if (val <= 0) return 'Ingresa un monto válido';
-                      if (val > defaultAmount) return 'El monto no puede ser mayor al total de los tickets seleccionados';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  // Resumen de tickets incluidos (compacto)
-                  Align(alignment: Alignment.centerLeft, child: Text('Tickets a aplicar', style: Theme.of(context).textTheme.titleMedium)),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 80,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: tickets.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) {
-                        final t = tickets[i];
-                        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
-                        return Chip(
-                          avatar: const Icon(Icons.receipt_long, size: 18),
-                          label: Text('${t['documentId'] ?? t['id']} | Bs ${saldo.toStringAsFixed(0)}'),
-                          backgroundColor: Theme.of(context).colorScheme.primary.withAlpha(20),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('Cancelar'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: isNarrow ? 140 : 180,
-                      child: FilledButton(
-                        onPressed: () async {
-                          if (!formKey.currentState!.validate()) return;
-                          final monto = double.tryParse(montoCtrl.text.trim()) ?? 0;
-                          Navigator.of(context).pop(true);
-                          await _processPaymentOnTickets(monto, tickets);
+                  Form(
+                    key: formKey,
+                    child: Column(children: [
+                      TextFormField(
+                        controller: montoCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'Monto a pagar',
+                          prefixIcon: Icon(Icons.attach_money, color: theme.colorScheme.primary),
+                        ),
+                        validator: (v) {
+                          final val = double.tryParse(v ?? '0') ?? 0;
+                          if (val <= 0) return 'Ingresa un monto válido';
+                          if (val > defaultAmount) return 'El monto no puede ser mayor al total de los tickets seleccionados';
+                          return null;
                         },
-                        child: const Text('Pagar'),
                       ),
-                    ),
-                  ])
-                ]),
+                      const SizedBox(height: 12),
+                      Align(alignment: Alignment.centerLeft, child: Text('Tickets a aplicar', style: theme.textTheme.titleMedium)),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 80,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: tickets.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, i) {
+                            final t = tickets[i];
+                            final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
+                            return Chip(
+                              avatar: Icon(Icons.receipt_long, size: 18, color: theme.colorScheme.onPrimary),
+                              label: Text('${t['documentId'] ?? t['id']} | Bs ${saldo.toStringAsFixed(0)}'),
+                              backgroundColor: theme.colorScheme.primary.withAlpha(20),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: isNarrow ? 140 : 180,
+                          child: FilledButton(
+                            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            onPressed: () async {
+                              if (!formKey.currentState!.validate()) return;
+                              final monto = double.tryParse(montoCtrl.text.trim()) ?? 0;
+                              Navigator.of(context).pop(true);
+                              await _processPaymentOnTickets(monto, tickets);
+                            },
+                            child: const Text('Pagar'),
+                          ),
+                        ),
+                      ])
+                    ]),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         );
       },
@@ -457,6 +449,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 FilledButton(
+                                  style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                                   onPressed: () => _makePaymentForSelected(singleTicketId: tid),
                                   child: const Text('Pagar'),
                                 ),
