@@ -125,97 +125,372 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Normalizar lista byDay para evitar accesos nulos
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final List<Map<String, dynamic>> byDayList = List<Map<String, dynamic>>.from((_dailyReport?['byDay'] as List?) ?? []);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reporte Diario'),
-        // Exportar removido por pedido del cliente
+        elevation: 0,
+        surfaceTintColor: colorScheme.surfaceTint,
+        backgroundColor: colorScheme.surface,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(child: Text('Error: $_error'))
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Mostrar sucursal y fecha (sin selector)
-                      Row(children: [
-                        Expanded(child: Text('Sucursal: ${_sucursalProvider?.selectedSucursalName ?? '—'}', style: Theme.of(context).textTheme.bodyLarge)),
-                        const SizedBox(width: 12),
-                        // Fecha (hoy)
-                        ElevatedButton.icon(
-                          onPressed: null,
-                          icon: const Icon(Icons.calendar_today),
-                          label: Text(_start ?? ''),
-                          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        )
-                      ]),
-
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(child: _buildStatCard('Total Ingresos Netos (hoy)', 'Bs ${_formatNumber(_dailyReport?['totalPayments'])}')),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildStatCard('Deuda Pendiente (hoy)', 'Bs ${_formatNumber(_dailyReport?['pendingDebt'])}')),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildStatCard('Total Tickets (hoy)', '${_dailyReport?['totalTickets'] ?? 0}')),
-                        ],
-                      ),
+                      Icon(Icons.error_outline, size: 64, color: colorScheme.error),
                       const SizedBox(height: 16),
-
-                      // Título del gráfico
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.insights,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Comparativa Ingresos vs Deuda',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: byDayList.isEmpty
-                            ? Center(child: Text('No hay datos para mostrar', style: Theme.of(context).textTheme.bodyLarge))
-                            : _MiniBarChart(data: byDayList),
-                      )
+                      Text('Error: $_error', style: theme.textTheme.bodyLarge),
                     ],
                   ),
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header compacto con sucursal y fecha
+                      Container(
+                        margin: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.primaryContainer,
+                              colorScheme.primaryContainer.withValues(alpha: 0.7),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.store_rounded,
+                                color: colorScheme.onPrimary,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Sucursal',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  Text(
+                                    _sucursalProvider?.selectedSucursalName ?? '—',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.calendar_today, size: 14, color: colorScheme.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _start ?? '',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Tarjetas de métricas compactas
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final crossAxisCount = constraints.maxWidth > 600 ? 3 : 1;
+                            return GridView.count(
+                              crossAxisCount: crossAxisCount,
+                              childAspectRatio: crossAxisCount == 3 ? 3.5 : 5.0,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              children: [
+                                _buildCompactStatCard(
+                                  context,
+                                  'Total Ingresos Netos',
+                                  'Bs ${_formatNumber(_dailyReport?['totalPayments'])}',
+                                  Icons.trending_up_rounded,
+                                  Colors.green,
+                                ),
+                                _buildCompactStatCard(
+                                  context,
+                                  'Deuda Pendiente',
+                                  'Bs ${_formatNumber(_dailyReport?['pendingDebt'])}',
+                                  Icons.warning_amber_rounded,
+                                  Colors.orange,
+                                ),
+                                _buildCompactStatCard(
+                                  context,
+                                  'Total Tickets',
+                                  '${_dailyReport?['totalTickets'] ?? 0}',
+                                  Icons.receipt_long_rounded,
+                                  colorScheme.primary,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Tarjetas de métricas compactas
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.insights_rounded,
+                                size: 18,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Comparativa Ingresos vs Deuda',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Gráfico compacto
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: byDayList.isEmpty
+                                ? Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(32),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.bar_chart_rounded, size: 48, color: colorScheme.outlineVariant),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            'No hay datos para mostrar',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : _MiniBarChart(data: byDayList),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildCompactStatCard(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon,
+    Color iconColor,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value) {
+  Widget _buildModernStatCard(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon,
+    Color iconColor,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ]),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, size: 20, color: iconColor),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   String _formatNumber(dynamic value) {
-    if (value == null) return '0.0';
+    if (value == null) return '0.00';
     if (value is num) return value.toStringAsFixed(2);
     if (value is String) {
       final parsed = double.tryParse(value);
-      return parsed?.toStringAsFixed(2) ?? '0.0';
+      return parsed?.toStringAsFixed(2) ?? '0.00';
     }
     return value.toString();
   }
@@ -267,7 +542,7 @@ class _MiniBarChart extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
 
           // Barra de Ingresos
           _buildBarItem(
@@ -279,7 +554,7 @@ class _MiniBarChart extends StatelessWidget {
             icon: Icons.trending_up,
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
           // Barra de Deuda
           _buildBarItem(
@@ -291,14 +566,14 @@ class _MiniBarChart extends StatelessWidget {
             icon: Icons.warning_amber_rounded,
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
-          // Información adicional
+          // Información adicional compacta
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: theme.colorScheme.primary.withValues(alpha: 0.3),
                 width: 1,
@@ -314,6 +589,11 @@ class _MiniBarChart extends StatelessWidget {
                   value: totalTickets.toString(),
                   color: theme.colorScheme.primary,
                 ),
+                Container(
+                  width: 1,
+                  height: 25,
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                ),
                 _buildInfoChip(
                   context: context,
                   icon: Icons.calendar_today,
@@ -325,7 +605,7 @@ class _MiniBarChart extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -367,11 +647,11 @@ class _MiniBarChart extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
         // Barra de progreso
         Container(
-          height: 40,
+          height: 28,
           decoration: BoxDecoration(
             color: Colors.grey[200],
             borderRadius: BorderRadius.circular(10),
@@ -428,13 +708,14 @@ class _MiniBarChart extends StatelessWidget {
     required Color color,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 32, color: color),
-        const SizedBox(height: 4),
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 2),
         Text(
           value,
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: color,
           ),
@@ -442,7 +723,7 @@ class _MiniBarChart extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 10,
             color: Colors.grey[600],
           ),
         ),

@@ -109,9 +109,9 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reporte por Rango / Mensual'),
+        title: const Text('Reporte Mensual'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(12.0),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -120,39 +120,87 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Selector de rango
-                      Row(children: [
-                        Expanded(
-                          child: Text(
-                            'Sucursal: $sucName',
-                            style: Theme.of(context).textTheme.bodyLarge,
+                      // Header compacto
+                      Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                            width: 1,
                           ),
                         ),
-                        ElevatedButton.icon(
-                          onPressed: _pickRange,
-                          icon: const Icon(Icons.date_range),
-                          label: Text('${_formatDateShort(_start)} → ${_formatDateShort(_end)}'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.store_rounded,
+                                    size: 20,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      sucName,
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.tonalIcon(
+                                  onPressed: _pickRange,
+                                  icon: const Icon(Icons.date_range_rounded, size: 18),
+                                  label: Text('${_formatDateShort(_start)} → ${_formatDateShort(_end)}'),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ]),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Tarjetas de resumen compactas
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          return constraints.maxWidth > 600
+                              ? Row(
+                                  children: [
+                                    Expanded(child: _compactStatCard('Total Ingresos', 'Bs ${_formatNumber(_report?['totalPayments'])}', Icons.trending_up_rounded, Colors.green)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _compactStatCard('Deuda Pendiente', 'Bs ${_formatNumber(_report?['pendingDebt'])}', Icons.warning_amber_rounded, Colors.orange)),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: _compactStatCard('Total Tickets', '${_report?['totalTickets'] ?? 0}', Icons.receipt_long_rounded, Theme.of(context).colorScheme.primary)),
+                                  ],
+                                )
+                              : Column(
+                                  children: [
+                                    _compactStatCard('Total Ingresos', 'Bs ${_formatNumber(_report?['totalPayments'])}', Icons.trending_up_rounded, Colors.green),
+                                    const SizedBox(height: 8),
+                                    _compactStatCard('Deuda Pendiente', 'Bs ${_formatNumber(_report?['pendingDebt'])}', Icons.warning_amber_rounded, Colors.orange),
+                                    const SizedBox(height: 8),
+                                    _compactStatCard('Total Tickets', '${_report?['totalTickets'] ?? 0}', Icons.receipt_long_rounded, Theme.of(context).colorScheme.primary),
+                                  ],
+                                );
+                        },
+                      ),
 
                       const SizedBox(height: 12),
 
-                      // Tarjetas de resumen
-                      Row(children: [
-                        Expanded(child: _statCard('Total Ingresos', 'Bs ${_formatNumber(_report?['totalPayments'])}')),
-                        const SizedBox(width: 8),
-                        Expanded(child: _statCard('Deuda Pendiente', 'Bs ${_formatNumber(_report?['pendingDebt'])}')),
-                        const SizedBox(width: 8),
-                        Expanded(child: _statCard('Total Tickets', '${_report?['totalTickets'] ?? 0}')),
-                      ]),
-
-                      const SizedBox(height: 16),
-
-                      // Título del gráfico
+                      // Título del gráfico compacto
                       Row(
                         children: [
                           Icon(
@@ -161,20 +209,21 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            _isMultiMonth() ? 'Comparativa por Meses' : 'Comparativa por Días',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Text(
+                              _isMultiMonth() ? 'Comparativa por Meses' : 'Comparativa por Días',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          const Spacer(),
-                          OutlinedButton.icon(
+                          IconButton.filledTonal(
                             onPressed: _fetch,
-                            icon: const Icon(Icons.refresh, size: 18),
-                            label: const Text('Refrescar'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            icon: const Icon(Icons.refresh_rounded, size: 20),
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            style: IconButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ],
@@ -183,26 +232,29 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
                       const SizedBox(height: 8),
 
                       // Gráfico
-                      Expanded(
-                        child: byDayList.isEmpty
-                            ? Center(
+                      byDayList.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
                                 child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.bar_chart, size: 64, color: Colors.grey[300]),
-                                    const SizedBox(height: 16),
+                                    Icon(Icons.bar_chart_rounded, size: 48, color: Theme.of(context).colorScheme.outlineVariant),
+                                    const SizedBox(height: 12),
                                     Text(
                                       'No hay datos para el rango seleccionado',
-                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
                                   ],
                                 ),
-                              )
-                            : _RangeChart(
-                                data: byDayList,
-                                isMultiMonth: _isMultiMonth(),
                               ),
-                      ),
+                            )
+                          : _RangeChart(
+                              data: byDayList,
+                              isMultiMonth: _isMultiMonth(),
+                            ),
                     ],
                   ),
       ),
@@ -240,6 +292,61 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
       return parsed?.toStringAsFixed(2) ?? '0.00';
     }
     return value.toString();
+  }
+
+  Widget _compactStatCard(String title, String value, IconData icon, Color iconColor) {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _statCard(String title, String value) {
