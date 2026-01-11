@@ -166,8 +166,23 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Reemplazamos la lista "Por día" por un gráfico de barras pequeño
-                      const Text('Resumen por día', style: TextStyle(fontWeight: FontWeight.bold)),
+                      // Título del gráfico
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.insights,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Comparativa Ingresos vs Deuda',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       Expanded(
                         child: byDayList.isEmpty
@@ -212,46 +227,226 @@ class _MiniBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tomamos los últimos 7 días si hay muchos
-    final list = data.length > 7 ? data.sublist(data.length - 7) : data;
-    double maxVal = 0;
-    for (final d in list) {
+    final theme = Theme.of(context);
+
+    // Si no hay datos, mostrar mensaje
+    if (data.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bar_chart, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text('No hay datos para mostrar', style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[600])),
+          ],
+        ),
+      );
+    }
+
+    // Calcular totales
+    double totalIngresos = 0;
+    double totalDeuda = 0;
+    int totalTickets = 0;
+
+    for (final d in data) {
       final p = (d['payments'] is String) ? double.tryParse(d['payments']) ?? 0 : (d['payments'] ?? 0.0);
       final pd = (d['pendingDebt'] is String) ? double.tryParse(d['pendingDebt']) ?? 0 : (d['pendingDebt'] ?? 0.0);
-      maxVal = [maxVal, p, pd].reduce((a, b) => a > b ? a : b);
+      final t = d['tickets'] ?? 0;
+      totalIngresos += p;
+      totalDeuda += pd;
+      totalTickets += t as int;
     }
-    if (maxVal <= 0) maxVal = 1;
 
-    return LayoutBuilder(builder: (context, constraints) {
-       return Row(
-         crossAxisAlignment: CrossAxisAlignment.end,
-         children: list.map((d) {
-           final payments = (d['payments'] is String) ? double.tryParse(d['payments']) ?? 0 : (d['payments'] ?? 0.0);
-           final pending = (d['pendingDebt'] is String) ? double.tryParse(d['pendingDebt']) ?? 0 : (d['pendingDebt'] ?? 0.0);
-           final payH = (payments / maxVal) * (constraints.maxHeight - 40);
-           final debtH = (pending / maxVal) * (constraints.maxHeight - 40);
-           return Expanded(
-             child: Padding(
-               padding: const EdgeInsets.symmetric(horizontal: 4.0),
-               child: Column(
-                 mainAxisAlignment: MainAxisAlignment.end,
-                 children: [
-                   // Barras apiladas (payments arriba en color primario, deuda en secundario)
-                   Stack(
-                     alignment: Alignment.bottomCenter,
-                     children: [
-                       Container(height: debtH, width: double.infinity, decoration: BoxDecoration(color: Colors.redAccent.withAlpha(120), borderRadius: BorderRadius.circular(6))),
-                       Container(height: payH, width: double.infinity, decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(6))),
-                     ],
-                   ),
-                   const SizedBox(height: 6),
-                   Text(d['date']?.toString().split('-').last ?? '', style: Theme.of(context).textTheme.bodySmall),
-                 ],
-               ),
-             ),
-           );
-         }).toList(),
-       );
-     });
-   }
+    final maxValue = totalIngresos > totalDeuda ? totalIngresos : totalDeuda;
+    if (maxValue == 0) {
+      return Center(
+        child: Text('No hay movimientos registrados', style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[600])),
+      );
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          const SizedBox(height: 16),
+
+          // Barra de Ingresos
+          _buildBarItem(
+            context: context,
+            label: 'Total Ingresos',
+            value: totalIngresos,
+            maxValue: maxValue,
+            color: Colors.green,
+            icon: Icons.trending_up,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Barra de Deuda
+          _buildBarItem(
+            context: context,
+            label: 'Total Deuda Pendiente',
+            value: totalDeuda,
+            maxValue: maxValue,
+            color: Colors.orange,
+            icon: Icons.warning_amber_rounded,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Información adicional
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildInfoChip(
+                  context: context,
+                  icon: Icons.receipt_long,
+                  label: 'Tickets',
+                  value: totalTickets.toString(),
+                  color: theme.colorScheme.primary,
+                ),
+                _buildInfoChip(
+                  context: context,
+                  icon: Icons.calendar_today,
+                  label: 'Días',
+                  value: data.length.toString(),
+                  color: theme.colorScheme.secondary,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarItem({
+    required BuildContext context,
+    required String label,
+    required double value,
+    required double maxValue,
+    required Color color,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+    final percentage = maxValue > 0 ? (value / maxValue) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label con ícono
+        Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const Spacer(),
+            Text(
+              'Bs ${value.toStringAsFixed(2)}',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // Barra de progreso
+        Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Stack(
+            children: [
+              // Barra de color
+              FractionallySizedBox(
+                widthFactor: percentage,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0.7),
+                        color,
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Texto centrado
+              Center(
+                child: Text(
+                  '${(percentage * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: percentage > 0.5 ? Colors.white : Colors.grey[800],
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoChip({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 32, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
 }
