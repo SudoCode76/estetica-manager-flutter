@@ -1134,4 +1134,211 @@ class ApiService {
       return item;
     }).toList();
   }
+
+  // ==================== GESTIÓN DE USUARIOS ====================
+
+  /// Obtener roles disponibles
+  Future<List<Map<String, dynamic>>> getUserRoles() async {
+    final headers = await _getHeaders();
+    final url = Uri.parse('$_baseUrl/users-permissions/roles');
+
+    try {
+      final response = await _getWithTimeout(url, headers);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final List<dynamic> roles = data['roles'] ?? [];
+        return roles.map((e) => Map<String, dynamic>.from(e)).toList();
+      } else {
+        throw Exception('Error al obtener roles: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getUserRoles: $e');
+      rethrow;
+    }
+  }
+
+  /// Obtener todos los usuarios
+  Future<List<Map<String, dynamic>>> getUsers() async {
+    final headers = await _getHeaders();
+    final url = Uri.parse('$_baseUrl/users');
+
+    try {
+      final response = await _getWithTimeout(url, headers);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((e) => Map<String, dynamic>.from(e)).toList();
+      } else {
+        throw Exception('Error al obtener usuarios: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getUsers: $e');
+      rethrow;
+    }
+  }
+
+  /// Crear un nuevo usuario
+  Future<Map<String, dynamic>> createUser({
+    required String username,
+    required String email,
+    required String password,
+    String tipoUsuario = 'empleado',
+    bool confirmed = true,
+    bool blocked = false,
+    int? roleId,
+  }) async {
+    final headers = await _getHeaders();
+    final url = Uri.parse('$_baseUrl/users');
+
+    // Si no se proporciona roleId, intentar obtener el rol "Authenticated" (normalmente es 1)
+    int finalRoleId = roleId ?? 1;
+
+    // Si roleId es null, intentar obtener el rol correcto
+    if (roleId == null) {
+      try {
+        final roles = await getUserRoles();
+        final authenticatedRole = roles.firstWhere(
+          (role) => role['type'] == 'authenticated',
+          orElse: () => {'id': 1},
+        );
+        finalRoleId = authenticatedRole['id'] ?? 1;
+      } catch (e) {
+        print('No se pudo obtener el rol, usando ID 1 por defecto');
+      }
+    }
+
+    final body = jsonEncode({
+      'username': username,
+      'email': email,
+      'password': password,
+      'role': finalRoleId,
+      'tipoUsuario': tipoUsuario,
+      'confirmed': confirmed,
+      'blocked': blocked,
+    });
+
+    try {
+      final response = await _postWithTimeout(url, headers, body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return Map<String, dynamic>.from(jsonDecode(response.body));
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMsg = errorData['error']?['message'] ?? 'Error al crear usuario';
+        print('Error completo al crear usuario: ${response.body}');
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      print('Error en createUser: $e');
+      rethrow;
+    }
+  }
+
+  /// Actualizar un usuario existente
+  Future<Map<String, dynamic>> updateUser(
+    String documentId, {
+    String? username,
+    String? email,
+    bool? confirmed,
+    bool? blocked,
+    int? roleId,
+  }) async {
+    final headers = await _getHeaders();
+
+    // Primero obtener el usuario para conseguir su ID numérico
+    int userId;
+    try {
+      final users = await getUsers();
+      final user = users.firstWhere(
+        (u) => u['documentId'] == documentId,
+        orElse: () => throw Exception('Usuario no encontrado'),
+      );
+      userId = user['id'];
+    } catch (e) {
+      print('Error al buscar usuario: $e');
+      throw Exception('Usuario no encontrado');
+    }
+
+    // Usar el ID numérico en la URL
+    final url = Uri.parse('$_baseUrl/users/$userId');
+
+    // Si no se proporciona roleId, intentar obtener el rol "Authenticated"
+    int? finalRoleId = roleId;
+    if (finalRoleId == null) {
+      try {
+        final roles = await getUserRoles();
+        final authenticatedRole = roles.firstWhere(
+          (role) => role['type'] == 'authenticated',
+          orElse: () => {'id': 1},
+        );
+        finalRoleId = authenticatedRole['id'] ?? 1;
+      } catch (e) {
+        print('No se pudo obtener el rol, usando ID 1 por defecto');
+        finalRoleId = 1;
+      }
+    }
+
+    final Map<String, dynamic> updates = {
+      'role': finalRoleId, // Siempre incluir role
+    };
+    if (username != null) updates['username'] = username;
+    if (email != null) updates['email'] = email;
+    if (confirmed != null) updates['confirmed'] = confirmed;
+    if (blocked != null) updates['blocked'] = blocked;
+
+    final body = jsonEncode(updates);
+
+    print('Actualizando usuario $userId con body: $body');
+
+    try {
+      final response = await _putWithTimeout(url, headers, body);
+
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(jsonDecode(response.body));
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMsg = errorData['error']?['message'] ?? 'Error al actualizar usuario';
+        print('Error completo al actualizar usuario: ${response.body}');
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      print('Error en updateUser: $e');
+      rethrow;
+    }
+  }
+
+  /// Eliminar un usuario
+  Future<void> deleteUser(String documentId) async {
+    final headers = await _getHeaders();
+
+    // Primero obtener el usuario para conseguir su ID numérico
+    int userId;
+    try {
+      final users = await getUsers();
+      final user = users.firstWhere(
+        (u) => u['documentId'] == documentId,
+        orElse: () => throw Exception('Usuario no encontrado'),
+      );
+      userId = user['id'];
+    } catch (e) {
+      print('Error al buscar usuario: $e');
+      throw Exception('Usuario no encontrado');
+    }
+
+    final url = Uri.parse('$_baseUrl/users/$userId');
+
+    print('Eliminando usuario $userId');
+
+    try {
+      final response = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('Error al eliminar usuario: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en deleteUser: $e');
+      rethrow;
+    }
+  }
 }

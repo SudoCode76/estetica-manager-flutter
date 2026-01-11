@@ -5,6 +5,7 @@ import 'package:app_estetica/screens/admin/settings_screen.dart';
 import 'package:app_estetica/screens/admin/tickets_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
 import 'package:app_estetica/screens/admin/payments_screen.dart';
+import 'package:app_estetica/screens/admin/employees_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
@@ -34,6 +35,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const TreatmentsScreen(),
     const PaymentsScreen(),
     const ReportsScreen(),
+    const EmployeesScreen(),
     const SettingsScreen(),
   ];
 
@@ -270,12 +272,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.settings_outlined,
-                    selectedIcon: Icons.settings,
-                    label: 'Configuración',
+                    icon: Icons.people_outline_rounded,
+                    selectedIcon: Icons.people_rounded,
+                    label: 'Empleados',
                     selected: _selectedIndex == 5,
                     onTap: () {
                       setState(() { _selectedIndex = 5; });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.settings_outlined,
+                    selectedIcon: Icons.settings,
+                    label: 'Configuración',
+                    selected: _selectedIndex == 6,
+                    onTap: () {
+                      setState(() { _selectedIndex = 6; });
                       Navigator.pop(context);
                     },
                   ),
