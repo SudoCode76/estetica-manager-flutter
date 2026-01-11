@@ -401,11 +401,48 @@ class ApiService {
   }
 
   // Crear un nuevo ticket
+  /// Si el ticket contiene un pago inicial (cuota > saldoPendiente), crea automáticamente el registro de pago
   Future<bool> crearTicket(Map<String, dynamic> ticket) async {
     final url = Uri.parse('$_baseUrl/tickets');
     final headers = await _getHeaders();
     final response = await _postWithTimeout(url, headers, jsonEncode({'data': ticket}));
     if (response.statusCode == 200 || response.statusCode == 201) {
+      try {
+        // Verificar si hay un pago inicial (cuota > saldoPendiente)
+        final cuota = ticket['cuota'];
+        final saldoPendiente = ticket['saldoPendiente'];
+        if (cuota != null && saldoPendiente != null) {
+          final cuotaNum = double.tryParse(cuota.toString()) ?? 0;
+          final saldoNum = double.tryParse(saldoPendiente.toString()) ?? 0;
+          final pagoInicial = cuotaNum - saldoNum;
+
+          if (pagoInicial > 0) {
+            // Extraer el ID del ticket creado
+            final data = jsonDecode(response.body);
+            final createdTicket = _normalizeItems([data['data']]).first as Map<String, dynamic>;
+            final ticketId = createdTicket['id'];
+
+            if (ticketId != null) {
+              // Crear registro de pago
+              print('crearTicket: creando pago inicial de $pagoInicial para ticket $ticketId');
+              try {
+                await crearPago({
+                  'montoPagado': pagoInicial,
+                  'fechaPago': DateTime.now().toIso8601String(),
+                  'ticket': ticketId,
+                });
+                print('crearTicket: pago inicial creado exitosamente');
+              } catch (e) {
+                print('crearTicket: Error al crear pago inicial: $e');
+                // No fallar la creación del ticket si falla el pago
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('crearTicket: Error al procesar pago inicial: $e');
+        // No fallar la creación del ticket si hay error en el pago
+      }
       return true;
     } else {
       print('Error al crear ticket: ${response.body}');
@@ -480,15 +517,32 @@ class ApiService {
   }
 
     // Obtener pagos
-    Future<List<dynamic>> getPagos() async {
+    Future<List<dynamic>> getPagos({int? sucursalId}) async {
     final headers = await _getHeaders();
-    final endpoint = '$_baseUrl/pagos?populate=*';
+    // Pedimos la relación ticket->sucursal para poder filtrar localmente
+    final params = ['populate[ticket][populate]=sucursal', 'pagination[pageSize]=1000'];
+    final endpoint = '$_baseUrl/pagos?${params.join('&')}';
     try {
       final response = await _getWithTimeout(Uri.parse(endpoint), headers);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final raw = data['data'] ?? [];
-        return _normalizeItems(raw);
+        final raw = List<dynamic>.from(data['data'] ?? []);
+        final normalized = _normalizeItems(raw);
+        if (sucursalId != null) {
+          // Filtrar localmente por la sucursal del ticket
+          return normalized.where((p) {
+            final pt = p['ticket'];
+            if (pt == null) return false;
+            if (pt is Map) {
+              final suc = pt['sucursal'];
+              if (suc == null) return false;
+              final sid = suc['id'] ?? suc['documentId'];
+              return sid == sucursalId || (sid is String && sid == sucursalId.toString());
+            }
+            return false;
+          }).toList();
+        }
+        return normalized;
       } else {
         print('getPagos failed ${response.statusCode}: ${response.body}');
         throw Exception('Error al obtener pagos');
@@ -728,6 +782,302 @@ class ApiService {
     } catch (e) {
       print('Exception getTicketByDocumentId: $e');
       return null;
+    }
+  }
+
+  // ------------------------------
+  // Funciones de Reportes (cliente-side)
+  // ------------------------------
+
+  /// Obtiene un reporte diario/por rango calculando sobre pagos y tickets.
+  /// Parámetros opcionales: start y end en formato YYYY-MM-DD, sucursalId para filtrar.
+  /// NOTA: Filtra por createdAt (fecha de creación) en lugar de fechaPago/fecha
+  Future<Map<String, dynamic>> getDailyReport({String? start, String? end, int? sucursalId}) async {
+    final headers = await _getHeaders();
+
+    // Construir filtros para pagos usando createdAt (fecha de creación del pago)
+    final List<String> pagoParams = ['populate[ticket][populate]=sucursal','populate[ticket][populate]=cliente','pagination[pageSize]=1000'];
+    if (start != null && end != null) {
+      // Construir DateTimes en UTC desde las fechas YYYY-MM-DD
+      try {
+        final partsStart = start.split('-');
+        final partsEnd = end.split('-');
+        final startDt = DateTime.utc(int.parse(partsStart[0]), int.parse(partsStart[1]), int.parse(partsStart[2]));
+        final endDt = DateTime.utc(int.parse(partsEnd[0]), int.parse(partsEnd[1]), int.parse(partsEnd[2]), 23, 59, 59, 999);
+        final isoStart = startDt.toIso8601String();
+        final isoEnd = endDt.toIso8601String();
+        pagoParams.add('filters[createdAt][\$gte]=$isoStart');
+        pagoParams.add('filters[createdAt][\$lte]=$isoEnd');
+      } catch (e) {
+        // fallback simple ISO without padding
+        final isoStart = '${start}T00:00:00.000Z';
+        final isoEnd = '${end}T23:59:59.999Z';
+        pagoParams.add('filters[createdAt][\$gte]=$isoStart');
+        pagoParams.add('filters[createdAt][\$lte]=$isoEnd');
+      }
+    }
+
+    final pagosEndpoint = '$_baseUrl/pagos?${pagoParams.join('&')}';
+    print('ApiService.getDailyReport: calling pagos $pagosEndpoint');
+
+    // Construir filtros para tickets (TODOS los tickets de la sucursal para calcular deuda y contar tickets del día)
+    final List<String> ticketParams = [
+      'populate[cliente]=true',
+      'populate[sucursal]=true',
+      'pagination[pageSize]=1000',
+    ];
+    if (sucursalId != null) {
+      ticketParams.add('filters[sucursal][id][\$eq]=$sucursalId');
+    }
+    final ticketsEndpoint = '$_baseUrl/tickets?${ticketParams.join('&')}';
+    print('ApiService.getDailyReport: calling tickets $ticketsEndpoint');
+
+    try {
+      final pagosResp = await _getWithTimeout(Uri.parse(pagosEndpoint), headers, seconds: 12);
+      final ticketsResp = await _getWithTimeout(Uri.parse(ticketsEndpoint), headers, seconds: 12);
+
+      if (pagosResp.statusCode != 200) {
+        throw Exception('Error al obtener pagos: ${pagosResp.statusCode}');
+      }
+      if (ticketsResp.statusCode != 200) {
+        throw Exception('Error al obtener tickets: ${ticketsResp.statusCode}');
+      }
+
+      final pagosData = jsonDecode(pagosResp.body);
+      final ticketsData = jsonDecode(ticketsResp.body);
+
+      final pagosRaw = List<dynamic>.from(pagosData['data'] ?? []);
+      final ticketsRaw = List<dynamic>.from(ticketsData['data'] ?? []);
+
+      final pagosListAll = _normalizeItems(pagosRaw);
+      final ticketsList = _normalizeItems(ticketsRaw);
+
+      final int pagosAllCount = pagosListAll.length;
+      final int ticketsCount = ticketsList.length;
+      final int pagosUnlinkedCountAll = pagosListAll.where((p) => p['ticket'] == null).length;
+
+      // Filtrar pagos en cliente según la sucursalId (si se pasó)
+      final List<dynamic> pagosList;
+      if (sucursalId != null) {
+        pagosList = pagosListAll.where((p) {
+          final pt = p['ticket'];
+          if (pt == null) return false; // pago sin ticket -> no pertenece a ninguna sucursal
+          if (pt is Map) {
+            final suc = pt['sucursal'];
+            if (suc == null) return false;
+            final sid = suc['id'] ?? suc['documentId'];
+            return sid == sucursalId || (sid is String && sid == sucursalId.toString());
+          }
+          // ticket puede venir como primitivo (id o documentId)
+          return false;
+        }).toList();
+      } else {
+        pagosList = pagosListAll;
+      }
+
+      // Calcular totales
+      double totalPayments = 0.0;
+      for (final p in pagosList) {
+        try {
+          totalPayments += (p['montoPagado'] is String) ? double.parse(p['montoPagado'].toString()) : (p['montoPagado'] ?? 0.0);
+        } catch (_) {}
+      }
+
+      // Deuda pendiente: suma de TODOS los tickets con saldo > 0 (independiente de estadoTicket)
+      double pendingDebt = 0.0;
+      for (final t in ticketsList) {
+        try {
+          final saldo = (t['saldoPendiente'] is String) ? double.parse(t['saldoPendiente'].toString()) : (t['saldoPendiente'] ?? 0.0);
+          if (saldo > 0) {
+            pendingDebt += saldo;
+          }
+        } catch (_) {}
+      }
+
+      // Total de tickets del día: filtrar por fecha de creación (createdAt)
+      int totalTicketsToday = 0;
+      if (start != null && end != null) {
+        try {
+          final partsStart = start.split('-');
+          final partsEnd = end.split('-');
+          final startDt = DateTime.utc(int.parse(partsStart[0]), int.parse(partsStart[1]), int.parse(partsStart[2]));
+          final endDt = DateTime.utc(int.parse(partsEnd[0]), int.parse(partsEnd[1]), int.parse(partsEnd[2]), 23, 59, 59, 999);
+
+          for (final t in ticketsList) {
+            final rawDate = t['createdAt']; // Usar createdAt en lugar de fecha
+            if (rawDate == null) continue;
+            try {
+              final ticketDate = DateTime.parse(rawDate.toString());
+              if (ticketDate.isAfter(startDt.subtract(const Duration(seconds: 1))) &&
+                  ticketDate.isBefore(endDt.add(const Duration(seconds: 1)))) {
+                totalTicketsToday++;
+              }
+            } catch (_) {}
+          }
+        } catch (_) {
+          totalTicketsToday = ticketsList.length;
+        }
+      } else {
+        totalTicketsToday = ticketsList.length;
+      }
+
+      print('getDailyReport: pagosAll=$pagosAllCount pagosUnlinkedAll=$pagosUnlinkedCountAll pagosFiltered=${pagosList.length} ticketsAll=$ticketsCount ticketsToday=$totalTicketsToday totalPayments=$totalPayments pendingDebt=$pendingDebt');
+
+      // Agrupar por día (pagos usando createdAt)
+      final Map<String, Map<String, dynamic>> byDayMap = {};
+      for (final p in pagosList) {
+        final rawDate = p['createdAt']; // Usar createdAt
+        final dateKey = _toDateKey(rawDate);
+        final value = (p['montoPagado'] is String) ? double.parse(p['montoPagado'].toString()) : (p['montoPagado'] ?? 0.0);
+        byDayMap.putIfAbsent(dateKey, () => {'date': dateKey, 'payments': 0.0, 'tickets': 0, 'pendingDebt': 0.0});
+        byDayMap[dateKey]!['payments'] = (byDayMap[dateKey]!['payments'] as double) + value;
+      }
+
+      // Para tickets agrupamos contando solo los del rango de fechas usando createdAt
+      if (start != null && end != null) {
+        try {
+          final partsStart = start.split('-');
+          final partsEnd = end.split('-');
+          final startDt = DateTime.utc(int.parse(partsStart[0]), int.parse(partsStart[1]), int.parse(partsStart[2]));
+          final endDt = DateTime.utc(int.parse(partsEnd[0]), int.parse(partsEnd[1]), int.parse(partsEnd[2]), 23, 59, 59, 999);
+
+          for (final t in ticketsList) {
+            final rawDate = t['createdAt']; // Usar createdAt
+            if (rawDate == null) continue;
+            try {
+              final ticketDate = DateTime.parse(rawDate.toString());
+              if (ticketDate.isAfter(startDt.subtract(const Duration(seconds: 1))) &&
+                  ticketDate.isBefore(endDt.add(const Duration(seconds: 1)))) {
+                final dateKey = _toDateKey(rawDate);
+                final debt = (t['saldoPendiente'] is String) ? double.parse(t['saldoPendiente'].toString()) : (t['saldoPendiente'] ?? 0.0);
+                byDayMap.putIfAbsent(dateKey, () => {'date': dateKey, 'payments': 0.0, 'tickets': 0, 'pendingDebt': 0.0});
+                byDayMap[dateKey]!['pendingDebt'] = (byDayMap[dateKey]!['pendingDebt'] as double) + debt;
+                byDayMap[dateKey]!['tickets'] = (byDayMap[dateKey]!['tickets'] as int) + 1;
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      final byDay = byDayMap.values.toList();
+      byDay.sort((a, b) => a['date'].compareTo(b['date']));
+
+      return {
+        'totalPayments': totalPayments,
+        'pendingDebt': pendingDebt,
+        'totalTickets': totalTicketsToday,
+        'byDay': byDay,
+        'debug': {
+          'pagosAll': pagosAllCount,
+          'pagosUnlinkedAll': pagosUnlinkedCountAll,
+          'pagosFiltered': pagosList.length,
+          'ticketsAll': ticketsCount,
+          'ticketsToday': totalTicketsToday,
+        }
+      };
+    } catch (e) {
+      print('getDailyReport exception: $e');
+      throw Exception('Error al generar reporte diario: $e');
+    }
+  }
+
+  /// Obtiene lista de clientes con deuda (suma de saldoPendiente en sus tickets)
+  Future<List<dynamic>> getDebtReport({int? sucursalId}) async {
+    final headers = await _getHeaders();
+    final List<String> ticketParams = [
+      'populate[cliente]=true',
+      'populate[sucursal]=true',
+      'pagination[pageSize]=1000',
+    ];
+    if (sucursalId != null) ticketParams.add('filters[sucursal][id][\$eq]=$sucursalId');
+    final ticketsEndpoint = '$_baseUrl/tickets?${ticketParams.join('&')}';
+    try {
+      final ticketsResp = await _getWithTimeout(Uri.parse(ticketsEndpoint), headers, seconds: 12);
+      if (ticketsResp.statusCode != 200) throw Exception('Error al obtener tickets: ${ticketsResp.statusCode}');
+      final ticketsData = jsonDecode(ticketsResp.body);
+      final ticketsList = _normalizeItems(List<dynamic>.from(ticketsData['data'] ?? []));
+
+      final Map<int, Map<String, dynamic>> clients = {};
+      for (final t in ticketsList) {
+        final cliente = t['cliente'];
+        if (cliente == null) continue;
+        final cid = cliente['id'] ?? cliente['documentId']?.hashCode;
+        final debt = (t['saldoPendiente'] is String) ? double.parse(t['saldoPendiente'].toString()) : (t['saldoPendiente'] ?? 0.0);
+        if (debt <= 0) continue;
+        clients.putIfAbsent(cid, () => {'client': cliente, 'deudaTotal': 0.0, 'tickets': <dynamic>[]});
+        clients[cid]!['deudaTotal'] = (clients[cid]!['deudaTotal'] as double) + debt;
+        clients[cid]!['tickets'].add(t);
+      }
+
+      final list = clients.values.toList();
+      list.sort((a, b) => (b['deudaTotal'] as double).compareTo(a['deudaTotal'] as double));
+      return list;
+    } catch (e) {
+      print('getDebtReport exception: $e');
+      throw Exception('Error al generar reporte de deudas: $e');
+    }
+  }
+
+  /// Detalle de cliente: tickets y pagos asociados (si se pueden resolver)
+  Future<Map<String, dynamic>> getClientReport(int clientId) async {
+    final headers = await _getHeaders();
+    // Tickets del cliente
+    final ticketsEndpoint = '$_baseUrl/tickets?filters[cliente][id][\$eq]=$clientId&populate=*';
+    // Pagos que tengan ticket con cliente (populamos ticket->cliente)
+    final pagosEndpoint = '$_baseUrl/pagos?populate[ticket][populate]=cliente&pagination[pageSize]=1000';
+
+    try {
+      final ticketsResp = await _getWithTimeout(Uri.parse(ticketsEndpoint), headers, seconds: 12);
+      if (ticketsResp.statusCode != 200) throw Exception('Error al obtener tickets del cliente: ${ticketsResp.statusCode}');
+      final ticketsData = jsonDecode(ticketsResp.body);
+      final ticketsList = _normalizeItems(List<dynamic>.from(ticketsData['data'] ?? []));
+
+      final pagosResp = await _getWithTimeout(Uri.parse(pagosEndpoint), headers, seconds: 12);
+      if (pagosResp.statusCode != 200) throw Exception('Error al obtener pagos: ${pagosResp.statusCode}');
+      final pagosData = jsonDecode(pagosResp.body);
+      final pagosList = _normalizeItems(List<dynamic>.from(pagosData['data'] ?? []));
+
+      // Filtrar pagos relacionados al cliente (vía pago.ticket.cliente)
+      final List<dynamic> pagosCliente = [];
+      for (final p in pagosList) {
+        final ticket = p['ticket'];
+        if (ticket != null) {
+          final cliente = ticket['cliente'];
+          if (cliente != null && (cliente['id'] == clientId || cliente['documentId'] == clientId)) {
+            pagosCliente.add(p);
+          }
+        }
+      }
+
+      double deudaTotal = 0.0;
+      for (final t in ticketsList) {
+        deudaTotal += (t['saldoPendiente'] is String) ? double.parse(t['saldoPendiente'].toString()) : (t['saldoPendiente'] ?? 0.0);
+      }
+
+      return {
+        'tickets': ticketsList,
+        'pagos': pagosCliente,
+        'deudaTotal': deudaTotal,
+      };
+    } catch (e) {
+      print('getClientReport exception: $e');
+      throw Exception('Error al obtener detalle del cliente: $e');
+    }
+  }
+
+  // Helper para normalizar fecha a YYYY-MM-DD
+  String _toDateKey(dynamic rawDate) {
+    if (rawDate == null) return 'unknown';
+    try {
+      final d = DateTime.parse(rawDate.toString()).toUtc();
+      return '${d.year.toString().padLeft(4,'0')}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+    } catch (_) {
+      try {
+        final d = DateTime.parse(rawDate.toString());
+        return '${d.year.toString().padLeft(4,'0')}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+      } catch (e) {
+        return rawDate.toString().split('T').first;
+      }
     }
   }
 

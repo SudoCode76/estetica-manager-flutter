@@ -224,7 +224,110 @@ class ShareService {
     await shareFile(file, text: 'Ticket: $nameBase');
   }
 
+  // Generar PDF de un reporte (daily report)
+  static Future<Uint8List> buildReportPdf(Map<String, dynamic> report, {String? title, String? sucursalName}) async {
+    final pdf = pw.Document();
+
+    // Header values
+    final totalPayments = report['totalPayments'] ?? 0.0;
+    final pendingDebt = report['pendingDebt'] ?? 0.0;
+    final totalTickets = report['totalTickets'] ?? 0;
+    final byDay = List<dynamic>.from(report['byDay'] ?? []);
+
+    // Try load logo
+    Uint8List? logoBytes;
+    try {
+      final bytes = await rootBundle.load('assets/logo.png');
+      logoBytes = bytes.buffer.asUint8List();
+    } catch (_) {
+      logoBytes = null;
+    }
+
+    pdf.addPage(pw.Page(pageFormat: PdfPageFormat.a4, build: (pw.Context ctx) {
+      return pw.Padding(
+        padding: pw.EdgeInsets.all(20),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            if (logoBytes != null) pw.Image(pw.MemoryImage(logoBytes), width: 48, height: 48) else pw.Container(),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              pw.Text(title ?? 'Reporte', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              if (sucursalName != null) pw.Text(sucursalName, style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+              pw.SizedBox(height: 4),
+              pw.Text('Generado: ${DateFormat('dd MMM yyyy HH:mm').format(DateTime.now())}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+            ])
+          ]),
+
+          pw.SizedBox(height: 16),
+          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Text('Total Ingresos', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+            pw.Text('Bs ${double.tryParse(totalPayments.toString())?.toStringAsFixed(2) ?? totalPayments.toString()}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          ]),
+          pw.SizedBox(height: 6),
+          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Text('Deuda pendiente', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+            pw.Text('Bs ${double.tryParse(pendingDebt.toString())?.toStringAsFixed(2) ?? pendingDebt.toString()}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          ]),
+          pw.SizedBox(height: 6),
+          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Text('Total Tickets', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+            pw.Text('${totalTickets}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          ]),
+
+          pw.SizedBox(height: 16),
+          pw.Text('Detalle por día', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 8),
+
+          pw.TableHelper.fromTextArray(
+            headers: ['Fecha', 'Ingresos', 'Deuda', 'Tickets'],
+            data: byDay.map((d) => [d['date'] ?? '', (d['payments'] ?? 0).toString(), (d['pendingDebt'] ?? 0).toString(), (d['tickets'] ?? 0).toString()]).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+            cellStyle: pw.TextStyle(fontSize: 10),
+            cellAlignment: pw.Alignment.centerLeft,
+            headerDecoration: pw.BoxDecoration(color: PdfColors.grey200),
+          ),
+
+          pw.Spacer(),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+          pw.Center(child: pw.Text('Gracias por usar la aplicación', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)))
+        ]),
+      );
+    }));
+
+    return pdf.save();
+  }
+
+  // Generar CSV simple para el reporte
+  static Uint8List buildReportCsv(Map<String, dynamic> report) {
+    final buffer = StringBuffer();
+    buffer.writeln('Fecha,Ingresos,Deuda,Tickets');
+    final byDay = List<dynamic>.from(report['byDay'] ?? []);
+    for (final d in byDay) {
+      final date = d['date'] ?? '';
+      final payments = d['payments']?.toString() ?? '0';
+      final debt = d['pendingDebt']?.toString() ?? '0';
+      final tickets = d['tickets']?.toString() ?? '0';
+      buffer.writeln('$date,$payments,$debt,$tickets');
+    }
+    return Uint8List.fromList(buffer.toString().codeUnits);
+  }
+
+  // Escribir CSV/PDF y compartir
+  static Future<void> generateReportPdfAndShare(Map<String, dynamic> report, {String? title, String? sucursalName}) async {
+    final bytes = await buildReportPdf(report, title: title, sucursalName: sucursalName);
+    final filename = 'reporte_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final file = await writeTempFile(bytes, filename);
+    await shareFile(file, text: title ?? 'Reporte');
+  }
+
+  static Future<void> generateReportCsvAndShare(Map<String, dynamic> report, {String? title}) async {
+    final bytes = buildReportCsv(report);
+    final filename = 'reporte_${DateTime.now().millisecondsSinceEpoch}.csv';
+    final file = await writeTempFile(bytes, filename);
+    await shareFile(file, text: title ?? 'Reporte CSV');
+  }
+
   static String sanitizeFileName(String input) {
     return input.replaceAll(RegExp(r"[^a-zA-Z0-9-_\.]"), '_');
   }
-}
+ }

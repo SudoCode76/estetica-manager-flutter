@@ -116,7 +116,7 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
         return tclient == clientId;
       }).toList();
 
-      final allPagos = await _api.getPagos();
+      final allPagos = await _api.getPagos(sucursalId: sucursalId);
       final pagosCliente = allPagos.where((p) {
         final pc = p['cliente'] is Map ? p['cliente']['id'] : p['cliente'];
         if (pc != null && pc == clientId) return true;

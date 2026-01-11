@@ -50,7 +50,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
       }
 
       // Cargar historial de pagos del cliente (si el modelo contiene cliente o ticket, lo relacionamos)
-      final allPagos = await _api.getPagos();
+      final allPagos = await _api.getPagos(sucursalId: sucursalId);
       final pagosCliente = allPagos.where((p) {
         final pc = p['cliente'] is Map ? p['cliente']['id'] : p['cliente'];
         if (pc != null && pc == cid) return true;
@@ -222,8 +222,14 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
         if (saldo <= 0) continue;
         final apply = remaining >= saldo ? saldo : remaining;
-        // Crear pago incluyendo relación a ticket. Usamos documentId si está disponible (algunos backends esperan documentId)
-        final ticketRef = t['documentId'] ?? t['id'];
+        // Crear pago incluyendo relación a ticket. Usamos el id numérico del ticket para asegurar el enlace
+        dynamic ticketRef = t['id'];
+        if (ticketRef == null && (t['documentId'] != null)) {
+          try {
+            final resolved = await _api.getTicketByDocumentId(t['documentId'].toString());
+            if (resolved != null) ticketRef = resolved['id'];
+          } catch (_) {}
+        }
         final pagoPayload = {
           'montoPagado': apply,
           'fechaPago': DateTime.now().toIso8601String(),
@@ -255,25 +261,26 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
 
       // refresh pagos list
       try {
-        final refreshedPagos = await _api.getPagos();
-        setState(() {
-          _pagos = refreshedPagos.where((p) {
-            // Some payments may include a 'ticket' relation as Map with 'id' or 'documentId', or as primitive
-            final ptRaw = p['ticket'];
-            if (ptRaw == null) return false;
-            if (ptRaw is Map) {
-              final tid = ptRaw['id'];
-              final tdoc = ptRaw['documentId'];
-              if (tid != null && _tickets.any((t) => t['id'] == tid)) return true;
-              if (tdoc != null && _tickets.any((t) => (t['documentId'] ?? '').toString() == tdoc.toString())) return true;
-            } else {
-              // primitive: could be numeric id or documentId string
-              if (_tickets.any((t) => t['id'] == ptRaw || (t['documentId'] ?? '').toString() == ptRaw.toString())) return true;
-            }
-            return false;
-          }).toList();
-        });
-      } catch (_) {}
+        final sucursalIdRef = SucursalInherited.of(context)?.selectedSucursalId;
+        final refreshedPagos = await _api.getPagos(sucursalId: sucursalIdRef);
+         setState(() {
+           _pagos = refreshedPagos.where((p) {
+             // Some payments may include a 'ticket' relation as Map with 'id' or 'documentId', or as primitive
+             final ptRaw = p['ticket'];
+             if (ptRaw == null) return false;
+             if (ptRaw is Map) {
+               final tid = ptRaw['id'];
+               final tdoc = ptRaw['documentId'];
+               if (tid != null && _tickets.any((t) => t['id'] == tid)) return true;
+               if (tdoc != null && _tickets.any((t) => (t['documentId'] ?? '').toString() == tdoc.toString())) return true;
+             } else {
+               // primitive: could be numeric id or documentId string
+               if (_tickets.any((t) => t['id'] == ptRaw || (t['documentId'] ?? '').toString() == ptRaw.toString())) return true;
+             }
+             return false;
+           }).toList();
+         });
+       } catch (_) {}
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pago registrado')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error registrando pago: $e')));
