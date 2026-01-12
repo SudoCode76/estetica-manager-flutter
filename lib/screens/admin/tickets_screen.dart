@@ -14,6 +14,7 @@ class TicketsScreen extends StatefulWidget {
 
 class _TicketsScreenState extends State<TicketsScreen> {
   final ApiService api = ApiService();
+  final TextEditingController _searchController = TextEditingController();
   List<dynamic> tickets = [];
   List<dynamic> filteredTickets = [];
   bool isLoading = true;
@@ -42,6 +43,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _sucursalProvider?.removeListener(_onSucursalChanged);
     super.dispose();
   }
@@ -63,7 +65,22 @@ class _TicketsScreenState extends State<TicketsScreen> {
         estadoTicket: showAtendidos,
       );
       tickets = data;
-      filteredTickets = tickets;
+      // Aplicar filtro de búsqueda actual
+      if (search.isEmpty) {
+        filteredTickets = tickets;
+      } else {
+        filteredTickets = tickets.where((t) {
+          final cliente = t['cliente']?['nombreCliente'] ?? '';
+          final apellido = t['cliente']?['apellidoCliente'] ?? '';
+          final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
+          final tratamientosMatch = tratamientos.any((tr) =>
+            (tr['nombreTratamiento'] ?? '').toLowerCase().contains(search.toLowerCase())
+          );
+          return cliente.toLowerCase().contains(search.toLowerCase()) ||
+              apellido.toLowerCase().contains(search.toLowerCase()) ||
+              tratamientosMatch;
+        }).toList();
+      }
       sortTickets();
     } catch (e) {
       errorMsg = 'No se pudo conectar al servidor.';
@@ -119,8 +136,20 @@ class _TicketsScreenState extends State<TicketsScreen> {
                   children: [
                     Expanded(
                       child: SearchBar(
+                        controller: _searchController,
                         hintText: 'Buscar por cliente o tratamiento',
                         leading: const Icon(Icons.search),
+                        trailing: search.isNotEmpty
+                            ? [
+                                IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    filterTickets('');
+                                  },
+                                ),
+                              ]
+                            : null,
                         onChanged: filterTickets,
                         elevation: const WidgetStatePropertyAll(1),
                       ),
