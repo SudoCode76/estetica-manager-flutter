@@ -94,6 +94,95 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
+  Future<void> _eliminarTicket() async {
+    // Mostrar diálogo de confirmación
+    final confirmacion = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.red),
+          title: const Text('¿Eliminar ticket?'),
+          content: const Text(
+            'Esta acción no se puede deshacer. ¿Está seguro de que desea eliminar este ticket?',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmacion != true) return;
+
+    setState(() {
+      isUpdating = true;
+    });
+
+    try {
+      final documentId = widget.ticket['documentId'];
+      final success = await api.eliminarTicket(documentId);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Ticket eliminado correctamente'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        // Regresar a la pantalla anterior
+        Navigator.pop(context, true);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Error al eliminar el ticket'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isUpdating = false;
+        });
+      }
+    }
+  }
+
   // Construye el texto del ticket (sin lanzar)
   String _buildWhatsAppMessage() {
     final cliente = widget.ticket['cliente'];
@@ -244,16 +333,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         title: const Text('Detalle del Ticket'),
         elevation: 0,
         actions: [
+          // Botón para eliminar ticket
           IconButton(
-            onPressed: () {
-              // TODO: Editar ticket
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Función de edición próximamente')),
-              );
-            },
-            icon: const Icon(Icons.edit_outlined),
+            onPressed: isUpdating ? null : _eliminarTicket,
+            tooltip: 'Eliminar ticket',
+            icon: const Icon(Icons.delete_outline),
+            color: Colors.red,
           ),
-          // Botón único para enviar ticket por WhatsApp (texto o PDF). Usa asset si existe, si no fallback a icono.
+          // Botón único para enviar ticket por WhatsApp (texto o PDF)
           IconButton(
             onPressed: _chooseAndSendToWhatsApp,
             tooltip: 'Enviar ticket por WhatsApp',

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
+import 'package:app_estetica/screens/admin/all_tickets_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 
@@ -22,6 +23,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   String? errorMsg;
   bool showAtendidos = false; // false = pendientes, true = atendidos
   bool sortAscending = true; // true = antiguo→nuevo, false = nuevo→antiguo
+  bool showOnlyToday = true; // true = solo hoy, false = todos los tickets
   SucursalProvider? _sucursalProvider;
 
   @override
@@ -65,11 +67,27 @@ class _TicketsScreenState extends State<TicketsScreen> {
         estadoTicket: showAtendidos,
       );
       tickets = data;
+
+      // Filtrar por fecha de hoy si showOnlyToday es true
+      List<dynamic> dateFilteredTickets = tickets;
+      if (showOnlyToday) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final tomorrow = today.add(const Duration(days: 1));
+
+        dateFilteredTickets = tickets.where((t) {
+          if (t['fecha'] == null) return false;
+          final ticketDate = DateTime.parse(t['fecha']);
+          return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) &&
+                 ticketDate.isBefore(tomorrow);
+        }).toList();
+      }
+
       // Aplicar filtro de búsqueda actual
       if (search.isEmpty) {
-        filteredTickets = tickets;
+        filteredTickets = dateFilteredTickets;
       } else {
-        filteredTickets = tickets.where((t) {
+        filteredTickets = dateFilteredTickets.where((t) {
           final cliente = t['cliente']?['nombreCliente'] ?? '';
           final apellido = t['cliente']?['apellidoCliente'] ?? '';
           final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
@@ -184,29 +202,68 @@ class _TicketsScreenState extends State<TicketsScreen> {
                 ),
                 const SizedBox(height: 16),
                 // Filtro de estado (Pendientes / Atendidos)
-                SegmentedButton<bool>(
-                  segments: const [
-                    ButtonSegment<bool>(
-                      value: false,
-                      label: Text('Pendientes'),
-                      icon: Icon(Icons.pending_actions),
-                    ),
-                    ButtonSegment<bool>(
-                      value: true,
-                      label: Text('Atendidos'),
-                      icon: Icon(Icons.check_circle),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment<bool>(
+                            value: false,
+                            label: Text('Pendientes'),
+                            icon: Icon(Icons.pending_actions),
+                          ),
+                          ButtonSegment<bool>(
+                            value: true,
+                            label: Text('Atendidos'),
+                            icon: Icon(Icons.check_circle),
+                          ),
+                        ],
+                        selected: {showAtendidos},
+                        onSelectionChanged: (Set<bool> newSelection) async {
+                          setState(() {
+                            showAtendidos = newSelection.first;
+                          });
+                          await fetchTickets();
+                        },
+                        style: const ButtonStyle(
+                          visualDensity: VisualDensity.comfortable,
+                        ),
+                      ),
                     ),
                   ],
-                  selected: {showAtendidos},
-                  onSelectionChanged: (Set<bool> newSelection) async {
-                    setState(() {
-                      showAtendidos = newSelection.first;
-                    });
-                    await fetchTickets();
-                  },
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.comfortable,
-                  ),
+                ),
+                const SizedBox(height: 12),
+                // Indicador de filtro por fecha y botón para ver histórico
+                Row(
+                  children: [
+                    Chip(
+                      avatar: Icon(
+                        Icons.today,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                      label: Text(
+                        'Solo hoy',
+                        style: textTheme.labelMedium?.copyWith(
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      backgroundColor: colorScheme.primaryContainer,
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AllTicketsScreen(),
+                          ),
+                        ).then((_) => fetchTickets());
+                      },
+                      icon: const Icon(Icons.history),
+                      label: const Text('Ver todos'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
               ],

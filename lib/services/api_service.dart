@@ -516,6 +516,26 @@ class ApiService {
     }
   }
 
+  // Eliminar ticket
+  Future<bool> eliminarTicket(String documentId) async {
+    try {
+      final url = Uri.parse('$_baseUrl/tickets/$documentId');
+      final headers = await _getHeaders();
+      final response = await http.delete(url, headers: headers).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('Ticket eliminado exitosamente: $documentId');
+        return true;
+      } else {
+        print('Error al eliminar ticket: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Exception al eliminar ticket: $e');
+      return false;
+    }
+  }
+
     // Obtener pagos
     Future<List<dynamic>> getPagos({int? sucursalId}) async {
     final headers = await _getHeaders();
