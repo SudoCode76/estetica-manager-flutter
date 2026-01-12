@@ -20,6 +20,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   String search = '';
   String? errorMsg;
   bool showAtendidos = false; // false = pendientes, true = atendidos
+  bool sortAscending = true; // true = antiguo→nuevo, false = nuevo→antiguo
   SucursalProvider? _sucursalProvider;
 
   @override
@@ -63,11 +64,20 @@ class _TicketsScreenState extends State<TicketsScreen> {
       );
       tickets = data;
       filteredTickets = tickets;
+      sortTickets();
     } catch (e) {
       errorMsg = 'No se pudo conectar al servidor.';
     }
     setState(() {
       isLoading = false;
+    });
+  }
+
+  void sortTickets() {
+    filteredTickets.sort((a, b) {
+      final dateA = a['fecha'] != null ? DateTime.parse(a['fecha']) : DateTime.now();
+      final dateB = b['fecha'] != null ? DateTime.parse(b['fecha']) : DateTime.now();
+      return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
   }
 
@@ -86,6 +96,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
             apellido.toLowerCase().contains(value.toLowerCase()) ||
             tratamientosMatch;
       }).toList();
+      sortTickets();
     });
   }
 
@@ -115,6 +126,22 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
+                    // Botón de ordenamiento
+                    IconButton.filledTonal(
+                      onPressed: () {
+                        setState(() {
+                          sortAscending = !sortAscending;
+                          sortTickets();
+                        });
+                      },
+                      icon: Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
+                      tooltip: sortAscending ? 'Ordenar: Más antiguo primero' : 'Ordenar: Más nuevo primero',
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(56, 56),
+                        padding: const EdgeInsets.all(16),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: fetchTickets,
                       icon: const Icon(Icons.refresh),
