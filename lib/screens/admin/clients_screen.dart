@@ -46,11 +46,15 @@ class _ClientsScreenState extends State<ClientsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    print('ClientsScreen: didChangeDependencies called');
     final provider = SucursalInherited.of(context);
+    print('ClientsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}');
     if (provider != _sucursalProvider) {
+      print('ClientsScreen: Provider changed, removing old listener');
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
+      print('ClientsScreen: Calling fetchClients()');
       fetchClients();
     }
   }
@@ -64,11 +68,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
   }
 
   void _onSucursalChanged() {
+    print('ClientsScreen: _onSucursalChanged called');
     fetchClients();
   }
 
   Future<void> fetchClients() async {
+    print('ClientsScreen: fetchClients() called');
+    print('ClientsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+
     if (_sucursalProvider?.selectedSucursalId == null) {
+      print('ClientsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
       setState(() {
         isLoading = false;
         errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
@@ -78,18 +87,22 @@ class _ClientsScreenState extends State<ClientsScreen> {
       return;
     }
 
+    print('ClientsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}');
     setState(() {
       isLoading = true;
       errorMsg = null;
     });
     try {
+      print('ClientsScreen: Llamando api.getClientes con sucursalId=${_sucursalProvider!.selectedSucursalId}');
       final data = await api.getClientes(
         sucursalId: _sucursalProvider!.selectedSucursalId,
         query: search.isEmpty ? null : search,
       );
+      print('ClientsScreen: ✓ Recibidos ${data.length} clientes');
       clients = data;
       filteredClients = clients;
     } catch (e) {
+      print('ClientsScreen: ❌ Error: $e');
       errorMsg = 'No se pudo conectar al servidor.';
     }
     setState(() {

@@ -22,10 +22,13 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoadingUser = true;
 
-  final List<Widget> _screens = [
-    const TicketsScreen(), // Reutilizamos la pantalla del admin
-    const ClientsScreen(), // Reutilizamos la pantalla del admin
-  ];
+  // NO crear las pantallas aquí, se crearán dinámicamente en build
+  List<Widget> _getScreens() {
+    return [
+      const TicketsScreen(key: ValueKey('tickets_screen')),
+      const ClientsScreen(key: ValueKey('clients_screen')),
+    ];
+  }
 
   @override
   void initState() {
@@ -38,38 +41,34 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userString = prefs.getString('user');
 
-      print('User string from prefs: $userString');
+      print('EmployeeHome: User string from prefs: $userString');
 
       if (userString != null) {
         final user = jsonDecode(userString);
-        print('User decoded: $user');
+        print('EmployeeHome: User decoded: $user');
 
         setState(() {
           _userData = user;
         });
 
-        // Auto-seleccionar la sucursal del empleado
-        if (user['sucursal'] != null) {
-          final sucursal = user['sucursal'];
-          print('Sucursal encontrada: $sucursal');
-
-          final sucursalId = sucursal['id'];
-          final sucursalNombre = sucursal['nombreSucursal'] ?? 'Sin nombre';
-
-          // Esperar al próximo frame para tener acceso al provider
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _sucursalProvider != null) {
-              print('Estableciendo sucursal en provider: $sucursalId - $sucursalNombre');
-              _sucursalProvider!.setSucursal(sucursalId, sucursalNombre);
-            }
-          });
+        // NO establecer la sucursal aquí, lo haremos en didChangeDependencies
+        if (user['sucursal'] == null) {
+          print('EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Tu usuario no tiene sucursal asignada. Contacta al administrador.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
         } else {
-          print('ADVERTENCIA: El empleado no tiene sucursal asignada');
+          print('EmployeeHome: Sucursal del empleado: ${user['sucursal']}');
         }
       }
     } catch (e) {
-      print('Error cargando datos del usuario: $e');
-      // Mostrar mensaje de error al usuario
+      print('EmployeeHome: ❌ Error cargando datos del usuario: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -88,9 +87,29 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    print('EmployeeHome: didChangeDependencies called');
+
     final provider = SucursalInherited.of(context);
+
+    // Si el provider cambió o es la primera vez
     if (provider != null && provider != _sucursalProvider) {
+      print('EmployeeHome: Provider disponible, estableciendo sucursal del empleado');
       _sucursalProvider = provider;
+
+      // Si el empleado tiene sucursal asignada, establecerla AHORA
+      if (_userData != null && _userData!['sucursal'] != null) {
+        final sucursal = _userData!['sucursal'];
+        final sucursalId = sucursal['id'];
+        final sucursalNombre = sucursal['nombreSucursal'] ?? 'Sin nombre';
+
+        // Establecer solo si no está ya establecida o es diferente
+        if (_sucursalProvider!.selectedSucursalId != sucursalId) {
+          print('EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre');
+          _sucursalProvider!.setSucursal(sucursalId, sucursalNombre);
+        } else {
+          print('EmployeeHome: Sucursal ya establecida: $sucursalId');
+        }
+      }
     }
   }
 
@@ -250,7 +269,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       drawer: Drawer(
         child: Column(
           children: [
-            DrawerHeader(
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -263,30 +284,76 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: colorScheme.surface,
-                    child: Icon(
-                      Icons.person,
-                      size: 32,
-                      color: colorScheme.primary,
-                    ),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: colorScheme.surface,
+                        child: Icon(
+                          Icons.person,
+                          size: 28,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              username,
+                              style: textTheme.titleMedium?.copyWith(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Empleado',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white24, height: 1),
                   const SizedBox(height: 12),
-                  Text(
-                    username,
-                    style: textTheme.titleLarge?.copyWith(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold,
+                  // Selector de sucursal BLOQUEADO para empleados
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.3),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    sucursalNombre,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            sucursalNombre,
+                            style: TextStyle(
+                              color: colorScheme.onPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Icon(
+                          Icons.lock,
+                          size: 16,
+                          color: colorScheme.onPrimary.withValues(alpha: 0.6),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -332,7 +399,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           ],
         ),
       ),
-      body: _screens[_selectedIndex],
+      body: _getScreens()[_selectedIndex],
       floatingActionButton: _selectedIndex == 0
           ? FloatingActionButton.extended(
               onPressed: () async {
@@ -358,10 +425,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // Refrescar tickets si se creó uno
-                  setState(() {
-                    _screens[0] = const TicketsScreen();
-                  });
+                  // Refrescar tickets - simplemente rebuild todo
+                  setState(() {});
                 }
               },
               icon: const Icon(Icons.add),
@@ -385,10 +450,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
 
                   if (result != null) {
-                    // Refrescar clientes
-                    setState(() {
-                      _screens[1] = const ClientsScreen();
-                    });
+                    // Refrescar clientes - simplemente rebuild todo
+                    setState(() {});
                   }
                 },
                 icon: const Icon(Icons.person_add),

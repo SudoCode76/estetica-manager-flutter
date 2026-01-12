@@ -1,5 +1,4 @@
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
-import 'package:app_estetica/screens/employee/employee_home_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -92,9 +91,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
         );
       } else if (userType == 'empleado') {
-        print('=== Navegando a EmployeeHomeScreen ===');
+        print('=== Navegando a AdminHomeScreen (modo empleado) ===');
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const EmployeeHomeScreen()),
+          MaterialPageRoute(builder: (context) => const AdminHomeScreen(isEmployee: true)),
         );
       } else {
         print('=== Tipo de usuario desconocido: $userType ===');

@@ -15,7 +15,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class AdminHomeScreen extends StatefulWidget {
-  const AdminHomeScreen({Key? key}) : super(key: key);
+  final bool isEmployee;
+
+  const AdminHomeScreen({Key? key, this.isEmployee = false}) : super(key: key);
 
   @override
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
@@ -23,13 +25,19 @@ class AdminHomeScreen extends StatefulWidget {
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _selectedIndex = 0;
-  SucursalProvider? _sucursalProvider; // Obtener del contexto
+  SucursalProvider? _sucursalProvider;
   final ApiService _api = ApiService();
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  List<Widget> _screens = [
+  // Datos del usuario empleado
+  Map<String, dynamic>? _employeeData;
+  int? _employeeSucursalId;
+  String? _employeeSucursalName;
+
+  // Pantallas para admin (todas)
+  List<Widget> get _adminScreens => [
     const TicketsScreen(),
     const ClientsScreen(),
     const TreatmentsScreen(),
@@ -39,9 +47,42 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const SettingsScreen(),
   ];
 
+  // Pantallas para empleado (solo tickets y clientes)
+  List<Widget> get _employeeScreens => [
+    const TicketsScreen(),
+    const ClientsScreen(),
+  ];
+
+  List<Widget> get _screens => widget.isEmployee ? _employeeScreens : _adminScreens;
+
   @override
   void initState() {
     super.initState();
+    if (widget.isEmployee) {
+      _loadEmployeeData();
+    }
+  }
+
+  Future<void> _loadEmployeeData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user');
+      if (userString != null) {
+        final user = jsonDecode(userString);
+        print('AdminHomeScreen: Empleado data: $user');
+        setState(() {
+          _employeeData = user;
+        });
+
+        if (user['sucursal'] != null) {
+          _employeeSucursalId = user['sucursal']['id'];
+          _employeeSucursalName = user['sucursal']['nombreSucursal'] ?? 'Sin nombre';
+          print('AdminHomeScreen: Sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
+        }
+      }
+    } catch (e) {
+      print('AdminHomeScreen: Error cargando datos empleado: $e');
+    }
   }
 
   @override
@@ -51,7 +92,42 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _sucursalProvider = SucursalInherited.of(context);
       print('AdminHomeScreen: Got provider from context: $_sucursalProvider');
       print('AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}');
-      _loadSucursales();
+      print('AdminHomeScreen: isEmployee: ${widget.isEmployee}');
+
+      if (widget.isEmployee) {
+        // Para empleado: establecer su sucursal directamente
+        _setupEmployeeSucursal();
+      } else {
+        // Para admin: cargar todas las sucursales
+        _loadSucursales();
+      }
+    }
+  }
+
+  Future<void> _setupEmployeeSucursal() async {
+    print('AdminHomeScreen: _setupEmployeeSucursal started');
+
+    // Esperar a que se carguen los datos del empleado si aún no están listos
+    if (_employeeSucursalId == null) {
+      await _loadEmployeeData();
+    }
+
+    if (_employeeSucursalId != null && _employeeSucursalName != null) {
+      print('AdminHomeScreen: ✓ Estableciendo sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
+      _sucursalProvider?.setSucursal(_employeeSucursalId!, _employeeSucursalName!);
+
+      // Crear lista de sucursales con solo la del empleado (para mostrar en el drawer)
+      setState(() {
+        _sucursales = [
+          {'id': _employeeSucursalId, 'nombreSucursal': _employeeSucursalName}
+        ];
+        _isLoadingSucursales = false;
+      });
+    } else {
+      print('AdminHomeScreen: ⚠️ Empleado sin sucursal asignada');
+      setState(() {
+        _isLoadingSucursales = false;
+      });
     }
   }
 
@@ -130,7 +206,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // Ya no necesitamos SucursalInherited aquí, está a nivel global
+    final username = widget.isEmployee ? (_employeeData?['username'] ?? 'Empleado') : 'Administrador';
+    final rolLabel = widget.isEmployee ? 'Empleado' : 'Administrador';
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: Drawer(
@@ -148,17 +226,31 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     children: [
                       Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
                       const SizedBox(width: 12),
-                      Text(
-                        'App Estética',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: colorScheme.onPrimary,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              username,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              rolLabel,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Selector de sucursal
+                  // Selector de sucursal - BLOQUEADO para empleados
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -183,56 +275,80 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               ),
                             ],
                           )
-                        : Row(
-                            children: [
-                              Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: DropdownButtonHideUnderline(
-                                  child: Builder(
-                                    builder: (context) {
-                                      // Validar que el selectedSucursalId exista en la lista
-                                      final currentId = _sucursalProvider?.selectedSucursalId;
-                                      final validValue = currentId != null &&
-                                          _sucursales.any((s) => s['id'] == currentId)
-                                          ? currentId
-                                          : null;
-
-                                      return DropdownButton<int>(
-                                        value: validValue,
-                                        isExpanded: true,
-                                        dropdownColor: colorScheme.surface,
-                                        icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-                                        style: TextStyle(
-                                          color: colorScheme.onSurface,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        hint: Text(
-                                          'Seleccionar sucursal',
-                                          style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7)),
-                                        ),
-                                        items: _sucursales.map((s) {
-                                          return DropdownMenuItem<int>(
-                                            value: s['id'],
-                                            child: Text(s['nombreSucursal'] ?? '-'),
-                                          );
-                                        }).toList(),
-                                        onChanged: (value) {
-                                          if (value != null) {
-                                            final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
-                                            setState(() {
-                                              _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
-                                            });
-                                          }
-                                        },
-                                      );
-                                    },
+                        : widget.isEmployee
+                            // Para empleados: mostrar sucursal bloqueada
+                            ? Row(
+                                children: [
+                                  Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _employeeSucursalName ?? 'Sin sucursal',
+                                      style: TextStyle(
+                                        color: colorScheme.onPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
+                                  Icon(
+                                    Icons.lock,
+                                    size: 16,
+                                    color: colorScheme.onPrimary.withValues(alpha: 0.6),
+                                  ),
+                                ],
+                              )
+                            // Para admin: dropdown editable
+                            : Row(
+                                children: [
+                                  Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: DropdownButtonHideUnderline(
+                                      child: Builder(
+                                        builder: (context) {
+                                          final currentId = _sucursalProvider?.selectedSucursalId;
+                                          final validValue = currentId != null &&
+                                              _sucursales.any((s) => s['id'] == currentId)
+                                              ? currentId
+                                              : null;
+
+                                          return DropdownButton<int>(
+                                            value: validValue,
+                                            isExpanded: true,
+                                            dropdownColor: colorScheme.surface,
+                                            icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
+                                            style: TextStyle(
+                                              color: colorScheme.onSurface,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            hint: Text(
+                                              'Seleccionar sucursal',
+                                              style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7)),
+                                            ),
+                                            items: _sucursales.map((s) {
+                                              return DropdownMenuItem<int>(
+                                                value: s['id'],
+                                                child: Text(s['nombreSucursal'] ?? '-'),
+                                              );
+                                            }).toList(),
+                                            onChanged: (value) {
+                                              if (value != null) {
+                                                final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
+                                                setState(() {
+                                                  _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
+                                                });
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
                   ),
                 ],
               ),
@@ -241,6 +357,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
+                  // Tickets - disponible para todos
                   _DrawerItem(
                     icon: Icons.receipt_long_outlined,
                     selectedIcon: Icons.receipt_long,
@@ -251,6 +368,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       Navigator.pop(context);
                     },
                   ),
+                  // Clientes - disponible para todos
                   _DrawerItem(
                     icon: Icons.people_outline,
                     selectedIcon: Icons.people,
@@ -261,56 +379,59 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       Navigator.pop(context);
                     },
                   ),
-                  _DrawerItem(
-                    icon: Icons.spa,
-                    selectedIcon: Icons.spa,
-                    label: 'Tratamientos',
-                    selected: _selectedIndex == 2,
-                    onTap: () {
-                      setState(() { _selectedIndex = 2; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.payments,
-                    selectedIcon: Icons.payments_outlined,
-                    label: 'Pagos',
-                    selected: _selectedIndex == 3,
-                    onTap: () {
-                      setState(() { _selectedIndex = 3; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.insights_outlined,
-                    selectedIcon: Icons.bar_chart,
-                    label: 'Reportes',
-                    selected: _selectedIndex == 4,
-                    onTap: () {
-                      setState(() { _selectedIndex = 4; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.people_outline_rounded,
-                    selectedIcon: Icons.people_rounded,
-                    label: 'Empleados',
-                    selected: _selectedIndex == 5,
-                    onTap: () {
-                      setState(() { _selectedIndex = 5; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.settings_outlined,
-                    selectedIcon: Icons.settings,
-                    label: 'Configuración',
-                    selected: _selectedIndex == 6,
-                    onTap: () {
-                      setState(() { _selectedIndex = 6; });
-                      Navigator.pop(context);
-                    },
-                  ),
+                  // Las siguientes opciones SOLO para admin
+                  if (!widget.isEmployee) ...[
+                    _DrawerItem(
+                      icon: Icons.spa,
+                      selectedIcon: Icons.spa,
+                      label: 'Tratamientos',
+                      selected: _selectedIndex == 2,
+                      onTap: () {
+                        setState(() { _selectedIndex = 2; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.payments,
+                      selectedIcon: Icons.payments_outlined,
+                      label: 'Pagos',
+                      selected: _selectedIndex == 3,
+                      onTap: () {
+                        setState(() { _selectedIndex = 3; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.insights_outlined,
+                      selectedIcon: Icons.bar_chart,
+                      label: 'Reportes',
+                      selected: _selectedIndex == 4,
+                      onTap: () {
+                        setState(() { _selectedIndex = 4; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.people_outline_rounded,
+                      selectedIcon: Icons.people_rounded,
+                      label: 'Empleados',
+                      selected: _selectedIndex == 5,
+                      onTap: () {
+                        setState(() { _selectedIndex = 5; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings,
+                      label: 'Configuración',
+                      selected: _selectedIndex == 6,
+                      onTap: () {
+                        setState(() { _selectedIndex = 6; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -409,11 +530,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // refrescar tickets si se creó uno
-                  // crear nueva instancia de TicketsScreen para forzar refresh
-                  setState(() {
-                    _screens[0] = const TicketsScreen();
-                  });
+                  // refrescar tickets - rebuild forzado
+                  setState(() {});
                 }
               },
               icon: const Icon(Icons.add),
@@ -436,10 +554,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
 
                   if (result != null) {
-                    // refrescar clientes
-                    setState(() {
-                      _screens[1] = const ClientsScreen();
-                    });
+                    // refrescar clientes - rebuild forzado
+                    setState(() {});
                   }
                 },
                 icon: const Icon(Icons.person_add),

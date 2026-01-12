@@ -34,11 +34,15 @@ class _TicketsScreenState extends State<TicketsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    print('TicketsScreen: didChangeDependencies called');
     final provider = SucursalInherited.of(context);
+    print('TicketsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}');
     if (provider != _sucursalProvider) {
+      print('TicketsScreen: Provider changed, removing old listener');
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
+      print('TicketsScreen: Calling fetchTickets()');
       fetchTickets();
     }
   }
@@ -55,7 +59,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 
   Future<void> fetchTickets() async {
+    print('TicketsScreen: fetchTickets() called');
+    print('TicketsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+
     if (_sucursalProvider?.selectedSucursalId == null) {
+      print('TicketsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
       setState(() {
         isLoading = false;
         errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
@@ -65,15 +73,18 @@ class _TicketsScreenState extends State<TicketsScreen> {
       return;
     }
 
+    print('TicketsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}');
     setState(() {
       isLoading = true;
       errorMsg = null;
     });
     try {
+      print('TicketsScreen: Llamando api.getTickets con sucursalId=${_sucursalProvider!.selectedSucursalId}, estadoTicket=$showAtendidos');
       final data = await api.getTickets(
         sucursalId: _sucursalProvider!.selectedSucursalId,
         estadoTicket: showAtendidos,
       );
+      print('TicketsScreen: ✓ Recibidos ${data.length} tickets');
       tickets = data;
 
       // Filtrar por fecha de hoy si showOnlyToday es true
