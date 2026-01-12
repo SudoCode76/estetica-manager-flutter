@@ -70,7 +70,36 @@ class ApiService {
       }));
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+
+        // Obtener información completa del usuario con su sucursal
+        if (data['user'] != null && data['user']['id'] != null) {
+          try {
+            final userId = data['user']['id'];
+            final userUrl = Uri.parse('$_baseUrl/users/$userId?populate=*');
+            final headers = {'Content-Type': 'application/json'};
+            if (data['jwt'] != null) {
+              headers['Authorization'] = 'Bearer ${data['jwt']}';
+            }
+
+            print('Obteniendo datos completos del usuario: $userUrl');
+            final userResponse = await _getWithTimeout(userUrl, headers, seconds: 10);
+
+            if (userResponse.statusCode == 200) {
+              final userData = jsonDecode(userResponse.body);
+              print('Datos completos del usuario: $userData');
+              data['user'] = userData; // Reemplazar con datos completos
+            } else {
+              print('Error al obtener datos del usuario: ${userResponse.statusCode}');
+              print('Response: ${userResponse.body}');
+            }
+          } catch (e) {
+            print('Error obteniendo datos completos del usuario: $e');
+            // Continuar con datos básicos si falla
+          }
+        }
+
+        return data;
       } else {
         print('Failed to login. Status code: ${response.statusCode}');
         print('Response body: ${response.body}');

@@ -59,38 +59,52 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     });
 
     try {
+      print('=== Iniciando login con email: ${_emailController.text} ===');
       final result = await _apiService.login(
         _emailController.text,
         _passwordController.text,
       );
 
+      print('=== Login exitoso, resultado: $result ===');
+      
       final user = result['user'];
+      print('=== Usuario obtenido: $user ===');
+      
       final userType = user['tipoUsuario'];
+      print('=== Tipo de usuario: $userType ===');
+      
       final jwt = result['jwt'];
+      print('=== JWT obtenido: ${jwt != null ? "Sí" : "No"} ===');
 
       // Guardar sesión en SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwt', jwt ?? '');
       await prefs.setString('user', jsonEncode(user));
       await prefs.setString('userType', userType ?? '');
+      
+      print('=== Datos guardados en SharedPreferences ===');
 
       if (!mounted) return;
 
       if (userType == 'administrador') {
+        print('=== Navegando a AdminHomeScreen ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
         );
       } else if (userType == 'empleado') {
+        print('=== Navegando a EmployeeHomeScreen ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const EmployeeHomeScreen()),
         );
       } else {
+        print('=== Tipo de usuario desconocido: $userType ===');
         setState(() {
           _errorMessage = 'Tipo de usuario desconocido.';
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('=== ERROR EN LOGIN: $e ===');
       setState(() {
         _errorMessage = 'Error al iniciar sesión. Verifique sus credenciales.';
         _isLoading = false;

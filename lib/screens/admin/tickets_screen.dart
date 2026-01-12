@@ -55,7 +55,15 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 
   Future<void> fetchTickets() async {
-    if (_sucursalProvider?.selectedSucursalId == null) return;
+    if (_sucursalProvider?.selectedSucursalId == null) {
+      setState(() {
+        isLoading = false;
+        errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
+        tickets = [];
+        filteredTickets = [];
+      });
+      return;
+    }
 
     setState(() {
       isLoading = true;

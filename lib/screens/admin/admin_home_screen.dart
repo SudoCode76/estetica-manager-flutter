@@ -102,10 +102,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             FilledButton(
               onPressed: () async {
                 Navigator.pop(context);
+                // Limpiar sucursal del provider
+                _sucursalProvider?.clearSucursal();
+                // Limpiar SharedPreferences
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('jwt');
                 await prefs.remove('user');
                 await prefs.remove('userType');
+                await prefs.remove('selectedSucursalId');
+                await prefs.remove('selectedSucursalName');
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -184,29 +189,44 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<int>(
-                                    value: _sucursalProvider?.selectedSucursalId,
-                                    isExpanded: true,
-                                    dropdownColor: colorScheme.surface,
-                                    icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-                                    style: TextStyle(
-                                      color: colorScheme.onSurface,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    items: _sucursales.map((s) {
-                                      return DropdownMenuItem<int>(
-                                        value: s['id'],
-                                        child: Text(s['nombreSucursal'] ?? '-'),
+                                  child: Builder(
+                                    builder: (context) {
+                                      // Validar que el selectedSucursalId exista en la lista
+                                      final currentId = _sucursalProvider?.selectedSucursalId;
+                                      final validValue = currentId != null &&
+                                          _sucursales.any((s) => s['id'] == currentId)
+                                          ? currentId
+                                          : null;
+
+                                      return DropdownButton<int>(
+                                        value: validValue,
+                                        isExpanded: true,
+                                        dropdownColor: colorScheme.surface,
+                                        icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
+                                        style: TextStyle(
+                                          color: colorScheme.onSurface,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        hint: Text(
+                                          'Seleccionar sucursal',
+                                          style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7)),
+                                        ),
+                                        items: _sucursales.map((s) {
+                                          return DropdownMenuItem<int>(
+                                            value: s['id'],
+                                            child: Text(s['nombreSucursal'] ?? '-'),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
+                                            setState(() {
+                                              _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
+                                            });
+                                          }
+                                        },
                                       );
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
-                                        setState(() {
-                                          _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
-                                        });
-                                      }
                                     },
                                   ),
                                 ),
@@ -381,7 +401,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 }
                 final result = await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => NewTicketScreen(currentUserId: userIdStr)),
+                  MaterialPageRoute(
+                    builder: (context) => NewTicketScreen(
+                      key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
+                      currentUserId: userIdStr,
+                    ),
+                  ),
                 );
                 if (result == true) {
                   // refrescar tickets si se creó uno

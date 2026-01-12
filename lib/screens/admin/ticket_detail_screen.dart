@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_estetica/services/share_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ticket;
@@ -19,15 +20,29 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   final GlobalKey _ticketKey = GlobalKey();
   bool isUpdating = false;
   bool localeReady = false;
+  bool _isEmployee = false;
 
   @override
   void initState() {
     super.initState();
+    _loadUserType();
     initializeDateFormatting('es').then((_) {
       setState(() {
         localeReady = true;
       });
     });
+  }
+
+  Future<void> _loadUserType() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userType = prefs.getString('userType');
+      setState(() {
+        _isEmployee = userType == 'empleado';
+      });
+    } catch (e) {
+      print('Error cargando tipo de usuario: $e');
+    }
   }
 
   String? _getCategoriaNombreFromTratamiento(dynamic tratamiento) {
@@ -333,13 +348,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         title: const Text('Detalle del Ticket'),
         elevation: 0,
         actions: [
-          // Botón para eliminar ticket
-          IconButton(
-            onPressed: isUpdating ? null : _eliminarTicket,
-            tooltip: 'Eliminar ticket',
-            icon: const Icon(Icons.delete_outline),
-            color: Colors.red,
-          ),
+          // Botón para eliminar ticket (solo visible para administradores)
+          if (!_isEmployee)
+            IconButton(
+              onPressed: isUpdating ? null : _eliminarTicket,
+              tooltip: 'Eliminar ticket',
+              icon: const Icon(Icons.delete_outline),
+              color: Colors.red,
+            ),
           // Botón único para enviar ticket por WhatsApp (texto o PDF)
           IconButton(
             onPressed: _chooseAndSendToWhatsApp,

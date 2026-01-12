@@ -6,6 +6,8 @@ import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/select_client_screen.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
@@ -22,6 +24,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    int? clienteId;
    String? clienteNombre;
    int? usuarioId;
+   String? usuarioNombre;
    double? cuota;
    double? pago;
    double saldoPendiente = 0;
@@ -33,9 +36,13 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    List<dynamic> clientes = [];
    List<dynamic> usuarios = [];
    bool isLoading = true;
+   bool isLoadingUsuarios = false;
+   bool isLoadingUserType = true; // NUEVO: controla si se ha determinado el tipo de usuario
    String? error;
    final Map<int, bool> _expansionState = {}; // Para el estado de expansión de categorías
 
+   // Variable para tipo de usuario
+   bool _isEmployee = false;
 
    SucursalProvider? _sucursalProvider;
    Timer? _clientSearchDebounce;
@@ -43,6 +50,10 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    @override
    void initState() {
      super.initState();
+     // IMPORTANTE: Limpiar usuarioId al inicio para evitar valores obsoletos
+     usuarioId = null;
+     usuarioNombre = null;
+     _loadUserType();
      cargarDatos();
    }
 
@@ -64,6 +75,50 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      _clientSearchDebounce?.cancel();
      _sucursalProvider?.removeListener(_onSucursalChanged);
      super.dispose();
+   }
+
+   Future<void> _loadUserType() async {
+     try {
+       final prefs = await SharedPreferences.getInstance();
+       final userType = prefs.getString('userType');
+       final userString = prefs.getString('user');
+
+       final wasEmployee = _isEmployee;
+
+       setState(() {
+         _isEmployee = userType == 'empleado';
+       });
+
+       // Si es empleado, auto-seleccionar su ID
+       if (_isEmployee && userString != null) {
+         final userData = jsonDecode(userString);
+         final userId = userData['id'];
+         final username = userData['username'] ?? userData['email'] ?? 'Usuario';
+
+         setState(() {
+           usuarioId = userId;
+           usuarioNombre = username;
+         });
+       } else {
+         // Si NO es empleado, limpiar el usuarioId para evitar conflictos
+         setState(() {
+           usuarioId = null;
+           usuarioNombre = null;
+         });
+
+         // Si cambió de empleado a admin, recargar lista de usuarios
+         if (wasEmployee != _isEmployee) {
+           _loadUsuariosForSucursal();
+         }
+       }
+     } catch (e) {
+       print('Error cargando tipo de usuario: $e');
+     } finally {
+       // IMPORTANTE: marcar que ya se cargó el tipo de usuario
+       setState(() {
+         isLoadingUserType = false;
+       });
+     }
    }
 
    void _onSucursalChanged() {
@@ -258,22 +313,34 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    }
 
    Future<void> _loadUsuariosForSucursal() async {
+     setState(() {
+       isLoadingUsuarios = true;
+     });
+
      final sucId = _sucursalProvider?.selectedSucursalId;
      print('NewTicketScreen: _loadUsuariosForSucursal called with sucursalId=$sucId');
+     print('NewTicketScreen: Current usuarioId=$usuarioId, _isEmployee=$_isEmployee');
      try {
        final data = await api.getUsuarios(sucursalId: sucId);
        print('NewTicketScreen: Loaded ${data.length} usuarios');
+       print('NewTicketScreen: Usuario IDs en lista: ${data.map((u) => u['id']).toList()}');
        setState(() {
          usuarios = data;
+         isLoadingUsuarios = false;
          // si el usuario seleccionado no pertenece a esta sucursal, limpiarlo
          if (usuarioId != null && !usuarios.any((u) => u['id'] == usuarioId)) {
-           print('NewTicketScreen: Clearing usuarioId=$usuarioId (not in filtered list)');
+           print('NewTicketScreen: ⚠️ Clearing usuarioId=$usuarioId (not in filtered list)');
            usuarioId = null;
+         } else if (usuarioId != null) {
+           print('NewTicketScreen: ✓ usuarioId=$usuarioId está en la lista');
          }
        });
      } catch (e) {
        final msg = e.toString();
-       print('NewTicketScreen: Error loading usuarios: $msg');
+       print('NewTicketScreen: ❌ Error loading usuarios: $msg');
+       setState(() {
+         isLoadingUsuarios = false;
+       });
        if (mounted) {
          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar usuarios: $msg')));
        }
@@ -632,20 +699,146 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                              ),
                            ],
                          ),
-                         const SizedBox(height: 8),
+                         const SizedBox(width: 8),
                          // Usuario
                          Text('Usuario', style: Theme.of(context).textTheme.labelLarge),
                          const SizedBox(height: 8),
-                         DropdownButtonFormField<int>(
-                           initialValue: usuarioId,
-                           items: usuarios.map<DropdownMenuItem<int>>((u) {
-                             return DropdownMenuItem(
-                               value: u['id'],
-                               child: Text(u['username'] ?? u['email'] ?? ''),
-                             );
-                           }).toList(),
-                           onChanged: (v) => setState(() => usuarioId = v),
-                         ),
+                         // Mostrar loading mientras se determina el tipo de usuario
+                         if (isLoadingUserType)
+                           Container(
+                             padding: const EdgeInsets.all(16),
+                             decoration: BoxDecoration(
+                               color: colorScheme.surfaceContainerHighest,
+                               borderRadius: BorderRadius.circular(12),
+                               border: Border.all(
+                                 color: colorScheme.outline.withValues(alpha: 0.5),
+                               ),
+                             ),
+                             child: Row(
+                               children: [
+                                 SizedBox(
+                                   width: 20,
+                                   height: 20,
+                                   child: CircularProgressIndicator(
+                                     strokeWidth: 2,
+                                     color: colorScheme.primary,
+                                   ),
+                                 ),
+                                 const SizedBox(width: 12),
+                                 Text(
+                                   'Verificando permisos...',
+                                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                     color: colorScheme.onSurfaceVariant,
+                                   ),
+                                 ),
+                               ],
+                             ),
+                           )
+                         // Si es empleado, mostrar solo texto (no puede cambiar)
+                         else if (_isEmployee)
+                           Container(
+                             padding: const EdgeInsets.all(16),
+                             decoration: BoxDecoration(
+                               color: colorScheme.surfaceContainerHighest,
+                               borderRadius: BorderRadius.circular(12),
+                               border: Border.all(
+                                 color: colorScheme.outline.withValues(alpha: 0.5),
+                               ),
+                             ),
+                             child: Row(
+                               children: [
+                                 Icon(Icons.person, color: colorScheme.primary),
+                                 const SizedBox(width: 12),
+                                 Expanded(
+                                   child: Text(
+                                     usuarioNombre ?? 'Usuario actual',
+                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                       color: colorScheme.onSurface,
+                                     ),
+                                   ),
+                                 ),
+                                 Icon(Icons.lock, size: 16, color: colorScheme.onSurfaceVariant),
+                               ],
+                             ),
+                           )
+                         // Si es admin, mostrar dropdown para seleccionar
+                         else
+                           Builder(
+                             builder: (context) {
+                               // Si está cargando usuarios, mostrar un indicador
+                               if (isLoadingUsuarios) {
+                                 return Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     color: colorScheme.surfaceContainerHighest,
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: Border.all(
+                                       color: colorScheme.outline.withValues(alpha: 0.5),
+                                     ),
+                                   ),
+                                   child: Row(
+                                     children: [
+                                       SizedBox(
+                                         width: 20,
+                                         height: 20,
+                                         child: CircularProgressIndicator(
+                                           strokeWidth: 2,
+                                           color: colorScheme.primary,
+                                         ),
+                                       ),
+                                       const SizedBox(width: 12),
+                                       Text(
+                                         'Cargando usuarios...',
+                                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                           color: colorScheme.onSurfaceVariant,
+                                         ),
+                                       ),
+                                     ],
+                                   ),
+                                 );
+                               }
+
+                               // Eliminar usuarios duplicados por ID
+                               final uniqueUsuarios = <int, Map<String, dynamic>>{};
+                               for (var u in usuarios) {
+                                 if (u['id'] != null) {
+                                   uniqueUsuarios[u['id'] as int] = u;
+                                 }
+                               }
+                               final usuariosList = uniqueUsuarios.values.toList();
+
+                               // SOLUCIÓN SIMPLE: SIEMPRE usar null como value para evitar el error
+                               // Esto fuerza al admin a seleccionar manualmente
+                               print('NewTicket: Creando dropdown con ${usuariosList.length} usuarios, usuarioId actual=$usuarioId');
+
+                               return DropdownButtonFormField<int>(
+                                 value: null, // SIEMPRE null para evitar errores
+                                 decoration: InputDecoration(
+                                   filled: true,
+                                   fillColor: colorScheme.surfaceContainerHighest,
+                                   border: OutlineInputBorder(
+                                     borderRadius: BorderRadius.circular(12),
+                                     borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
+                                   ),
+                                 ),
+                                 items: usuariosList.isEmpty
+                                     ? [
+                                         DropdownMenuItem<int>(
+                                           value: null,
+                                           child: Text('No hay usuarios disponibles'),
+                                         )
+                                       ]
+                                     : usuariosList.map<DropdownMenuItem<int>>((u) {
+                                         return DropdownMenuItem(
+                                           value: u['id'],
+                                           child: Text(u['username'] ?? u['email'] ?? ''),
+                                         );
+                                       }).toList(),
+                                 onChanged: usuariosList.isEmpty ? null : (v) => setState(() => usuarioId = v),
+                                 hint: const Text('Seleccionar usuario'),
+                               );
+                             }
+                           ),
                          const SizedBox(height: 18),
                          // Mostrar precio total de tratamientos
                          if (tratamientosSeleccionados.isNotEmpty)

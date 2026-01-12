@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({Key? key}) : super(key: key);
@@ -22,10 +23,24 @@ class _ClientsScreenState extends State<ClientsScreen> {
   SucursalProvider? _sucursalProvider;
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+  bool _isEmployee = false;
 
   @override
   void initState() {
     super.initState();
+    _loadUserType();
+  }
+
+  Future<void> _loadUserType() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userType = prefs.getString('userType');
+      setState(() {
+        _isEmployee = userType == 'empleado';
+      });
+    } catch (e) {
+      print('Error cargando tipo de usuario: $e');
+    }
   }
 
   @override
@@ -53,7 +68,15 @@ class _ClientsScreenState extends State<ClientsScreen> {
   }
 
   Future<void> fetchClients() async {
-    if (_sucursalProvider?.selectedSucursalId == null) return;
+    if (_sucursalProvider?.selectedSucursalId == null) {
+      setState(() {
+        isLoading = false;
+        errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
+        clients = [];
+        filteredClients = [];
+      });
+      return;
+    }
 
     setState(() {
       isLoading = true;
@@ -388,38 +411,40 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                       ),
                                     ],
                                   ),
-                                  trailing: PopupMenuButton(
-                                    icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        onTap: () {
-                                          Future.delayed(Duration.zero, () => _showEditClientDialog(c));
-                                        },
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit, size: 20, color: colorScheme.primary),
-                                            const SizedBox(width: 12),
-                                            const Text('Editar'),
+                                  trailing: _isEmployee
+                                      ? null // No mostrar menú para empleados
+                                      : PopupMenuButton(
+                                          icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          itemBuilder: (context) => [
+                                            PopupMenuItem(
+                                              onTap: () {
+                                                Future.delayed(Duration.zero, () => _showEditClientDialog(c));
+                                              },
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.edit, size: 20, color: colorScheme.primary),
+                                                  const SizedBox(width: 12),
+                                                  const Text('Editar'),
+                                                ],
+                                              ),
+                                            ),
+                                            PopupMenuItem(
+                                              onTap: () {
+                                                Future.delayed(Duration.zero, () => _deleteClient(c));
+                                              },
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.delete, size: 20, color: colorScheme.error),
+                                                  const SizedBox(width: 12),
+                                                  const Text('Eliminar'),
+                                                ],
+                                              ),
+                                            ),
                                           ],
                                         ),
-                                      ),
-                                      PopupMenuItem(
-                                        onTap: () {
-                                          Future.delayed(Duration.zero, () => _deleteClient(c));
-                                        },
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete, size: 20, color: colorScheme.error),
-                                            const SizedBox(width: 12),
-                                            const Text('Eliminar'),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
                                 ),
                               );
                             },
