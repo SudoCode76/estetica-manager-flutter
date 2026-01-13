@@ -39,6 +39,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    bool isLoadingUsuarios = false;
    bool isLoadingUserType = true; // NUEVO: controla si se ha determinado el tipo de usuario
    String? error;
+   bool _isSubmitting = false; // Flag para evitar envíos múltiples y mostrar loader
    final Map<int, bool> _expansionState = {}; // Para el estado de expansión de categorías
 
    // Variable para tipo de usuario
@@ -420,6 +421,9 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    }
 
    Future<void> crearTicket() async {
+     // Evitar envíos múltiples
+     if (_isSubmitting) return;
+
      if (fecha == null || tratamientosSeleccionados.isEmpty || clienteId == null || (usuarioId == null && widget.currentUserId == null) || pago == null) {
        setState(() { error = 'Completa todos los campos'; });
        ScaffoldMessenger.of(context).showSnackBar(
@@ -447,25 +451,37 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        'sucursal': _sucursalProvider!.selectedSucursalId,
      };
 
-     final ok = await api.crearTicket(ticket);
-     if (ok) {
-       if (mounted) {
+     setState(() { _isSubmitting = true; });
+     try {
+       final ok = await api.crearTicket(ticket);
+       if (ok) {
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(
+               content: Text('Ticket creado exitosamente'),
+               backgroundColor: Colors.green,
+             ),
+           );
+           Navigator.pop(context, true);
+         }
+       } else {
+         setState(() { error = 'Error al crear ticket'; });
          ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(
-             content: Text('Ticket creado exitosamente'),
-             backgroundColor: Colors.green,
+             content: Text('Error al crear el ticket'),
+             backgroundColor: Colors.red,
            ),
          );
-         Navigator.pop(context, true);
        }
-     } else {
-       setState(() { error = 'Error al crear ticket'; });
+     } catch (e) {
+       // Mostrar error y permitir reintento
+       final msg = e.toString();
+       setState(() { error = 'Error al crear ticket: $msg'; });
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(
-           content: Text('Error al crear el ticket'),
-           backgroundColor: Colors.red,
-         ),
+         SnackBar(content: Text('Error al crear el ticket: $msg'), backgroundColor: Colors.red),
        );
+     } finally {
+       if (mounted) setState(() { _isSubmitting = false; });
      }
    }
 
@@ -925,9 +941,13 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                              child: Text(error!, style: const TextStyle(color: Colors.red)),
                            ),
                          FilledButton.icon(
-                           onPressed: crearTicket,
-                           icon: const Icon(Icons.save),
-                           label: const Text('Guardar Ticket'),
+                           onPressed: _isSubmitting ? null : crearTicket,
+                           icon: _isSubmitting ? const SizedBox(
+                             width: 18,
+                             height: 18,
+                             child: CircularProgressIndicator(strokeWidth: 2),
+                           ) : const Icon(Icons.save),
+                           label: _isSubmitting ? const Text('Guardando...') : const Text('Guardar Ticket'),
                            style: FilledButton.styleFrom(
                              padding: const EdgeInsets.symmetric(vertical: 16),
                              textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -942,4 +962,4 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
              ),
      );
    }
-}
+ }

@@ -8,11 +8,8 @@ class ApiService {
 
   static String? debugBaseUrl;
 
-  // URL de producción de Strapi desplegado
   static const String _productionUrl = 'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
 
-  // URL de desarrollo local (comentar la línea de abajo para usar solo producción)
-  // static const String _localUrl = 'http://localhost:1337/api';
 
   String get _baseUrl {
     // Si se ha establecido una URL de debug manualmente, usarla (para testing)
