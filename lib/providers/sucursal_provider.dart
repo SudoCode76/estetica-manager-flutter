@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SucursalProvider extends ChangeNotifier {
   int? _selectedSucursalId;
   String? _selectedSucursalName;
+  bool _wasSetManually = false; // Flag para evitar que _loadFromPrefs sobrescriba
 
   int? get selectedSucursalId => _selectedSucursalId;
   String? get selectedSucursalName => _selectedSucursalName;
@@ -17,6 +18,7 @@ class SucursalProvider extends ChangeNotifier {
     print('SucursalProvider: setSucursal called with id=$id, name=$name');
     _selectedSucursalId = id;
     _selectedSucursalName = name;
+    _wasSetManually = true; // Marcar que fue establecido manualmente
     _saveToPrefs();
     notifyListeners();
   }
@@ -25,6 +27,7 @@ class SucursalProvider extends ChangeNotifier {
     print('SucursalProvider: clearSucursal called');
     _selectedSucursalId = null;
     _selectedSucursalName = null;
+    _wasSetManually = false; // Reset flag al limpiar
     _saveToPrefs();
     notifyListeners();
   }
@@ -44,17 +47,23 @@ class SucursalProvider extends ChangeNotifier {
 
   Future<void> _loadFromPrefs() async {
     print('SucursalProvider: _loadFromPrefs started');
+    // No sobrescribir si ya fue establecido manualmente
+    if (_wasSetManually) {
+      print('SucursalProvider: Skipping _loadFromPrefs - value was set manually');
+      return;
+    }
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getInt('selectedSucursalId');
     final name = prefs.getString('selectedSucursalName');
     print('SucursalProvider: Loaded from prefs - id=$id, name=$name');
-    if (id != null) {
+    // Solo establecer si no fue establecido manualmente mientras tanto
+    if (id != null && !_wasSetManually) {
       _selectedSucursalId = id;
       _selectedSucursalName = name;
       notifyListeners();
       print('SucursalProvider: Set from prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
     } else {
-      print('SucursalProvider: No saved sucursal in prefs');
+      print('SucursalProvider: No saved sucursal in prefs or was set manually');
     }
   }
 }

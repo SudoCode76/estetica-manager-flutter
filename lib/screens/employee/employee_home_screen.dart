@@ -51,7 +51,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           _userData = user;
         });
 
-        // NO establecer la sucursal aquí, lo haremos en didChangeDependencies
+        // Establecer la sucursal aquí después de cargar los datos
         if (user['sucursal'] == null) {
           print('EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada');
           if (mounted) {
@@ -65,6 +65,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           }
         } else {
           print('EmployeeHome: Sucursal del empleado: ${user['sucursal']}');
+          // Establecer la sucursal inmediatamente después de cargar los datos
+          _setupEmployeeSucursal(user['sucursal']);
         }
       }
     } catch (e) {
@@ -84,6 +86,23 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     }
   }
 
+  void _setupEmployeeSucursal(Map<String, dynamic> sucursal) {
+    final sucursalId = sucursal['id'];
+    final sucursalNombre = sucursal['nombreSucursal'] ?? 'Sin nombre';
+
+    print('EmployeeHome: _setupEmployeeSucursal - id=$sucursalId, nombre=$sucursalNombre');
+
+    // Obtener el provider del contexto
+    final provider = SucursalInherited.of(context);
+    if (provider != null) {
+      print('EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre');
+      provider.setSucursal(sucursalId, sucursalNombre);
+      _sucursalProvider = provider;
+    } else {
+      print('EmployeeHome: ⚠️ Provider no disponible aún');
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -93,22 +112,12 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
 
     // Si el provider cambió o es la primera vez
     if (provider != null && provider != _sucursalProvider) {
-      print('EmployeeHome: Provider disponible, estableciendo sucursal del empleado');
+      print('EmployeeHome: Provider disponible');
       _sucursalProvider = provider;
 
-      // Si el empleado tiene sucursal asignada, establecerla AHORA
+      // Si ya tenemos los datos del usuario con sucursal, establecerla ahora
       if (_userData != null && _userData!['sucursal'] != null) {
-        final sucursal = _userData!['sucursal'];
-        final sucursalId = sucursal['id'];
-        final sucursalNombre = sucursal['nombreSucursal'] ?? 'Sin nombre';
-
-        // Establecer solo si no está ya establecida o es diferente
-        if (_sucursalProvider!.selectedSucursalId != sucursalId) {
-          print('EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre');
-          _sucursalProvider!.setSucursal(sucursalId, sucursalNombre);
-        } else {
-          print('EmployeeHome: Sucursal ya establecida: $sucursalId');
-        }
+        _setupEmployeeSucursal(_userData!['sucursal']);
       }
     }
   }

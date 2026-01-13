@@ -29,6 +29,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final ApiService _api = ApiService();
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
+  bool _isInitialized = false; // NUEVO: controla si está listo para mostrar pantallas
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Datos del usuario empleado
@@ -36,21 +37,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int? _employeeSucursalId;
   String? _employeeSucursalName;
 
-  // Pantallas para admin (todas)
+  // Pantallas para admin (todas) - usando Key para forzar recreación cuando cambia sucursal
   List<Widget> get _adminScreens => [
-    const TicketsScreen(),
-    const ClientsScreen(),
-    const TreatmentsScreen(),
-    const PaymentsScreen(),
-    const ReportsScreen(),
-    const EmployeesScreen(),
+    TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
+    ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
+    TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
+    PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
+    ReportsScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
+    EmployeesScreen(key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}')),
     const SettingsScreen(),
   ];
 
-  // Pantallas para empleado (solo tickets y clientes)
+  // Pantallas para empleado (solo tickets y clientes) - usando Key para forzar recreación
   List<Widget> get _employeeScreens => [
-    const TicketsScreen(),
-    const ClientsScreen(),
+    TicketsScreen(key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}')),
+    ClientsScreen(key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}')),
   ];
 
   List<Widget> get _screens => widget.isEmployee ? _employeeScreens : _adminScreens;
@@ -58,31 +59,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.isEmployee) {
-      _loadEmployeeData();
-    }
+    // NO cargar datos aquí, esperar a didChangeDependencies para tener el provider
   }
 
-  Future<void> _loadEmployeeData() async {
+  Future<Map<String, dynamic>?> _loadEmployeeData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userString = prefs.getString('user');
       if (userString != null) {
         final user = jsonDecode(userString);
         print('AdminHomeScreen: Empleado data: $user');
-        setState(() {
-          _employeeData = user;
-        });
+        _employeeData = user;
 
         if (user['sucursal'] != null) {
           _employeeSucursalId = user['sucursal']['id'];
           _employeeSucursalName = user['sucursal']['nombreSucursal'] ?? 'Sin nombre';
           print('AdminHomeScreen: Sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
         }
+        return user;
       }
     } catch (e) {
       print('AdminHomeScreen: Error cargando datos empleado: $e');
     }
+    return null;
   }
 
   @override
@@ -94,13 +93,42 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       print('AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}');
       print('AdminHomeScreen: isEmployee: ${widget.isEmployee}');
 
-      if (widget.isEmployee) {
-        // Para empleado: establecer su sucursal directamente
-        _setupEmployeeSucursal();
-      } else {
-        // Para admin: cargar todas las sucursales
-        _loadSucursales();
-      }
+      // Inicializar según el tipo de usuario
+      _initializeForUserType();
+    }
+  }
+
+  Future<void> _initializeForUserType() async {
+    print('AdminHomeScreen: _initializeForUserType started, isEmployee=${widget.isEmployee}');
+
+    if (widget.isEmployee) {
+      // Para empleado: primero limpiar cualquier sucursal anterior
+      print('AdminHomeScreen: Limpiando sucursal anterior...');
+      _sucursalProvider?.clearSucursal();
+
+      // Esperar un poco para que se limpie
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      // Luego cargar datos y establecer sucursal del empleado
+      print('AdminHomeScreen: Cargando datos del empleado...');
+      await _loadEmployeeData();
+
+      print('AdminHomeScreen: Estableciendo sucursal del empleado...');
+      await _setupEmployeeSucursal();
+
+      // Verificar que se estableció correctamente
+      print('AdminHomeScreen: Sucursal después de setup: ${_sucursalProvider?.selectedSucursalId}');
+    } else {
+      // Para admin: cargar todas las sucursales
+      await _loadSucursales();
+    }
+
+    // Marcar como inicializado DESPUÉS de establecer la sucursal
+    if (mounted) {
+      print('AdminHomeScreen: Marcando como inicializado');
+      setState(() {
+        _isInitialized = true;
+      });
     }
   }
 
@@ -117,17 +145,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _sucursalProvider?.setSucursal(_employeeSucursalId!, _employeeSucursalName!);
 
       // Crear lista de sucursales con solo la del empleado (para mostrar en el drawer)
-      setState(() {
-        _sucursales = [
-          {'id': _employeeSucursalId, 'nombreSucursal': _employeeSucursalName}
-        ];
-        _isLoadingSucursales = false;
-      });
+      _sucursales = [
+        {'id': _employeeSucursalId, 'nombreSucursal': _employeeSucursalName}
+      ];
+      _isLoadingSucursales = false;
+
+      // Esperar un frame para que el provider notifique a los listeners
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Verificar que la sucursal se estableció correctamente
+      print('AdminHomeScreen: Sucursal en provider después de setup: ${_sucursalProvider?.selectedSucursalId}');
     } else {
       print('AdminHomeScreen: ⚠️ Empleado sin sucursal asignada');
-      setState(() {
-        _isLoadingSucursales = false;
-      });
+      _isLoadingSucursales = false;
     }
   }
 
@@ -206,6 +236,78 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    // Mostrar loading mientras se inicializa
+    if (!_isInitialized) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                'Cargando...',
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Verificar si el empleado tiene sucursal asignada
+    if (widget.isEmployee && _employeeSucursalId == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Error de Configuración'),
+          backgroundColor: colorScheme.errorContainer,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 80,
+                  color: colorScheme.error,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Sin Sucursal Asignada',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Tu cuenta de empleado no tiene una sucursal asignada. Por favor, contacta al administrador para que te asigne una sucursal.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                FilledButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Cerrar Sesión'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.error,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final username = widget.isEmployee ? (_employeeData?['username'] ?? 'Empleado') : 'Administrador';
     final rolLabel = widget.isEmployee ? 'Empleado' : 'Administrador';
 

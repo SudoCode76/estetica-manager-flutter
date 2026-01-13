@@ -8,16 +8,30 @@ class ApiService {
 
   static String? debugBaseUrl;
 
+  // URL de producción de Strapi desplegado
+  static const String _productionUrl = 'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
+
+  // URL de desarrollo local (comentar la línea de abajo para usar solo producción)
+  // static const String _localUrl = 'http://localhost:1337/api';
+
   String get _baseUrl {
+    // Si se ha establecido una URL de debug manualmente, usarla (para testing)
     if (debugBaseUrl != null && debugBaseUrl!.isNotEmpty) return debugBaseUrl!;
-    if (kIsWeb) return 'http://localhost:1337/api';
+
+    // Usar URL de producción para todas las plataformas
+    return _productionUrl;
+
+    // Para desarrollo local, descomentar las siguientes líneas y comentar el return de arriba:
+    /*
+    if (kIsWeb) return _localUrl;
     try {
       if (Platform.isAndroid) return 'http://10.0.2.2:1337/api';
-      if (Platform.isIOS || Platform.isMacOS) return 'http://localhost:1337/api';
-      return 'http://localhost:1337/api';
+      if (Platform.isIOS || Platform.isMacOS) return _localUrl;
+      return _localUrl;
     } catch (_) {
-      return 'http://localhost:1337/api';
+      return _localUrl;
     }
+    */
   }
 
   Future<Map<String, String>> _getHeaders() async {

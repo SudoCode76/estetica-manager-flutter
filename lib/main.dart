@@ -3,7 +3,6 @@ import 'package:app_estetica/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
-import 'package:app_estetica/screens/employee/employee_home_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 
 void main() {
@@ -62,7 +61,8 @@ class _RootState extends State<Root> {
       if (userType == 'administrador') {
         _initial = const AdminHomeScreen();
       } else if (userType == 'empleado') {
-        _initial = const EmployeeHomeScreen();
+        // Usar AdminHomeScreen con isEmployee=true para mantener consistencia con login
+        _initial = const AdminHomeScreen(isEmployee: true);
       }
     } else {
       _initial = const LoginScreen();
