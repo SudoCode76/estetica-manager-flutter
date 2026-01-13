@@ -8,6 +8,8 @@ import 'package:app_estetica/screens/admin/select_client_screen.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:app_estetica/providers/ticket_provider.dart';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
@@ -462,6 +464,15 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                backgroundColor: Colors.green,
              ),
            );
+
+           // Refrescar la lista global de tickets a través del provider
+           try {
+             await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: null);
+           } catch (e) {
+             // Si falla la recarga automática, no bloqueamos el flujo; el usuario volverá y podrá refrescar manualmente
+             print('NewTicketScreen: Error al refrescar TicketProvider: $e');
+           }
+
            Navigator.pop(context, true);
          }
        } else {

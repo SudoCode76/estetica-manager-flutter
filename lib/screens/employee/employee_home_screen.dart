@@ -7,6 +7,8 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:app_estetica/providers/ticket_provider.dart';
 
 class EmployeeHomeScreen extends StatefulWidget {
   const EmployeeHomeScreen({Key? key}) : super(key: key);
@@ -22,13 +24,10 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoadingUser = true;
 
-  // Nuevo: key para acceder a TicketsScreen
-  final GlobalKey _ticketsKey = GlobalKey();
-
   // NO crear las pantallas aquí, se crearán dinámicamente en build
   List<Widget> _getScreens() {
     return [
-      TicketsScreen(key: _ticketsKey),
+      TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
       const ClientsScreen(key: ValueKey('clients_screen')),
     ];
   }
@@ -437,17 +436,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // Intentar invocar fetchTickets en la pantalla de tickets
-                  try {
-                    final state = _ticketsKey.currentState;
-                    if (state != null) {
-                      (state as dynamic).fetchTickets();
-                    } else {
-                      setState(() {});
-                    }
-                  } catch (e) {
-                    setState(() {});
-                  }
+                  // Usar el provider para refrescar la lista de tickets
+                  Provider.of<TicketProvider>(context, listen: false).fetchTickets();
                 }
               },
               icon: const Icon(Icons.add),

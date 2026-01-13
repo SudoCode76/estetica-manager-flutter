@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:app_estetica/providers/ticket_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -24,13 +26,18 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return SucursalInherited(
       provider: _globalSucursalProvider,
-      child: MaterialApp(
-        title: 'App Estetica',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.light,
-        home: const Root(),
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider<TicketProvider>(create: (_) => TicketProvider()),
+        ],
+        child: MaterialApp(
+          title: 'App Estetica',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.light,
+          home: const Root(),
+        ),
       ),
     );
   }

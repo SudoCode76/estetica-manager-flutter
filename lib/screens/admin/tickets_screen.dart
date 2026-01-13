@@ -5,6 +5,8 @@ import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
 import 'package:app_estetica/screens/admin/all_tickets_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:app_estetica/providers/ticket_provider.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -16,9 +18,6 @@ class TicketsScreen extends StatefulWidget {
 class _TicketsScreenState extends State<TicketsScreen> {
   final ApiService api = ApiService();
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> tickets = [];
-  List<dynamic> filteredTickets = [];
-  bool isLoading = true;
   String search = '';
   String? errorMsg;
   bool showAtendidos = false; // false = pendientes, true = atendidos
@@ -34,17 +33,66 @@ class _TicketsScreenState extends State<TicketsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    print('TicketsScreen: didChangeDependencies called');
     final provider = SucursalInherited.of(context);
-    print('TicketsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}');
     if (provider != _sucursalProvider) {
-      print('TicketsScreen: Provider changed, removing old listener');
-      _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
-      _sucursalProvider?.addListener(_onSucursalChanged);
-      print('TicketsScreen: Calling fetchTickets()');
-      fetchTickets();
+      // Al cambiar la sucursal, pedir al TicketProvider que recargue
+      final ticketProvider = context.read<TicketProvider>();
+      ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos).catchError((_) {});
     }
+  }
+
+  void _onRefreshPressed() async {
+    final ticketProvider = context.read<TicketProvider>();
+    await ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
+  }
+
+  void filterTicketsBySearch(String value) {
+    setState(() {
+      search = value;
+    });
+  }
+
+  List<dynamic> _computeFilteredTickets(List<dynamic> tickets) {
+    // Filtrar por fecha de hoy si showOnlyToday es true
+    List<dynamic> dateFilteredTickets = tickets;
+    if (showOnlyToday) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+
+      dateFilteredTickets = tickets.where((t) {
+        if (t['fecha'] == null) return false;
+        final ticketDate = DateTime.parse(t['fecha']);
+        return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) &&
+            ticketDate.isBefore(tomorrow);
+      }).toList();
+    }
+
+    // Aplicar filtro de búsqueda actual
+    List<dynamic> filtered;
+    if (search.isEmpty) {
+      filtered = dateFilteredTickets;
+    } else {
+      filtered = dateFilteredTickets.where((t) {
+        final cliente = t['cliente']?['nombreCliente'] ?? '';
+        final apellido = t['cliente']?['apellidoCliente'] ?? '';
+        final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
+        final tratamientosMatch = tratamientos.any((tr) => (tr['nombreTratamiento'] ?? '').toLowerCase().contains(search.toLowerCase()));
+        return cliente.toLowerCase().contains(search.toLowerCase()) ||
+            apellido.toLowerCase().contains(search.toLowerCase()) ||
+            tratamientosMatch;
+      }).toList();
+    }
+
+    // Ordenar
+    filtered.sort((a, b) {
+      final dateA = a['fecha'] != null ? DateTime.parse(a['fecha']) : DateTime.now();
+      final dateB = b['fecha'] != null ? DateTime.parse(b['fecha']) : DateTime.now();
+      return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
+    });
+
+    return filtered;
   }
 
   @override
@@ -55,103 +103,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 
   void _onSucursalChanged() {
-    fetchTickets();
-  }
-
-  Future<void> fetchTickets() async {
-    print('TicketsScreen: fetchTickets() called');
-    print('TicketsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
-
-    if (_sucursalProvider?.selectedSucursalId == null) {
-      print('TicketsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
-      setState(() {
-        isLoading = false;
-        errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
-        tickets = [];
-        filteredTickets = [];
-      });
-      return;
-    }
-
-    print('TicketsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}');
-    setState(() {
-      isLoading = true;
-      errorMsg = null;
-    });
-    try {
-      print('TicketsScreen: Llamando api.getTickets con sucursalId=${_sucursalProvider!.selectedSucursalId}, estadoTicket=$showAtendidos');
-      final data = await api.getTickets(
-        sucursalId: _sucursalProvider!.selectedSucursalId,
-        estadoTicket: showAtendidos,
-      );
-      print('TicketsScreen: ✓ Recibidos ${data.length} tickets');
-      tickets = data;
-
-      // Filtrar por fecha de hoy si showOnlyToday es true
-      List<dynamic> dateFilteredTickets = tickets;
-      if (showOnlyToday) {
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        final tomorrow = today.add(const Duration(days: 1));
-
-        dateFilteredTickets = tickets.where((t) {
-          if (t['fecha'] == null) return false;
-          final ticketDate = DateTime.parse(t['fecha']);
-          return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) &&
-                 ticketDate.isBefore(tomorrow);
-        }).toList();
-      }
-
-      // Aplicar filtro de búsqueda actual
-      if (search.isEmpty) {
-        filteredTickets = dateFilteredTickets;
-      } else {
-        filteredTickets = dateFilteredTickets.where((t) {
-          final cliente = t['cliente']?['nombreCliente'] ?? '';
-          final apellido = t['cliente']?['apellidoCliente'] ?? '';
-          final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-          final tratamientosMatch = tratamientos.any((tr) =>
-            (tr['nombreTratamiento'] ?? '').toLowerCase().contains(search.toLowerCase())
-          );
-          return cliente.toLowerCase().contains(search.toLowerCase()) ||
-              apellido.toLowerCase().contains(search.toLowerCase()) ||
-              tratamientosMatch;
-        }).toList();
-      }
-      sortTickets();
-    } catch (e) {
-      errorMsg = 'No se pudo conectar al servidor.';
-    }
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  void sortTickets() {
-    filteredTickets.sort((a, b) {
-      final dateA = a['fecha'] != null ? DateTime.parse(a['fecha']) : DateTime.now();
-      final dateB = b['fecha'] != null ? DateTime.parse(b['fecha']) : DateTime.now();
-      return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
-    });
-  }
-
-  void filterTickets(String value) {
-    setState(() {
-      search = value;
-      filteredTickets = tickets.where((t) {
-        final cliente = t['cliente']?['nombreCliente'] ?? '';
-        final apellido = t['cliente']?['apellidoCliente'] ?? '';
-        // Buscar en todos los tratamientos del ticket
-        final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-        final tratamientosMatch = tratamientos.any((tr) =>
-          (tr['nombreTratamiento'] ?? '').toLowerCase().contains(value.toLowerCase())
-        );
-        return cliente.toLowerCase().contains(value.toLowerCase()) ||
-            apellido.toLowerCase().contains(value.toLowerCase()) ||
-            tratamientosMatch;
-      }).toList();
-      sortTickets();
-    });
+    // Cuando cambia la sucursal en el provider, recargar tickets
+    final ticketProvider = context.read<TicketProvider>();
+    ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos).catchError((_) {});
   }
 
   @override
@@ -159,7 +113,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    // Antes este widget devolvía un Scaffold; lo convertimos en contenido sin Scaffold
+    final ticketProvider = context.watch<TicketProvider>();
+    final providerTickets = ticketProvider.tickets;
+    final isLoading = ticketProvider.isLoading;
+    final providerError = ticketProvider.error;
+
+    final filteredTickets = _computeFilteredTickets(providerTickets);
+
     return SafeArea(
       child: Column(
         children: [
@@ -182,12 +142,12 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                   icon: const Icon(Icons.clear),
                                   onPressed: () {
                                     _searchController.clear();
-                                    filterTickets('');
+                                    filterTicketsBySearch('');
                                   },
                                 ),
                               ]
                             : null,
-                        onChanged: filterTickets,
+                        onChanged: filterTicketsBySearch,
                         elevation: const WidgetStatePropertyAll(1),
                       ),
                     ),
@@ -197,7 +157,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       onPressed: () {
                         setState(() {
                           sortAscending = !sortAscending;
-                          sortTickets();
                         });
                       },
                       icon: Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
@@ -209,7 +168,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: fetchTickets,
+                      onPressed: _onRefreshPressed,
                       icon: const Icon(Icons.refresh),
                       label: const Text(''),
                       style: FilledButton.styleFrom(
@@ -242,7 +201,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                           setState(() {
                             showAtendidos = newSelection.first;
                           });
-                          await fetchTickets();
+                          await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
                         },
                         style: const ButtonStyle(
                           visualDensity: VisualDensity.comfortable,
@@ -277,7 +236,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                           MaterialPageRoute(
                             builder: (context) => const AllTicketsScreen(),
                           ),
-                        ).then((_) => fetchTickets());
+                        ).then((_) => context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos));
                       },
                       icon: const Icon(Icons.history),
                       label: const Text('Ver todos'),
@@ -297,7 +256,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                       color: colorScheme.primary,
                     ),
                   )
-                : errorMsg != null
+                : providerError != null
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -305,7 +264,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                             Icon(Icons.error_outline, size: 64, color: colorScheme.error),
                             const SizedBox(height: 16),
                             Text(
-                              errorMsg!,
+                              providerError,
                               style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
                             ),
                           ],
@@ -342,7 +301,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                       ? '${t['cliente']['nombreCliente'] ?? '-'} ${t['cliente']['apellidoCliente'] ?? ''}'
                                       : t['cliente']['nombreCliente'] ?? '-')
                                   : '-';
-                              // Obtener lista de tratamientos
                               final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
                               final tratamientoTexto = tratamientos.isEmpty
                                   ? 'Sin tratamientos'
@@ -381,7 +339,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                               builder: (context) => TicketDetailScreen(ticket: t),
                                             ),
                                           );
-                                          await fetchTickets();
+                                          await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
                                         },
                                         child: Padding(
                                           padding: const EdgeInsets.all(16),
@@ -489,7 +447,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                             behavior: SnackBarBehavior.floating,
                                                           ),
                                                         );
-                                                        await fetchTickets();
+                                                        await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
                                                       } else {
                                                         ScaffoldMessenger.of(context).showSnackBar(
                                                           SnackBar(
