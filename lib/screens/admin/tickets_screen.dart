@@ -37,8 +37,17 @@ class _TicketsScreenState extends State<TicketsScreen> {
     if (provider != _sucursalProvider) {
       _sucursalProvider = provider;
       // Al cambiar la sucursal, pedir al TicketProvider que recargue
+      _reloadTicketsForCurrentFilters();
+    }
+  }
+
+  Future<void> _reloadTicketsForCurrentFilters() async {
+    try {
       final ticketProvider = context.read<TicketProvider>();
-      ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos).catchError((_) {});
+      await ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
+    } catch (e) {
+      // Registrar pero no interrumpir UI
+      print('TicketsScreen: Error recargando tickets en didChangeDependencies: $e');
     }
   }
 
@@ -104,8 +113,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   void _onSucursalChanged() {
     // Cuando cambia la sucursal en el provider, recargar tickets
-    final ticketProvider = context.read<TicketProvider>();
-    ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos).catchError((_) {});
+    _reloadTicketsForCurrentFilters();
   }
 
   @override
@@ -430,7 +438,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                 Padding(
                                                   padding: const EdgeInsets.only(left: 12.0),
                                                   child: _AttendButton(
-                                                    onPressed: () async {
+                                                    onPressedAsync: () async {
                                                       final documentId = t['documentId'];
                                                       final success = await api.actualizarEstadoTicket(documentId, true);
                                                       if (success) {
@@ -484,9 +492,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
 }
 
 class _AttendButton extends StatefulWidget {
-  final VoidCallback onPressed;
+  // Ahora recibe una función asíncrona que realizará la acción (API call + refresh)
+  final Future<void> Function()? onPressedAsync;
 
-  const _AttendButton({required this.onPressed});
+  const _AttendButton({required this.onPressedAsync});
 
   @override
   State<_AttendButton> createState() => __AttendButtonState();
@@ -495,6 +504,7 @@ class _AttendButton extends StatefulWidget {
 class __AttendButtonState extends State<_AttendButton> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -544,11 +554,24 @@ class __AttendButtonState extends State<_AttendButton> with SingleTickerProvider
             ],
           ),
           child: IconButton(
-            icon: const Icon(Icons.check, color: Colors.white, size: 28),
-            onPressed: () {
-              widget.onPressed();
-              _controller.forward().then((_) => _controller.reverse());
-            },
+            // Mostrar loader cuando está procesando
+            icon: _isLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
+                : const Icon(Icons.check, color: Colors.white, size: 28),
+            onPressed: (_isLoading || widget.onPressedAsync == null)
+                ? null
+                : () async {
+                    setState(() { _isLoading = true; });
+                    try {
+                      await widget.onPressedAsync!();
+                    } catch (e) {
+                      // El callback debería manejar errores y mostrar snackbars; aquí solo aseguramos que se quite el loader
+                      print('AttendButton: error en onPressedAsync: $e');
+                    } finally {
+                      if (mounted) setState(() { _isLoading = false; });
+                      _controller.forward().then((_) => _controller.reverse());
+                    }
+                  },
             splashRadius: 28,
             padding: EdgeInsets.zero,
           ),
