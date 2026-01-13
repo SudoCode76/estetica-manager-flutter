@@ -22,10 +22,13 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoadingUser = true;
 
+  // Nuevo: key para acceder a TicketsScreen
+  final GlobalKey _ticketsKey = GlobalKey();
+
   // NO crear las pantallas aquí, se crearán dinámicamente en build
   List<Widget> _getScreens() {
     return [
-      const TicketsScreen(key: ValueKey('tickets_screen')),
+      TicketsScreen(key: _ticketsKey),
       const ClientsScreen(key: ValueKey('clients_screen')),
     ];
   }
@@ -434,8 +437,17 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // Refrescar tickets - simplemente rebuild todo
-                  setState(() {});
+                  // Intentar invocar fetchTickets en la pantalla de tickets
+                  try {
+                    final state = _ticketsKey.currentState;
+                    if (state != null) {
+                      (state as dynamic).fetchTickets();
+                    } else {
+                      setState(() {});
+                    }
+                  } catch (e) {
+                    setState(() {});
+                  }
                 }
               },
               icon: const Icon(Icons.add),

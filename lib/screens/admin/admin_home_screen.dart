@@ -32,6 +32,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   bool _isInitialized = false; // NUEVO: controla si está listo para mostrar pantallas
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // Nuevo: GlobalKeys para acceder a TicketsScreen state (admin y empleado)
+  final GlobalKey _ticketsKey = GlobalKey();
+  final GlobalKey _empTicketsKey = GlobalKey();
+
   // Datos del usuario empleado
   Map<String, dynamic>? _employeeData;
   int? _employeeSucursalId;
@@ -39,7 +43,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   // Pantallas para admin (todas) - usando Key para forzar recreación cuando cambia sucursal
   List<Widget> get _adminScreens => [
-    TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
+    TicketsScreen(key: _ticketsKey),
     ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
     TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
     PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
@@ -50,7 +54,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   // Pantallas para empleado (solo tickets y clientes) - usando Key para forzar recreación
   List<Widget> get _employeeScreens => [
-    TicketsScreen(key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}')),
+    TicketsScreen(key: _empTicketsKey),
     ClientsScreen(key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}')),
   ];
 
@@ -632,8 +636,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // refrescar tickets - rebuild forzado
-                  setState(() {});
+                  // Llamar directamente al método fetchTickets del TicketsScreen
+                  try {
+                    final state = _ticketsKey.currentState;
+                    // usar dynamic para evitar referencia al tipo privado
+                    if (state != null) {
+                      (state as dynamic).fetchTickets();
+                    } else {
+                      setState(() {});
+                    }
+                  } catch (e) {
+                    // Fallback: rebuild por si no se pudo invocar fetch
+                    setState(() {});
+                  }
                 }
               },
               icon: const Icon(Icons.add),
