@@ -6,6 +6,7 @@ import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'package:app_estetica/navigation/route_observer.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,6 +37,7 @@ class _MyAppState extends State<MyApp> {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.light,
+          navigatorObservers: [routeObserver],
           home: const Root(),
         ),
       ),

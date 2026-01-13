@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../providers/sucursal_provider.dart';
+import 'package:app_estetica/navigation/route_observer.dart';
 
 class ReporteRangoScreen extends StatefulWidget {
   const ReporteRangoScreen({Key? key}) : super(key: key);
@@ -10,7 +11,7 @@ class ReporteRangoScreen extends StatefulWidget {
   State<ReporteRangoScreen> createState() => _ReporteRangoScreenState();
 }
 
-class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
+class _ReporteRangoScreenState extends State<ReporteRangoScreen> with RouteAware {
   final ApiService _api = ApiService();
   Map<String, dynamic>? _report;
   bool _loading = false;
@@ -21,7 +22,8 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
 
   SucursalProvider? _sucursalProvider;
   int? _sucursalId;
-  Timer? _refreshTimer;
+
+  bool _routeSubscribed = false;
 
   @override
   void initState() {
@@ -33,10 +35,7 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
     _start = '${start.year.toString().padLeft(4,'0')}-${start.month.toString().padLeft(2,'0')}-${start.day.toString().padLeft(2,'0')}';
     _end = '${end.year.toString().padLeft(4,'0')}-${end.month.toString().padLeft(2,'0')}-${end.day.toString().padLeft(2,'0')}';
 
-    // refrescar automáticamente cada 6 segundos para que los totales se mantengan actualizados
-    _refreshTimer = Timer.periodic(const Duration(seconds: 6), (t) {
-      if (mounted) _fetch();
-    });
+    // No iniciamos un timer periódico: la pantalla se refrescará solo al entrar
   }
 
   @override
@@ -51,6 +50,15 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
         _sucursalId = _sucursalProvider?.selectedSucursalId;
       });
       _fetch();
+    }
+
+    // Subscribe to route observer to refresh when returning to this route
+    if (!_routeSubscribed) {
+      final modal = ModalRoute.of(context);
+      if (modal != null) {
+        routeObserver.subscribe(this, modal);
+        _routeSubscribed = true;
+      }
     }
   }
 
@@ -98,9 +106,21 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> {
   @override
   void dispose() {
     _sucursalProvider?.removeListener(_onSucursalChanged);
-    _refreshTimer?.cancel();
+    if (_routeSubscribed) {
+      routeObserver.unsubscribe(this);
+      _routeSubscribed = false;
+    }
     super.dispose();
   }
+
+  @override
+  void didPopNext() {
+    // When returning to this screen, refetch current report
+    _fetch();
+  }
+
+  @override
+  void didPushNext() {}
 
   @override
   Widget build(BuildContext context) {

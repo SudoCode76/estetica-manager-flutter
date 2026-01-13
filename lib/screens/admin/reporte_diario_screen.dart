@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../providers/sucursal_provider.dart';
+import 'package:app_estetica/navigation/route_observer.dart';
 
 class ReporteDiarioScreen extends StatefulWidget {
   const ReporteDiarioScreen({Key? key}) : super(key: key);
@@ -10,7 +11,7 @@ class ReporteDiarioScreen extends StatefulWidget {
   State<ReporteDiarioScreen> createState() => _ReporteDiarioScreenState();
 }
 
-class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
+class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> with RouteAware {
   final ApiService _api = ApiService();
   Map<String, dynamic>? _dailyReport;
   bool _isLoading = false;
@@ -18,21 +19,12 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
 
   // Sucursal provider
   SucursalProvider? _sucursalProvider;
-  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     // Usar fecha actual del dispositivo
     _updateCurrentDate();
-
-    // Iniciar timer que refresca reporte cada 10 segundos mientras la pantalla esté montada
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (t) {
-      if (mounted) {
-        _updateCurrentDate(); // Actualizar fecha por si cambia el día
-        _fetchDaily();
-      }
-    });
   }
 
   void _updateCurrentDate() {
@@ -87,6 +79,8 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
     }
   }
 
+  bool _routeSubscribed = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -103,8 +97,17 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
       setState(() {
         _selectedSucursalId = _sucursalProvider?.selectedSucursalId;
       });
-      // refrescar reporte con la sucursal actual
+      // refrescar reporte con la sucursal actual (cuando entramos por primera vez)
       _fetchDaily();
+    }
+
+    // Subscribe to route observer so we can refresh when user returns to this screen
+    if (!_routeSubscribed) {
+      final modal = ModalRoute.of(context);
+      if (modal != null) {
+        routeObserver.subscribe(this, modal);
+        _routeSubscribed = true;
+      }
     }
   }
 
@@ -119,8 +122,24 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> {
   @override
   void dispose() {
     _sucursalProvider?.removeListener(_onSucursalChanged);
-    _refreshTimer?.cancel();
+    if (_routeSubscribed) {
+      routeObserver.unsubscribe(this);
+      _routeSubscribed = false;
+    }
     super.dispose();
+  }
+
+  // RouteAware hooks
+  @override
+  void didPopNext() {
+    // Called when this route is again visible (a pushed route was popped)
+    _updateCurrentDate();
+    _fetchDaily();
+  }
+
+  @override
+  void didPushNext() {
+    // called when a new route is pushed above this one; do nothing
   }
 
   @override
