@@ -436,8 +436,12 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // Usar el provider para refrescar la lista de tickets
-                  Provider.of<TicketProvider>(context, listen: false).fetchTickets();
+                  // Usar el provider para refrescar la lista con los mismos filtros
+                  try {
+                    await context.read<TicketProvider>().fetchCurrent();
+                  } catch (e) {
+                    setState(() {});
+                  }
                 }
               },
               icon: const Icon(Icons.add),

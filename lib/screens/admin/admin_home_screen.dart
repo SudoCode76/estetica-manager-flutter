@@ -634,11 +634,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 );
                 if (result == true) {
-                  // Refrescar globalmente a través del provider
+                  // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
                   try {
-                    await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId);
+                    await context.read<TicketProvider>().fetchCurrent();
                   } catch (e) {
-                    // fallback: rebuild
                     setState(() {});
                   }
                 }

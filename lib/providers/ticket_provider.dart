@@ -15,8 +15,16 @@ class TicketProvider extends ChangeNotifier {
   // Evitar fetches paralelos
   bool _fetchInProgress = false;
 
+  // Últimos filtros usados por fetchTickets
+  int? _lastSucursalId;
+  bool? _lastEstadoTicket;
+
   Future<List<dynamic>> fetchTickets({int? sucursalId, bool? estadoTicket}) async {
     if (_fetchInProgress) return _tickets;
+    // Guardar los filtros utilizados para permitir un "refresh" igual al botón
+    _lastSucursalId = sucursalId;
+    _lastEstadoTicket = estadoTicket;
+
     _fetchInProgress = true;
     _isLoading = true;
     _error = null;
@@ -36,6 +44,11 @@ class TicketProvider extends ChangeNotifier {
     }
   }
 
+  /// Re-ejecuta el último fetch con los filtros guardados.
+  Future<List<dynamic>> fetchCurrent() async {
+    return fetchTickets(sucursalId: _lastSucursalId, estadoTicket: _lastEstadoTicket);
+  }
+
   // Añadir ticket localmente evitando duplicados por id
   void addTicketLocal(Map<String, dynamic> ticket) {
     final id = ticket['id'] ?? ticket['documentId'];
@@ -53,4 +66,3 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-
