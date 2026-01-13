@@ -52,6 +52,28 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     }
   }
 
+  // Filtra una lista de tratamientos según el flag _showDisabled
+  List<dynamic> _filterTratamientosList(List<dynamic> tr) {
+    if (_showDisabled) return List<dynamic>.from(tr);
+
+    // Build set of active category ids
+    final activeCatIds = _categoriasAll
+        .where((c) => c['estadoCategoria'] == true || c['estadoCategoria'] == null)
+        .map((c) => c['id'])
+        .toSet();
+
+    return tr.where((t) {
+      final bool tratActivo = t['estadoTratamiento'] == true || t['estadoTratamiento'] == null;
+      if (!tratActivo) return false;
+      // Si el tratamiento tiene categoría, comprobar que la categoría esté activa
+      final cat = t['categoria_tratamiento'];
+      if (cat == null) return true;
+      final catId = (cat is Map) ? cat['id'] : cat;
+      if (catId == null) return true;
+      return activeCatIds.contains(catId);
+    }).toList();
+  }
+
   Future<void> _refresh() async => await _loadAll();
 
   Future<void> _showCreateCategoriaDialog() async {
@@ -344,7 +366,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
           onSelected: (v) async {
             setState(() => _selectedCategoriaId = v ? c['id'] : null);
             final tr = await _api.getTratamientos(categoriaId: v ? c['id'] : null);
-            setState(() => _tratamientos = tr);
+            setState(() => _tratamientos = _filterTratamientosList(tr));
           },
           selectedColor: cs.primaryContainer,
           backgroundColor: cs.surface,
@@ -594,7 +616,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
       onTap: () async {
         setState(() => _selectedCategoriaId = c['id']);
         final tr = await _api.getTratamientos(categoriaId: c['id']);
-        setState(() => _tratamientos = tr);
+        setState(() => _tratamientos = _filterTratamientosList(tr));
       },
     );
   }
