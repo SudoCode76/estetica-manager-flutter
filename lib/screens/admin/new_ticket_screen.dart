@@ -41,7 +41,8 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    bool isLoading = true;
    bool isLoadingUsuarios = false;
    bool isLoadingUserType = true; // NUEVO: controla si se ha determinado el tipo de usuario
-   String? error;
+   String? error; // Error de carga de datos (muestra pantalla completa de error)
+   String? validationError; // Error de validación/creación (se muestra inline en el formulario)
    bool _isSubmitting = false; // Flag para evitar envíos múltiples y mostrar loader
    final Map<int, bool> _expansionState = {}; // Para el estado de expansión de categorías
 
@@ -484,15 +485,27 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      // Evitar envíos múltiples
      if (_isSubmitting) return;
 
-     if (fecha == null || tratamientosSeleccionados.isEmpty || clienteId == null || (usuarioId == null && widget.currentUserId == null) || pago == null) {
-       setState(() { error = 'Completa todos los campos'; });
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Completa todos los campos requeridos')),
-       );
+     // Limpiar error de validación previo
+     setState(() { validationError = null; });
+
+     // Validar campos requeridos
+     List<String> camposFaltantes = [];
+
+     if (fecha == null) camposFaltantes.add('Fecha y hora');
+     if (tratamientosSeleccionados.isEmpty) camposFaltantes.add('Tratamientos');
+     if (clienteId == null) camposFaltantes.add('Cliente');
+     if (usuarioId == null && widget.currentUserId == null) camposFaltantes.add('Usuario');
+     if (pago == null) camposFaltantes.add('Pago realizado');
+
+     if (camposFaltantes.isNotEmpty) {
+       setState(() {
+         validationError = 'Campos requeridos: ${camposFaltantes.join(", ")}';
+       });
        return;
      }
+
      if (_sucursalProvider?.selectedSucursalId == null) {
-       setState(() { error = 'Selecciona una sucursal en el menú lateral'; });
+       setState(() { validationError = 'Selecciona una sucursal en el menú lateral'; });
        return;
      }
      calcularEstadoPago();
@@ -534,21 +547,12 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
            Navigator.pop(context, true);
          }
        } else {
-         setState(() { error = 'Error al crear ticket'; });
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(
-             content: Text('Error al crear el ticket'),
-             backgroundColor: Colors.red,
-           ),
-         );
+         setState(() { validationError = 'Error al crear ticket. Intenta de nuevo.'; });
        }
      } catch (e) {
-       // Mostrar error y permitir reintento
+       // Mostrar error inline y permitir reintento
        final msg = e.toString();
-       setState(() { error = 'Error al crear ticket: $msg'; });
-       ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(content: Text('Error al crear el ticket: $msg'), backgroundColor: Colors.red),
-       );
+       setState(() { validationError = 'Error: $msg'; });
      } finally {
        if (mounted) setState(() { _isSubmitting = false; });
      }
@@ -1027,10 +1031,49 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                            ],
                          ),
                          const SizedBox(height: 24),
-                         if (error != null)
-                           Padding(
-                             padding: const EdgeInsets.only(bottom: 12),
-                             child: Text(error!, style: const TextStyle(color: Colors.red)),
+                         // Mensaje de error de validación
+                         if (validationError != null)
+                           Container(
+                             margin: const EdgeInsets.only(bottom: 16),
+                             padding: const EdgeInsets.all(12),
+                             decoration: BoxDecoration(
+                               color: Theme.of(context).colorScheme.errorContainer,
+                               borderRadius: BorderRadius.circular(12),
+                               border: Border.all(
+                                 color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+                               ),
+                             ),
+                             child: Row(
+                               children: [
+                                 Icon(
+                                   Icons.error_outline,
+                                   color: Theme.of(context).colorScheme.onErrorContainer,
+                                   size: 24,
+                                 ),
+                                 const SizedBox(width: 12),
+                                 Expanded(
+                                   child: Text(
+                                     validationError!,
+                                     style: TextStyle(
+                                       color: Theme.of(context).colorScheme.onErrorContainer,
+                                       fontWeight: FontWeight.w500,
+                                     ),
+                                   ),
+                                 ),
+                                 IconButton(
+                                   icon: Icon(
+                                     Icons.close,
+                                     color: Theme.of(context).colorScheme.onErrorContainer,
+                                     size: 20,
+                                   ),
+                                   onPressed: () {
+                                     setState(() { validationError = null; });
+                                   },
+                                   padding: EdgeInsets.zero,
+                                   constraints: const BoxConstraints(),
+                                 ),
+                               ],
+                             ),
                            ),
                          FilledButton.icon(
                            onPressed: _isSubmitting ? null : crearTicket,

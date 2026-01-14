@@ -709,16 +709,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ],
         ),
       ),
-        body: ScaffoldKeyInherited(
-          scaffoldKey: _scaffoldKey,
-          child: Column(
-            children: [
-              // Header global (menú + logo + título)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 360;
-                  final isVerySmall = constraints.maxWidth < 340;
-                  return Padding(
+        body: SafeArea(
+          child: ScaffoldKeyInherited(
+            scaffoldKey: _scaffoldKey,
+            child: Column(
+              children: [
+                // Header global (menú + logo + título)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 360;
+                    final isVerySmall = constraints.maxWidth < 340;
+                    return Padding(
                     padding: EdgeInsets.fromLTRB(
                       isCompact ? 8 : 16,
                       isCompact ? 12 : 16,
@@ -764,6 +765,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               Expanded(child: _screens[_selectedIndex]),
             ],
           ),
+        ),
         ),
         floatingActionButton: _selectedIndex == 0
           ? Builder(
