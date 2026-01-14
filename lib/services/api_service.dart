@@ -1221,14 +1221,23 @@ class ApiService {
   /// Obtener todos los usuarios
   Future<List<Map<String, dynamic>>> getUsers() async {
     final headers = await _getHeaders();
-    final url = Uri.parse('$_baseUrl/users');
+    // Pedir populate=* para incluir relaciones (p. ej. sucursal)
+    final url = Uri.parse('$_baseUrl/users?populate=*');
 
     try {
       final response = await _getWithTimeout(url, headers);
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((e) => Map<String, dynamic>.from(e)).toList();
+        // Strapi puede devolver una lista directamente o { data: [...] } dependiendo de la versión/endpoint.
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        if (decoded is Map && decoded.containsKey('data')) {
+          final list = decoded['data'] as List<dynamic>;
+          return list.map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        throw Exception('Formato de respuesta inesperado al obtener usuarios');
       } else {
         throw Exception('Error al obtener usuarios: ${response.statusCode}');
       }
@@ -1247,6 +1256,7 @@ class ApiService {
     bool confirmed = true,
     bool blocked = false,
     int? roleId,
+    int? sucursalId, // ID de la sucursal a asignar al usuario (opcional)
   }) async {
     final headers = await _getHeaders();
     final url = Uri.parse('$_baseUrl/users');
@@ -1268,7 +1278,7 @@ class ApiService {
       }
     }
 
-    final body = jsonEncode({
+    final Map<String, dynamic> payload = {
       'username': username,
       'email': email,
       'password': password,
@@ -1276,7 +1286,12 @@ class ApiService {
       'tipoUsuario': tipoUsuario,
       'confirmed': confirmed,
       'blocked': blocked,
-    });
+    };
+    if (sucursalId != null) {
+      // Asignar relación con la sucursal (Strapi acepta el id para relaciones)
+      payload['sucursal'] = sucursalId;
+    }
+    final body = jsonEncode(payload);
 
     try {
       final response = await _postWithTimeout(url, headers, body);
@@ -1402,3 +1417,4 @@ class ApiService {
     }
   }
 }
+

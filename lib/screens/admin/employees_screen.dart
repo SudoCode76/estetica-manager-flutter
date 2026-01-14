@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../providers/sucursal_provider.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({Key? key}) : super(key: key);
@@ -1073,6 +1074,15 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
           blocked: _blocked,
         );
       } else {
+        // Obtener sucursal seleccionada desde el provider
+        final provider = SucursalInherited.of(context);
+        final selectedSucursalId = provider?.selectedSucursalId;
+        if (selectedSucursalId == null) {
+          // No permitimos crear empleado sin sucursal asignada
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de crear el empleado'), backgroundColor: Colors.orange));
+          if (mounted) setState(() => _loading = false);
+          return;
+        }
         // Crear
         await api.createUser(
           username: _usernameController.text,
@@ -1081,6 +1091,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
           tipoUsuario: 'empleado',
           confirmed: _confirmed,
           blocked: _blocked,
+          sucursalId: selectedSucursalId,
         );
       }
 
@@ -1107,4 +1118,6 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
     }
   }
 }
+
+
 

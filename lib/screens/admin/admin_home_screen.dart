@@ -169,6 +169,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     try {
       final sucursales = await _api.getSucursales();
       print('AdminHomeScreen: Loaded ${sucursales.length} sucursales');
+      // Guardar cache local de sucursales para fallback si el servidor está lento
+      await _saveSucursalesCache(sucursales);
       setState(() {
         _sucursales = sucursales;
         _isLoadingSucursales = false;
@@ -186,10 +188,60 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       print('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     } catch (e) {
       print('AdminHomeScreen: Error loading sucursales: $e');
-      setState(() {
-        _isLoadingSucursales = false;
-      });
+      // Intentar cargar desde caché local
+      final cached = await _loadSucursalesCache();
+      if (cached != null && cached.isNotEmpty) {
+        print('AdminHomeScreen: Using cached sucursales (${cached.length}) as fallback');
+        setState(() {
+          _sucursales = cached;
+          _isLoadingSucursales = false;
+          // Si no hay selección previa, seleccionar la primera del cache
+          if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
+            _sucursalProvider?.setSucursal(_sucursales.first['id'], _sucursales.first['nombreSucursal']);
+          }
+        });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usando datos en caché: servidor lento o inaccesible')));
+      } else {
+        // No hay caché: informar y permitir reintento
+        setState(() {
+          _isLoadingSucursales = false;
+        });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando sucursales: $e')));
+      }
     }
+  }
+
+  // Guardar lista de sucursales en SharedPreferences como JSON
+  Future<void> _saveSucursalesCache(List<dynamic> sucursales) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = jsonEncode(sucursales);
+      await prefs.setString('cachedSucursales', s);
+      print('AdminHomeScreen: Saved ${sucursales.length} sucursales to cache');
+    } catch (e) {
+      print('AdminHomeScreen: Error saving sucursales cache: $e');
+    }
+  }
+
+  // Cargar cache de sucursales si existe
+  Future<List<dynamic>?> _loadSucursalesCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString('cachedSucursales');
+      if (s == null || s.isEmpty) return null;
+      final decoded = jsonDecode(s) as List<dynamic>;
+      return decoded;
+    } catch (e) {
+      print('AdminHomeScreen: Error loading sucursales cache: $e');
+      return null;
+    }
+  }
+
+  Future<void> _retryLoadSucursales() async {
+    setState(() {
+      _isLoadingSucursales = true;
+    });
+    await _loadSucursales();
   }
 
   void _logout() {
@@ -409,47 +461,60 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                   Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: DropdownButtonHideUnderline(
-                                      child: Builder(
-                                        builder: (context) {
-                                          final currentId = _sucursalProvider?.selectedSucursalId;
-                                          final validValue = currentId != null &&
-                                              _sucursales.any((s) => s['id'] == currentId)
-                                              ? currentId
-                                              : null;
+                                    child: _sucursales.isEmpty
+                                        ? Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  'No hay sucursales disponibles',
+                                                  style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+                                                ),
+                                              ),
+                                              IconButton(
+                                                onPressed: _retryLoadSucursales,
+                                                icon: Icon(Icons.refresh, color: colorScheme.onPrimary),
+                                                tooltip: 'Reintentar',
+                                              ),
+                                            ],
+                                          )
+                                        : DropdownButtonHideUnderline(
+                                            child: Builder(
+                                              builder: (context) {
+                                                final currentId = _sucursalProvider?.selectedSucursalId;
+                                                final validValue = currentId != null && _sucursales.any((s) => s['id'] == currentId) ? currentId : null;
 
-                                          return DropdownButton<int>(
-                                            value: validValue,
-                                            isExpanded: true,
-                                            dropdownColor: colorScheme.surface,
-                                            icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-                                            style: TextStyle(
-                                              color: colorScheme.onSurface,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
+                                                return DropdownButton<int>(
+                                                  value: validValue,
+                                                  isExpanded: true,
+                                                  dropdownColor: colorScheme.surface,
+                                                  icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
+                                                  style: TextStyle(
+                                                    color: colorScheme.onSurface,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  hint: Text(
+                                                    'Seleccionar sucursal',
+                                                    style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7)),
+                                                  ),
+                                                  items: _sucursales.map((s) {
+                                                    return DropdownMenuItem<int>(
+                                                      value: s['id'],
+                                                      child: Text(s['nombreSucursal'] ?? '-'),
+                                                    );
+                                                  }).toList(),
+                                                  onChanged: (value) {
+                                                    if (value != null) {
+                                                      final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
+                                                      setState(() {
+                                                        _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
+                                                      });
+                                                    }
+                                                  },
+                                                );
+                                              },
                                             ),
-                                            hint: Text(
-                                              'Seleccionar sucursal',
-                                              style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7)),
-                                            ),
-                                            items: _sucursales.map((s) {
-                                              return DropdownMenuItem<int>(
-                                                value: s['id'],
-                                                child: Text(s['nombreSucursal'] ?? '-'),
-                                              );
-                                            }).toList(),
-                                            onChanged: (value) {
-                                              if (value != null) {
-                                                final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
-                                                setState(() {
-                                                  _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
-                                                });
-                                              }
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ),
+                                          ),
                                   ),
                                 ],
                               ),
@@ -534,6 +599,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         setState(() { _selectedIndex = 6; });
                         Navigator.pop(context);
                       },
+                    ),
+                  ],
+                  // Botón de reintento para cargar sucursales
+                  if (!widget.isEmployee) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ElevatedButton.icon(
+                        onPressed: _retryLoadSucursales,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reintentar Cargar Sucursales'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
                     ),
                   ],
                 ],
