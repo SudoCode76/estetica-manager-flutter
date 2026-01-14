@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/config/responsive.dart';
 
 class CreateClientDialog extends StatefulWidget {
   final int sucursalId;
@@ -135,17 +136,27 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isSmallScreen = Responsive.isSmallScreen(context);
+    final dialogWidth = Responsive.dialogWidth(context);
+    final dialogPadding = Responsive.dialogPadding(context);
+    final borderRadius = isSmallScreen ? 20.0 : 32.0;
+    final iconSize = isSmallScreen ? 24.0 : 32.0;
+    final headerPadding = isSmallScreen ? 16.0 : 24.0;
 
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: Responsive.horizontalPadding(context),
+        vertical: Responsive.verticalPadding(context),
+      ),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
+          constraints: BoxConstraints(maxWidth: dialogWidth),
           decoration: BoxDecoration(
             color: colorScheme.surface.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(borderRadius),
             border: Border.all(
               color: colorScheme.outline.withValues(alpha: 0.2),
               width: 1,
@@ -153,19 +164,19 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
+                blurRadius: isSmallScreen ? 20 : 30,
+                offset: Offset(0, isSmallScreen ? 5 : 10),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(borderRadius),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Header con gradiente
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(headerPadding),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -179,33 +190,33 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                         decoration: BoxDecoration(
                           color: colorScheme.surface.withValues(alpha: 0.3),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.person_add_rounded,
-                          size: 32,
+                          size: iconSize,
                           color: colorScheme.onPrimaryContainer,
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: Responsive.spacing(context, 16)),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Nuevo Cliente',
-                              style: textTheme.headlineSmall?.copyWith(
+                              style: (isSmallScreen ? textTheme.titleLarge : textTheme.headlineSmall)?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: Responsive.spacing(context, 4)),
                             Text(
                               'Registrar información del cliente',
-                              style: textTheme.bodySmall?.copyWith(
+                              style: (isSmallScreen ? textTheme.labelSmall : textTheme.bodySmall)?.copyWith(
                                 color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                               ),
                             ),
@@ -218,7 +229,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
 
                 // Formulario
                 Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: dialogPadding,
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -227,90 +238,102 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                         // Campo Nombre
                         TextFormField(
                           controller: _nombreController,
-                          autofocus: true,
+                          autofocus: !isSmallScreen, // No autofocus en pantallas pequeñas
+                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
                           decoration: InputDecoration(
                             labelText: 'Nombre *',
                             hintText: 'Ej: María',
                             prefixIcon: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.all(8),
+                              margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
                                 color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
                               ),
                               child: Icon(
                                 Icons.person_outline,
                                 color: colorScheme.primary,
-                                size: 20,
+                                size: isSmallScreen ? 18 : 20,
                               ),
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                             ),
                             filled: true,
                             fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 12 : 16,
+                              vertical: isSmallScreen ? 12 : 16,
+                            ),
                           ),
                           validator: (v) => v == null || v.trim().isEmpty ? 'El nombre es requerido' : null,
                           textCapitalization: TextCapitalization.words,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: Responsive.spacing(context, 16)),
 
                         // Campo Apellido
                         TextFormField(
                           controller: _apellidoController,
+                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
                           decoration: InputDecoration(
                             labelText: 'Apellido',
                             hintText: 'Ej: González',
                             prefixIcon: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.all(8),
+                              margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
                                 color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
                               ),
                               child: Icon(
                                 Icons.badge_outlined,
                                 color: colorScheme.secondary,
-                                size: 20,
+                                size: isSmallScreen ? 18 : 20,
                               ),
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                             ),
                             filled: true,
                             fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 12 : 16,
+                              vertical: isSmallScreen ? 12 : 16,
+                            ),
                           ),
                           textCapitalization: TextCapitalization.words,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: Responsive.spacing(context, 16)),
 
                         // Campo Teléfono
                         TextFormField(
                           controller: _telefonoController,
+                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
                           decoration: InputDecoration(
                             labelText: 'Teléfono',
                             hintText: 'Ej: 71234567',
                             prefixIcon: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.all(8),
+                              margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
                                 color: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
                               ),
                               child: Icon(
                                 Icons.phone_outlined,
                                 color: colorScheme.tertiary,
-                                size: 20,
+                                size: isSmallScreen ? 18 : 20,
                               ),
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                             ),
                             filled: true,
                             fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 12 : 16,
+                              vertical: isSmallScreen ? 12 : 16,
+                            ),
                           ),
                           keyboardType: TextInputType.phone,
                           validator: (v) {
@@ -321,7 +344,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: isSmallScreen ? 20 : 24),
 
                         // Botones
                         Row(
@@ -330,25 +353,35 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isSmallScreen ? 12 : 16,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                                   ),
                                 ),
-                                child: const Text('Cancelar'),
+                                child: Text(
+                                  'Cancelar',
+                                  style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: Responsive.spacing(context, 12)),
                             Expanded(
                               flex: 2,
                               child: FilledButton.icon(
                                 onPressed: _crearCliente,
-                                icon: const Icon(Icons.check_rounded),
-                                label: const Text('Registrar'),
+                                icon: Icon(Icons.check_rounded, size: isSmallScreen ? 18 : 20),
+                                label: Text(
+                                  'Registrar',
+                                  style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
+                                ),
                                 style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isSmallScreen ? 12 : 16,
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                                   ),
                                 ),
                               ),

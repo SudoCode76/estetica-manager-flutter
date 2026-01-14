@@ -416,45 +416,57 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               decoration: BoxDecoration(
                 color: colorScheme.primary,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isSmall = constraints.maxHeight < 150;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.account_circle, size: 48, color: colorScheme.onPrimary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              username,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: colorScheme.onPrimary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.account_circle,
+                            size: isSmall ? 36 : 48,
+                            color: colorScheme.onPrimary,
+                          ),
+                          SizedBox(width: isSmall ? 8 : 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  username,
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: colorScheme.onPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: isSmall ? 14 : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  rolLabel,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                                    fontSize: isSmall ? 11 : null,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              rolLabel,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onPrimary.withValues(alpha: 0.8),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Selector de sucursal - BLOQUEADO para empleados
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                      SizedBox(height: isSmall ? 8 : 16),
+                      // Selector de sucursal - BLOQUEADO para empleados
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmall ? 8 : 12,
+                          vertical: isSmall ? 6 : 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                     child: _isLoadingSucursales
                         ? Row(
                             children: [
@@ -561,7 +573,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                 ],
                               ),
                   ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
             Expanded(
@@ -700,35 +714,51 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           child: Column(
             children: [
               // Header global (menú + logo + título)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.menu),
-                      onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size(40, 40),
-                        fixedSize: const Size(40, 40),
-                        backgroundColor: colorScheme.surfaceContainerHighest,
-                      ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 360;
+                  final isVerySmall = constraints.maxWidth < 340;
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      isCompact ? 8 : 16,
+                      isCompact ? 12 : 16,
+                      isCompact ? 8 : 16,
+                      8,
                     ),
-                    const SizedBox(width: 12),
-                    Icon(Icons.spa_rounded, color: colorScheme.primary, size: 28),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'App Estética',
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.menu),
+                          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                          style: IconButton.styleFrom(
+                            minimumSize: Size(isCompact ? 36 : 40, isCompact ? 36 : 40),
+                            fixedSize: Size(isCompact ? 36 : 40, isCompact ? 36 : 40),
+                            backgroundColor: colorScheme.surfaceContainerHighest,
+                            padding: EdgeInsets.zero,
+                          ),
                         ),
-                      ),
+                        SizedBox(width: isVerySmall ? 6 : (isCompact ? 8 : 12)),
+                        Icon(
+                          Icons.spa_rounded,
+                          color: colorScheme.primary,
+                          size: isVerySmall ? 20 : (isCompact ? 24 : 28),
+                        ),
+                        SizedBox(width: isVerySmall ? 4 : (isCompact ? 6 : 8)),
+                        Expanded(
+                          child: Text(
+                            'App Estética',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: isVerySmall ? 16 : (isCompact ? 18 : null),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                  ],
-                ),
+                  );
+                },
               ),
               // Pantalla seleccionada
               Expanded(child: _screens[_selectedIndex]),
@@ -736,65 +766,142 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
         ),
         floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                // obtener user id desde prefs y pasarlo a NewTicketScreen
-                final prefs = await SharedPreferences.getInstance();
-                final userJson = prefs.getString('user');
-                String? userIdStr;
-                if (userJson != null && userJson.isNotEmpty) {
-                  try {
-                    final Map<String, dynamic> userMap = jsonDecode(userJson);
-                    userIdStr = userMap['id']?.toString();
-                  } catch (_) {
-                    userIdStr = null;
-                  }
+          ? Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isCompact = screenWidth < 360;
+
+                if (isCompact) {
+                  return FloatingActionButton(
+                    onPressed: () async {
+                      // obtener user id desde prefs y pasarlo a NewTicketScreen
+                      final prefs = await SharedPreferences.getInstance();
+                      final userJson = prefs.getString('user');
+                      String? userIdStr;
+                      if (userJson != null && userJson.isNotEmpty) {
+                        try {
+                          final Map<String, dynamic> userMap = jsonDecode(userJson);
+                          userIdStr = userMap['id']?.toString();
+                        } catch (_) {
+                          userIdStr = null;
+                        }
+                      }
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NewTicketScreen(
+                            key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
+                            currentUserId: userIdStr,
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
+                        try {
+                          await context.read<TicketProvider>().fetchCurrent();
+                        } catch (e) {
+                          setState(() {});
+                        }
+                      }
+                    },
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    child: const Icon(Icons.add),
+                  );
                 }
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => NewTicketScreen(
-                      key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
-                      currentUserId: userIdStr,
-                    ),
-                  ),
-                );
-                if (result == true) {
-                  // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
-                  try {
-                    await context.read<TicketProvider>().fetchCurrent();
-                  } catch (e) {
-                    setState(() {});
-                  }
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Nuevo Ticket'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            )
-          : _selectedIndex == 1
-            ? FloatingActionButton.extended(
-                onPressed: () async {
-                  if (_sucursalProvider?.selectedSucursalId == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
-                        behavior: SnackBarBehavior.floating,
+
+                return FloatingActionButton.extended(
+                  onPressed: () async {
+                    // obtener user id desde prefs y pasarlo a NewTicketScreen
+                    final prefs = await SharedPreferences.getInstance();
+                    final userJson = prefs.getString('user');
+                    String? userIdStr;
+                    if (userJson != null && userJson.isNotEmpty) {
+                      try {
+                        final Map<String, dynamic> userMap = jsonDecode(userJson);
+                        userIdStr = userMap['id']?.toString();
+                      } catch (_) {
+                        userIdStr = null;
+                      }
+                    }
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NewTicketScreen(
+                          key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
+                          currentUserId: userIdStr,
+                        ),
                       ),
                     );
-                    return;
+                    if (result == true) {
+                      // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
+                      try {
+                        await context.read<TicketProvider>().fetchCurrent();
+                      } catch (e) {
+                        setState(() {});
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nuevo Ticket'),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                );
+              },
+            )
+          : _selectedIndex == 1
+            ? Builder(
+                builder: (context) {
+                  final screenWidth = MediaQuery.of(context).size.width;
+                  final isCompact = screenWidth < 360;
+
+                  if (isCompact) {
+                    return FloatingActionButton(
+                      onPressed: () async {
+                        if (_sucursalProvider?.selectedSucursalId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+
+                        if (result != null) {
+                          // refrescar clientes - rebuild forzado
+                          setState(() {});
+                        }
+                      },
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      child: const Icon(Icons.person_add),
+                    );
                   }
 
-                  final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+                  return FloatingActionButton.extended(
+                    onPressed: () async {
+                      if (_sucursalProvider?.selectedSucursalId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
 
-                  if (result != null) {
-                    // refrescar clientes - rebuild forzado
-                    setState(() {});
-                  }
+                      final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+
+                      if (result != null) {
+                        // refrescar clientes - rebuild forzado
+                        setState(() {});
+                      }
+                    },
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Nuevo Cliente'),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                  );
                 },
-                icon: const Icon(Icons.person_add),
-                label: const Text('Nuevo Cliente'),
-                backgroundColor: Theme.of(context).colorScheme.primary,
               )
             : null,
     );

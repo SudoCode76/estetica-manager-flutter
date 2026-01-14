@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'package:app_estetica/config/responsive.dart';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
@@ -169,12 +170,27 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
           final categoriaId = -1; // Special ID for this group
           return ExpansionTile(
             key: ValueKey('cat_$categoriaId'),
+            leading: Icon(
+              Icons.category_outlined,
+              color: colorScheme.onSurfaceVariant,
+              size: Responsive.isSmallScreen(context) ? 20 : 24,
+            ),
             title: Text(
               'Otros tratamientos',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurfaceVariant,
+                    fontSize: Responsive.isSmallScreen(context) ? 13 : null,
                   ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            tilePadding: EdgeInsets.symmetric(
+              horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
+              vertical: 4,
+            ),
+            childrenPadding: EdgeInsets.symmetric(
+              horizontal: Responsive.isSmallScreen(context) ? 4 : 8,
             ),
             initiallyExpanded: _expansionState[categoriaId] ?? false,
             onExpansionChanged: (isExpanded) {
@@ -189,8 +205,25 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
               return CheckboxListTile(
                 key: ValueKey('tratamiento_sin_cat_$id'),
-                title: Text(t['nombreTratamiento'] ?? 'Sin nombre'),
-                subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
+                dense: Responsive.isSmallScreen(context),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
+                  vertical: 0,
+                ),
+                title: Text(
+                  t['nombreTratamiento'] ?? 'Sin nombre',
+                  style: TextStyle(
+                    fontSize: Responsive.isSmallScreen(context) ? 13 : null,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+                subtitle: Text(
+                  'Bs ${precio.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: Responsive.isSmallScreen(context) ? 11 : null,
+                  ),
+                ),
                 value: isSelected,
                 onChanged: (bool? value) {
                   setState(() {
@@ -230,13 +263,24 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
           leading: Icon(
             Icons.spa,
             color: colorScheme.primary,
+            size: Responsive.isSmallScreen(context) ? 20 : 24,
           ),
           title: Text(
             categoriaNombre,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.primary,
+                  fontSize: Responsive.isSmallScreen(context) ? 13 : null,
                 ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+          tilePadding: EdgeInsets.symmetric(
+            horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
+            vertical: 4,
+          ),
+          childrenPadding: EdgeInsets.symmetric(
+            horizontal: Responsive.isSmallScreen(context) ? 4 : 8,
           ),
           initiallyExpanded: _expansionState[categoriaId] ?? false,
           onExpansionChanged: (isExpanded) {
@@ -251,13 +295,27 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
             return CheckboxListTile(
               key: ValueKey('tratamiento_cat_${categoriaId}_$id'),
-              title: Text(t['nombreTratamiento'] ?? 'Sin nombre',
+              dense: Responsive.isSmallScreen(context),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
+                vertical: 0,
+              ),
+              title: Text(
+                t['nombreTratamiento'] ?? 'Sin nombre',
                 style: TextStyle(
                   color: isSelected ? colorScheme.primary : null,
                   fontWeight: isSelected ? FontWeight.bold : null,
+                  fontSize: Responsive.isSmallScreen(context) ? 13 : null,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+              subtitle: Text(
+                'Bs ${precio.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: Responsive.isSmallScreen(context) ? 11 : null,
                 ),
               ),
-              subtitle: Text('Bs ${precio.toStringAsFixed(2)}'),
               value: isSelected,
               onChanged: (bool? value) {
                 setState(() {
@@ -570,9 +628,12 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                    ),
                  )
                : SingleChildScrollView(
-               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+               padding: EdgeInsets.symmetric(
+                 horizontal: Responsive.horizontalPadding(context),
+                 vertical: Responsive.verticalPadding(context),
+               ),
                child: ClipRRect(
-                 borderRadius: BorderRadius.circular(28),
+                 borderRadius: BorderRadius.circular(Responsive.isSmallScreen(context) ? 20 : 28),
                  child: BackdropFilter(
                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                    child: Container(
@@ -631,14 +692,23 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                          // Tratamientos agrupados por categoría (permite seleccionar de múltiples categorías)
                          Row(
                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                           crossAxisAlignment: CrossAxisAlignment.start,
                            children: [
-                             Text('Tratamientos', style: Theme.of(context).textTheme.labelLarge),
+                             Text(
+                               'Tratamientos',
+                               style: Theme.of(context).textTheme.labelLarge,
+                             ),
                              if (tratamientosSeleccionados.isNotEmpty)
-                               Text(
-                                 '${tratamientosSeleccionados.length} seleccionado(s) - Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
-                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                   color: colorScheme.primary,
-                                   fontWeight: FontWeight.bold,
+                               Flexible(
+                                 child: Text(
+                                   '${tratamientosSeleccionados.length} seleccionado(s) - Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                     color: colorScheme.primary,
+                                     fontWeight: FontWeight.bold,
+                                   ),
+                                   textAlign: TextAlign.right,
+                                   overflow: TextOverflow.ellipsis,
+                                   maxLines: 2,
                                  ),
                                ),
                            ],
@@ -839,7 +909,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                print('NewTicket: Creando dropdown con ${usuariosList.length} usuarios, usuarioId actual=$usuarioId');
 
                                return DropdownButtonFormField<int>(
-                                 value: null, // SIEMPRE null para evitar errores
+                                 initialValue: null, // SIEMPRE null para evitar errores
                                  decoration: InputDecoration(
                                    filled: true,
                                    fillColor: colorScheme.surfaceContainerHighest,
@@ -880,18 +950,29 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                              ),
                              child: Row(
                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                               crossAxisAlignment: CrossAxisAlignment.center,
                                children: [
-                                 Text(
-                                   'Total de tratamientos:',
-                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                     fontWeight: FontWeight.bold,
+                                 Flexible(
+                                   flex: 2,
+                                   child: Text(
+                                     'Total de tratamientos:',
+                                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                       fontWeight: FontWeight.bold,
+                                     ),
+                                     overflow: TextOverflow.ellipsis,
                                    ),
                                  ),
-                                 Text(
-                                   'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
-                                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                     color: colorScheme.primary,
-                                     fontWeight: FontWeight.bold,
+                                 const SizedBox(width: 8),
+                                 Flexible(
+                                   flex: 1,
+                                   child: Text(
+                                     'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                       color: colorScheme.primary,
+                                       fontWeight: FontWeight.bold,
+                                     ),
+                                     textAlign: TextAlign.right,
+                                     overflow: TextOverflow.ellipsis,
                                    ),
                                  ),
                                ],
@@ -953,16 +1034,29 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                            ),
                          FilledButton.icon(
                            onPressed: _isSubmitting ? null : crearTicket,
-                           icon: _isSubmitting ? const SizedBox(
-                             width: 18,
-                             height: 18,
-                             child: CircularProgressIndicator(strokeWidth: 2),
-                           ) : const Icon(Icons.save),
-                           label: _isSubmitting ? const Text('Guardando...') : const Text('Guardar Ticket'),
+                           icon: _isSubmitting ? SizedBox(
+                             width: Responsive.isSmallScreen(context) ? 16 : 18,
+                             height: Responsive.isSmallScreen(context) ? 16 : 18,
+                             child: const CircularProgressIndicator(strokeWidth: 2),
+                           ) : Icon(
+                             Icons.save,
+                             size: Responsive.isSmallScreen(context) ? 18 : 20,
+                           ),
+                           label: Text(
+                             _isSubmitting ? 'Guardando...' : 'Guardar Ticket',
+                             style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 14 : 16),
+                           ),
                            style: FilledButton.styleFrom(
-                             padding: const EdgeInsets.symmetric(vertical: 16),
-                             textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                             padding: EdgeInsets.symmetric(
+                               vertical: Responsive.isSmallScreen(context) ? 14 : 16,
+                             ),
+                             textStyle: TextStyle(
+                               fontSize: Responsive.isSmallScreen(context) ? 16 : 18,
+                               fontWeight: FontWeight.bold,
+                             ),
+                             shape: RoundedRectangleBorder(
+                               borderRadius: BorderRadius.circular(Responsive.isSmallScreen(context) ? 12 : 16),
+                             ),
                            ),
                          ),
                        ],

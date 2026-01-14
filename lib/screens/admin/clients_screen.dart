@@ -5,6 +5,8 @@ import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_estetica/config/responsive.dart';
+
 
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({Key? key}) : super(key: key);
@@ -264,51 +266,119 @@ class _ClientsScreenState extends State<ClientsScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isSmallScreen = Responsive.isSmallScreen(context);
+    final isMobile = Responsive.isMobile(context);
 
     return SafeArea(
       child: Column(
         children: [
           // Barra de búsqueda y acciones
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: SearchBar(
-                        controller: _searchController,
-                        hintText: 'Buscar por nombre, apellido o teléfono',
-                        leading: const Icon(Icons.search),
-                        trailing: [
-                          if (_searchController.text.isNotEmpty)
-                            IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                search = '';
-                                _debounce?.cancel();
-                                fetchClients();
-                              },
-                            ),
-                        ],
-                        onChanged: filterClients,
-                        elevation: const WidgetStatePropertyAll(1),
-                      ),
+                // Búsqueda y botones en diseño adaptativo
+                if (isSmallScreen) ...[
+                  // En pantallas muy pequeñas, poner los botones debajo del SearchBar
+                  SearchBar(
+                    controller: _searchController,
+                    hintText: 'Buscar cliente...',
+                    hintStyle: WidgetStateProperty.all(
+                      TextStyle(fontSize: isSmallScreen ? 13 : 14),
                     ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed: fetchClients,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text(''),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(56, 56),
-                        padding: const EdgeInsets.all(16),
+                    leading: Icon(Icons.search, size: isSmallScreen ? 20 : 24),
+                    trailing: [
+                      if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: Icon(Icons.clear, size: isSmallScreen ? 20 : 24),
+                          onPressed: () {
+                            _searchController.clear();
+                            search = '';
+                            _debounce?.cancel();
+                            fetchClients();
+                          },
+                        ),
+                    ],
+                    onChanged: filterClients,
+                    elevation: const WidgetStatePropertyAll(1),
+                  ),
+                  SizedBox(height: Responsive.spacing(context, 12)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: fetchClients,
+                          icon: Icon(Icons.refresh, size: 18),
+                          label: Text('Actualizar', style: TextStyle(fontSize: 13)),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _isEmployee ? null : _showCreateClientDialog,
+                          icon: Icon(Icons.person_add, size: 18),
+                          label: Text('Nuevo', style: TextStyle(fontSize: 13)),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  // En pantallas normales, mantener diseño horizontal
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SearchBar(
+                          controller: _searchController,
+                          hintText: isMobile ? 'Buscar...' : 'Buscar por nombre, apellido o teléfono',
+                          leading: const Icon(Icons.search),
+                          trailing: [
+                            if (_searchController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  search = '';
+                                  _debounce?.cancel();
+                                  fetchClients();
+                                },
+                              ),
+                          ],
+                          onChanged: filterClients,
+                          elevation: const WidgetStatePropertyAll(1),
+                        ),
+                      ),
+                      SizedBox(width: Responsive.spacing(context, 12)),
+                      FilledButton.icon(
+                        onPressed: fetchClients,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(isMobile ? '' : 'Actualizar'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: Size(isMobile ? 56 : 120, 56),
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+                        ),
+                      ),
+                      if (!_isEmployee) ...[
+                        SizedBox(width: Responsive.spacing(context, 8)),
+                        FilledButton.icon(
+                          onPressed: _showCreateClientDialog,
+                          icon: const Icon(Icons.person_add),
+                          label: Text(isMobile ? '' : 'Nuevo'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: Size(isMobile ? 56 : 120, 56),
+                            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+                SizedBox(height: Responsive.spacing(context, 8)),
               ],
             ),
           ),
@@ -323,64 +393,90 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   )
                 : errorMsg != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-                            const SizedBox(height: 16),
-                            Text(
-                              errorMsg!,
-                              style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline,
+                                size: isSmallScreen ? 48 : 64,
+                                color: colorScheme.error
+                              ),
+                              SizedBox(height: Responsive.spacing(context, 16)),
+                              Text(
+                                errorMsg!,
+                                style: (isSmallScreen ? textTheme.bodyMedium : textTheme.bodyLarge)?.copyWith(
+                                  color: colorScheme.error
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : filteredClients.isEmpty
                         ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.person_search_rounded,
-                                  size: 64,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  search.isEmpty
-                                      ? 'No hay clientes en esta sucursal'
+                            child: Padding(
+                              padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_search_rounded,
+                                    size: isSmallScreen ? 48 : 64,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  SizedBox(height: Responsive.spacing(context, 16)),
+                                  Text(
+                                    search.isEmpty
+                                        ? 'No hay clientes en esta sucursal'
                                       : 'No se encontraron clientes',
-                                  style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                                  style: (isSmallScreen ? textTheme.bodyMedium : textTheme.bodyLarge)?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                const SizedBox(height: 8),
+                                SizedBox(height: Responsive.spacing(context, 8)),
                                 Text(
                                   search.isEmpty
                                       ? 'Registra el primer cliente'
                                       : 'Intenta con otro término de búsqueda',
-                                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                                  style: (isSmallScreen ? textTheme.bodySmall : textTheme.bodyMedium)?.copyWith(
+                                    color: colorScheme.onSurfaceVariant
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ],
                             ),
-                          )
+                          ),
+                        )
                         : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Responsive.horizontalPadding(context),
+                              vertical: Responsive.verticalPadding(context),
+                            ),
                             itemCount: filteredClients.length,
                             itemBuilder: (context, i) {
                               final c = filteredClients[i];
                               final nombre = '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim();
                               final telefono = c['telefono']?.toString() ?? 'Sin teléfono';
+                              final avatarSize = isSmallScreen ? 48.0 : 56.0;
+                              final fontSize = isSmallScreen ? 18.0 : 20.0;
 
                               return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
+                                margin: EdgeInsets.only(bottom: Responsive.spacing(context, 12)),
                                 elevation: 2,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
                                 ),
                                 child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: isSmallScreen ? 12 : 16,
+                                    vertical: isSmallScreen ? 8 : 12,
+                                  ),
                                   leading: Container(
-                                    width: 56,
-                                    height: 56,
+                                    width: avatarSize,
+                                    height: avatarSize,
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
@@ -390,12 +486,13 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       ),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
                                     ),
                                     child: Center(
                                       child: Text(
                                         nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                                        style: textTheme.headlineSmall?.copyWith(
+                                        style: TextStyle(
+                                          fontSize: fontSize,
                                           color: colorScheme.onPrimaryContainer,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -404,22 +501,26 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                   ),
                                   title: Text(
                                     nombre,
-                                    style: textTheme.titleMedium?.copyWith(
+                                    style: (isSmallScreen ? textTheme.titleSmall : textTheme.titleMedium)?.copyWith(
                                       fontWeight: FontWeight.w600,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   subtitle: Row(
                                     children: [
                                       Icon(
                                         Icons.phone,
-                                        size: 14,
+                                        size: isSmallScreen ? 12 : 14,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        telefono,
-                                        style: textTheme.bodyMedium?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
+                                      SizedBox(width: Responsive.spacing(context, 4)),
+                                      Flexible(
+                                        child: Text(
+                                          telefono,
+                                          style: (isSmallScreen ? textTheme.bodySmall : textTheme.bodyMedium)?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                        ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
@@ -427,7 +528,11 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                   trailing: _isEmployee
                                       ? null // No mostrar menú para empleados
                                       : PopupMenuButton(
-                                          icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
+                                          icon: Icon(
+                                            Icons.more_vert,
+                                            color: colorScheme.onSurfaceVariant,
+                                            size: isSmallScreen ? 20 : 24,
+                                          ),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(12),
                                           ),
@@ -438,9 +543,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                               },
                                               child: Row(
                                                 children: [
-                                                  Icon(Icons.edit, size: 20, color: colorScheme.primary),
-                                                  const SizedBox(width: 12),
-                                                  const Text('Editar'),
+                                                  Icon(Icons.edit, size: isSmallScreen ? 18 : 20, color: colorScheme.primary),
+                                                  SizedBox(width: Responsive.spacing(context, 12)),
+                                                  Text('Editar', style: TextStyle(fontSize: isSmallScreen ? 13 : 14)),
                                                 ],
                                               ),
                                             ),
@@ -450,9 +555,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                               },
                                               child: Row(
                                                 children: [
-                                                  Icon(Icons.delete, size: 20, color: colorScheme.error),
-                                                  const SizedBox(width: 12),
-                                                  const Text('Eliminar'),
+                                                  Icon(Icons.delete, size: isSmallScreen ? 18 : 20, color: colorScheme.error),
+                                                  SizedBox(width: Responsive.spacing(context, 12)),
+                                                  Text('Eliminar', style: TextStyle(fontSize: isSmallScreen ? 13 : 14)),
                                                 ],
                                               ),
                                             ),

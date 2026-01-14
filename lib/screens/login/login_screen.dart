@@ -3,6 +3,7 @@ import 'package:app_estetica/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:app_estetica/config/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -115,6 +116,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isSmallScreen = Responsive.isSmallScreen(context);
+    final screenWidth = Responsive.width(context);
+
+    // Tamaños responsivos
+    final logoSize = isSmallScreen ? 80.0 : 120.0;
+    final logoIconSize = isSmallScreen ? 40.0 : 60.0;
+    final titleSpacing = isSmallScreen ? 24.0 : 48.0;
+    final cardPadding = isSmallScreen ? 20.0 : 32.0;
+    final cardBorderRadius = isSmallScreen ? 20.0 : 28.0;
+    final maxCardWidth = screenWidth < 360 ? screenWidth - 32 : (screenWidth < 600 ? screenWidth - 48 : 450.0);
 
     return Scaffold(
       body: Container(
@@ -132,7 +143,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.symmetric(
+                horizontal: Responsive.horizontalPadding(context),
+                vertical: Responsive.verticalPadding(context),
+              ),
               child: SlideTransition(
                 position: _slideAnimation,
                 child: Column(
@@ -142,8 +156,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     Hero(
                       tag: 'app_logo',
                       child: Container(
-                        width: 120,
-                        height: 120,
+                        width: logoSize,
+                        height: logoSize,
                         decoration: BoxDecoration(
                           color: colorScheme.primary,
                           shape: BoxShape.circle,
@@ -157,39 +171,41 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         ),
                         child: Icon(
                           Icons.spa_rounded,
-                          size: 60,
+                          size: logoIconSize,
                           color: colorScheme.onPrimary,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 48),
+                    SizedBox(height: titleSpacing),
 
                     // Título
                     Text(
                       'Bienvenido',
-                      style: textTheme.displaySmall?.copyWith(
+                      style: (isSmallScreen ? textTheme.headlineMedium : textTheme.displaySmall)?.copyWith(
                         color: colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isSmallScreen ? 4 : 8),
                     Text(
                       'Inicia sesión para continuar',
-                      style: textTheme.bodyLarge?.copyWith(
+                      style: (isSmallScreen ? textTheme.bodyMedium : textTheme.bodyLarge)?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 48),
+                    SizedBox(height: titleSpacing),
 
                     // Formulario en Card Material 3
                     Card(
                       elevation: 2,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(cardBorderRadius),
                       ),
                       child: Container(
-                        constraints: const BoxConstraints(maxWidth: 450),
-                        padding: const EdgeInsets.all(32),
+                        constraints: BoxConstraints(maxWidth: maxCardWidth),
+                        padding: EdgeInsets.all(cardPadding),
                         child: Form(
                           key: _formKey,
                           child: Column(
@@ -199,10 +215,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
+                                style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
                                 decoration: InputDecoration(
                                   labelText: 'Email',
                                   hintText: 'nombre@ejemplo.com',
-                                  prefixIcon: const Icon(Icons.email_outlined),
+                                  prefixIcon: Icon(Icons.email_outlined, size: isSmallScreen ? 20 : 24),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: isSmallScreen ? 12 : 16,
+                                    vertical: isSmallScreen ? 12 : 16,
+                                  ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -250,9 +271,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
                               // Error Message
                               if (_errorMessage != null) ...[
-                                const SizedBox(height: 24),
+                                SizedBox(height: isSmallScreen ? 16 : 24),
                                 Container(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
                                   decoration: BoxDecoration(
                                     color: colorScheme.errorContainer,
                                     borderRadius: BorderRadius.circular(12),
@@ -262,13 +283,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       Icon(
                                         Icons.error_outline_rounded,
                                         color: colorScheme.onErrorContainer,
-                                        size: 24,
+                                        size: isSmallScreen ? 20 : 24,
                                       ),
-                                      const SizedBox(width: 12),
+                                      SizedBox(width: isSmallScreen ? 8 : 12),
                                       Expanded(
                                         child: Text(
                                           _errorMessage!,
-                                          style: textTheme.bodyMedium?.copyWith(
+                                          style: (isSmallScreen ? textTheme.bodySmall : textTheme.bodyMedium)?.copyWith(
                                             color: colorScheme.onErrorContainer,
                                           ),
                                         ),
@@ -278,18 +299,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 ),
                               ],
 
-                              const SizedBox(height: 32),
+                              SizedBox(height: isSmallScreen ? 24 : 32),
 
                               // Botón de Login Material 3
                               FilledButton(
                                 onPressed: _isLoading ? null : _login,
                                 style: FilledButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 56),
+                                  minimumSize: Size(double.infinity, Responsive.buttonHeight(context)),
+                                  padding: Responsive.buttonPadding(context),
                                 ),
                                 child: _isLoading
                                     ? SizedBox(
-                                        height: 24,
-                                        width: 24,
+                                        height: isSmallScreen ? 20 : 24,
+                                        width: isSmallScreen ? 20 : 24,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2.5,
                                           color: colorScheme.onPrimary,
@@ -297,17 +319,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       )
                                     : Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
                                             'Iniciar Sesión',
-                                            style: textTheme.labelLarge?.copyWith(
+                                            style: (isSmallScreen ? textTheme.labelMedium : textTheme.labelLarge)?.copyWith(
                                               color: colorScheme.onPrimary,
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
+                                          SizedBox(width: isSmallScreen ? 6 : 8),
                                           Icon(
                                             Icons.arrow_forward_rounded,
                                             color: colorScheme.onPrimary,
+                                            size: isSmallScreen ? 18 : 20,
                                           ),
                                         ],
                                       ),
@@ -318,14 +342,15 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       ),
                     ),
 
-                    const SizedBox(height: 32),
+                    SizedBox(height: isSmallScreen ? 16 : 32),
 
                     // Footer
                     Text(
-                      '© 2025 App Estética',
-                      style: textTheme.bodySmall?.copyWith(
+                      '© 2026 App Estética',
+                      style: (isSmallScreen ? textTheme.labelSmall : textTheme.bodySmall)?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
