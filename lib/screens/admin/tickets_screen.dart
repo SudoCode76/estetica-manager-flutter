@@ -24,6 +24,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   bool sortAscending = true; // true = antiguo→nuevo, false = nuevo→antiguo
   bool showOnlyToday = true; // true = solo hoy, false = todos los tickets
   SucursalProvider? _sucursalProvider;
+  bool _isFirstLoad = true; // Flag para controlar la primera carga
 
   @override
   void initState() {
@@ -34,26 +35,80 @@ class _TicketsScreenState extends State<TicketsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final provider = SucursalInherited.of(context);
-    if (provider != _sucursalProvider) {
+
+    // Detectar si el provider cambió
+    final providerChanged = provider != _sucursalProvider;
+
+    if (providerChanged) {
+      // Remover listener anterior si existe
+      _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
-      // Al cambiar la sucursal, pedir al TicketProvider que recargue
-      _reloadTicketsForCurrentFilters();
+      // Agregar nuevo listener
+      _sucursalProvider?.addListener(_onSucursalChanged);
+    }
+
+    // Cargar tickets en la primera vez o cuando cambia el provider
+    if (_isFirstLoad || providerChanged) {
+      _isFirstLoad = false;
+      // Usar addPostFrameCallback para evitar llamar durante el build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _reloadTicketsForCurrentFilters();
+        }
+      });
     }
   }
 
   Future<void> _reloadTicketsForCurrentFilters() async {
+    if (!mounted) return;
+
     try {
       final ticketProvider = context.read<TicketProvider>();
-      await ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
+      await ticketProvider.fetchTickets(
+        sucursalId: _sucursalProvider?.selectedSucursalId,
+        estadoTicket: showAtendidos,
+      );
     } catch (e) {
       // Registrar pero no interrumpir UI
-      print('TicketsScreen: Error recargando tickets en didChangeDependencies: $e');
+      print('TicketsScreen: Error recargando tickets: $e');
+      if (mounted) {
+        setState(() {
+          errorMsg = 'Error al cargar tickets: $e';
+        });
+      }
     }
   }
 
   void _onRefreshPressed() async {
-    final ticketProvider = context.read<TicketProvider>();
-    await ticketProvider.fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
+    if (!mounted) return;
+
+    setState(() {
+      errorMsg = null; // Limpiar error anterior
+    });
+
+    try {
+      final ticketProvider = context.read<TicketProvider>();
+      // Forzar recarga usando forceRefresh
+      await ticketProvider.fetchTickets(
+        sucursalId: _sucursalProvider?.selectedSucursalId,
+        estadoTicket: showAtendidos,
+        forceRefresh: true,
+      );
+    } catch (e) {
+      print('TicketsScreen: Error en refresh: $e');
+      if (mounted) {
+        setState(() {
+          errorMsg = 'Error al recargar: $e';
+        });
+      }
+    }
+  }
+
+  void _onSucursalChanged() {
+    // Cuando cambia la sucursal en el provider, recargar tickets
+    if (mounted) {
+      _reloadTicketsForCurrentFilters();
+    }
   }
 
   void filterTicketsBySearch(String value) {
@@ -111,10 +166,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
     super.dispose();
   }
 
-  void _onSucursalChanged() {
-    // Cuando cambia la sucursal en el provider, recargar tickets
-    _reloadTicketsForCurrentFilters();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,22 +311,56 @@ class _TicketsScreenState extends State<TicketsScreen> {
           Expanded(
             child: isLoading
                 ? Center(
-                    child: CircularProgressIndicator(
-                      color: colorScheme.primary,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Cargando tickets...',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : providerError != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-                            const SizedBox(height: 16),
-                            Text(
-                              providerError,
-                              style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error al cargar tickets',
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                providerError,
+                                style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 24),
+                              FilledButton.icon(
+                                onPressed: () {
+                                  // Forzar recarga
+                                  context.read<TicketProvider>().clearError();
+                                  _onRefreshPressed();
+                                },
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Reintentar'),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : filteredTickets.isEmpty
