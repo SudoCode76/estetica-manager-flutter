@@ -97,13 +97,36 @@ class ApiService {
             final userResponse = await _getWithTimeout(userUrl, headers, seconds: 10);
 
             if (userResponse.statusCode == 200) {
-              final userData = jsonDecode(userResponse.body);
-              print('Datos completos del usuario: $userData');
-              data['user'] = userData; // Reemplazar con datos completos
-            } else {
-              print('Error al obtener datos del usuario: ${userResponse.statusCode}');
-              print('Response: ${userResponse.body}');
-            }
+              final decodedUser = jsonDecode(userResponse.body);
+              print('Datos completos del usuario (raw): $decodedUser');
+
+              // Normalizar la respuesta para que tenga la misma forma que _normalizeItems
+              Map<String, dynamic> normalizedUser;
+              try {
+                if (decodedUser is Map && decodedUser.containsKey('data')) {
+                  final list = _normalizeItems([decodedUser['data']]);
+                  normalizedUser = Map<String, dynamic>.from(list.first as Map<String, dynamic>);
+                } else if (decodedUser is Map && decodedUser.containsKey('attributes')) {
+                  final list = _normalizeItems([decodedUser]);
+                  normalizedUser = Map<String, dynamic>.from(list.first as Map<String, dynamic>);
+                } else if (decodedUser is Map) {
+                  // Ya es un map plano: intentar convertir directamente
+                  normalizedUser = Map<String, dynamic>.from(decodedUser);
+                } else {
+                  // Fallback: usar el objeto tal cual dentro de un map
+                  normalizedUser = {'data': decodedUser};
+                }
+              } catch (e) {
+                print('Error normalizando user data: $e');
+                normalizedUser = Map<String, dynamic>.from(decodedUser as Map<String, dynamic>);
+              }
+
+              print('Datos completos del usuario (normalized): $normalizedUser');
+              data['user'] = normalizedUser; // Reemplazar con datos completos normalizados
+             } else {
+               print('Error al obtener datos del usuario: ${userResponse.statusCode}');
+               print('Response: ${userResponse.body}');
+             }
           } catch (e) {
             print('Error obteniendo datos completos del usuario: $e');
             // Continuar con datos básicos si falla
@@ -427,9 +450,33 @@ class ApiService {
     try {
       final response = await _getWithTimeout(Uri.parse(endpoint), headers);
       if (response.statusCode == 200) {
-        // Strapi /users endpoint returns a list directly
-        final data = jsonDecode(response.body);
-        return List<dynamic>.from(data);
+        final decoded = jsonDecode(response.body);
+        // Puede devolver una lista directamente o { data: [...] }
+        if (decoded is List) {
+          // Normalizar cualquier item que venga con attributes/data
+          try {
+            return _normalizeItems(decoded);
+          } catch (_) {
+            return List<dynamic>.from(decoded);
+          }
+        }
+        if (decoded is Map && decoded.containsKey('data')) {
+          final raw = List<dynamic>.from(decoded['data'] ?? []);
+          return _normalizeItems(raw);
+        }
+
+        // Fallback: si es un Map plano, devolverlo como lista con un solo elemento
+        if (decoded is Map) {
+          try {
+            final normalizedList = _normalizeItems([decoded]);
+            return normalizedList;
+          } catch (_) {
+            return [decoded];
+          }
+        }
+
+        // Si no entendemos el formato, devolver lista vacía
+        return [];
       } else {
         print('getUsuarios failed ${response.statusCode}: ${response.body}');
         throw Exception('Error al obtener usuarios');

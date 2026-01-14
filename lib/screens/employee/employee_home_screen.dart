@@ -38,6 +38,51 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     _loadUserData();
   }
 
+  // Helper para extraer/normalizar la sucursal desde distintos formatos
+  Map<String, dynamic>? _extractSucursal(dynamic sucursalObj) {
+    if (sucursalObj == null) return null;
+    try {
+      if (sucursalObj is Map) {
+        // Caso Strapi: { data: { id: x, attributes: {...} } }
+        if (sucursalObj.containsKey('data')) {
+          final d = sucursalObj['data'];
+          if (d is Map) {
+            // Si tiene attributes dentro
+            if (d.containsKey('attributes')) {
+              final attrs = Map<String, dynamic>.from(d['attributes']);
+              attrs['id'] = d['id'] ?? attrs['id'];
+              // Normalizar nombre
+              final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+              return {'id': attrs['id'], 'nombreSucursal': nombre};
+            }
+            // Si ya vino plano con id + campos
+            final id = d['id'] ?? d['ID'];
+            final nombre = d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
+            if (id != null) return {'id': id, 'nombreSucursal': nombre};
+          }
+        }
+
+        // Caso Strapi v4 normalizado: { id: x, attributes: { nombreSucursal: ... } }
+        if (sucursalObj.containsKey('attributes')) {
+          final attrs = Map<String, dynamic>.from(sucursalObj['attributes']);
+          final id = sucursalObj['id'] ?? attrs['id'];
+          final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+          if (id != null) return {'id': id, 'nombreSucursal': nombre};
+        }
+
+        // Caso ya normalizado por ApiService._normalizeItems: { id: x, nombreSucursal: '...' }
+        if (sucursalObj.containsKey('id')) {
+          final id = sucursalObj['id'];
+          final nombre = sucursalObj['nombreSucursal'] ?? sucursalObj['nombre'] ?? sucursalObj['nombre_sucursal'];
+          return {'id': id, 'nombreSucursal': nombre};
+        }
+      }
+    } catch (e) {
+      print('EmployeeHome: Error extrayendo sucursal: $e');
+    }
+    return null;
+  }
+
   Future<void> _loadUserData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -54,7 +99,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
         });
 
         // Establecer la sucursal aquí después de cargar los datos
-        if (user['sucursal'] == null) {
+        final extracted = _extractSucursal(user['sucursal']);
+        if (extracted == null) {
           print('EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -66,9 +112,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
             );
           }
         } else {
-          print('EmployeeHome: Sucursal del empleado: ${user['sucursal']}');
+          print('EmployeeHome: Sucursal del empleado (extraida): $extracted');
           // Establecer la sucursal inmediatamente después de cargar los datos
-          _setupEmployeeSucursal(user['sucursal']);
+          _setupEmployeeSucursal(extracted);
         }
       }
     } catch (e) {

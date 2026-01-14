@@ -64,6 +64,43 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     // NO cargar datos aquí, esperar a didChangeDependencies para tener el provider
   }
 
+  // Helper para extraer/normalizar la sucursal (reutilizable)
+  Map<String, dynamic>? _extractSucursal(dynamic sucursalObj) {
+    if (sucursalObj == null) return null;
+    try {
+      if (sucursalObj is Map) {
+        if (sucursalObj.containsKey('data')) {
+          final d = sucursalObj['data'];
+          if (d is Map) {
+            if (d.containsKey('attributes')) {
+              final attrs = Map<String, dynamic>.from(d['attributes']);
+              attrs['id'] = d['id'] ?? attrs['id'];
+              final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+              return {'id': attrs['id'], 'nombreSucursal': nombre};
+            }
+            final id = d['id'] ?? d['ID'];
+            final nombre = d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
+            if (id != null) return {'id': id, 'nombreSucursal': nombre};
+          }
+        }
+        if (sucursalObj.containsKey('attributes')) {
+          final attrs = Map<String, dynamic>.from(sucursalObj['attributes']);
+          final id = sucursalObj['id'] ?? attrs['id'];
+          final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+          if (id != null) return {'id': id, 'nombreSucursal': nombre};
+        }
+        if (sucursalObj.containsKey('id')) {
+          final id = sucursalObj['id'];
+          final nombre = sucursalObj['nombreSucursal'] ?? sucursalObj['nombre'] ?? sucursalObj['nombre_sucursal'];
+          return {'id': id, 'nombreSucursal': nombre};
+        }
+      }
+    } catch (e) {
+      print('AdminHomeScreen: Error extrayendo sucursal: $e');
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>?> _loadEmployeeData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -74,9 +111,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         _employeeData = user;
 
         if (user['sucursal'] != null) {
-          _employeeSucursalId = user['sucursal']['id'];
-          _employeeSucursalName = user['sucursal']['nombreSucursal'] ?? 'Sin nombre';
-          print('AdminHomeScreen: Sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
+          final extracted = _extractSucursal(user['sucursal']);
+          if (extracted != null) {
+            _employeeSucursalId = extracted['id'];
+            _employeeSucursalName = extracted['nombreSucursal'] ?? 'Sin nombre';
+            print('AdminHomeScreen: Sucursal del empleado (extraida): $_employeeSucursalId - $_employeeSucursalName');
+          } else {
+            print('AdminHomeScreen: Warning: user.sucursal exists but could not extract');
+          }
         }
         return user;
       }
