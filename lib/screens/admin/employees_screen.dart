@@ -16,9 +16,36 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   String? _error;
   String _searchQuery = '';
 
+  // Provider de sucursal
+  SucursalProvider? _sucursalProvider;
+
   @override
   void initState() {
     super.initState();
+    // No cargar aquí: esperar a que el provider esté disponible en didChangeDependencies
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = SucursalInherited.of(context);
+    if (provider != _sucursalProvider) {
+      _sucursalProvider?.removeListener(_onSucursalChanged);
+      _sucursalProvider = provider;
+      _sucursalProvider?.addListener(_onSucursalChanged);
+      // Cargar empleados para la sucursal actual (si existe)
+      _loadEmployees();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sucursalProvider?.removeListener(_onSucursalChanged);
+    super.dispose();
+  }
+
+  void _onSucursalChanged() {
+    // Cuando cambia la sucursal, recargar la lista
     _loadEmployees();
   }
 
@@ -27,10 +54,23 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       _loading = true;
       _error = null;
     });
-    try {
-      final users = await _api.getUsers();
+
+    final sucId = _sucursalProvider?.selectedSucursalId;
+    if (sucId == null) {
+      // No hay sucursal seleccionada: limpiar lista y mostrar mensaje
       setState(() {
-        _employees = users.where((u) => u['tipoUsuario'] == 'empleado').toList();
+        _employees = [];
+        _loading = false;
+        _error = 'No hay sucursal seleccionada. Selecciona una sucursal en el menú lateral.';
+      });
+      return;
+    }
+
+    try {
+      final users = await _api.getUsuarios(sucursalId: sucId);
+      setState(() {
+        // Asegurar que solo queden empleados
+        _employees = users.where((u) => u['tipoUsuario'] == 'empleado').map<Map<String, dynamic>>((u) => Map<String, dynamic>.from(u)).toList();
       });
     } catch (e) {
       setState(() => _error = e.toString());
@@ -1118,6 +1158,4 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
     }
   }
 }
-
-
 
