@@ -738,45 +738,52 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                   }
 
                   // Wider screens: show title left, toggle, and compact buttons to the right
-                  return Row(
+                  // Pero usamos Wrap para evitar overflow en pantallas medianas
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Categorías', style: tt.titleMedium),
-                      const SizedBox(width: 12),
-                      // Toggle show disabled visible on the header
                       Row(
                         children: [
-                          Text('Mostrar desactivados', style: tt.bodySmall),
-                          const SizedBox(width: 6),
-                          Switch(
-                            value: _showDisabled,
-                            onChanged: (v) {
-                              setState(() {
-                                _showDisabled = v;
-                                _applyFilters(_showDisabled);
-                              });
-                            },
+                          Text('Categorías', style: tt.titleMedium),
+                          const Spacer(),
+                          // Toggle show disabled
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('Mostrar desactivados', style: tt.bodySmall),
+                              const SizedBox(width: 6),
+                              Switch(
+                                value: _showDisabled,
+                                onChanged: (v) {
+                                  setState(() {
+                                    _showDisabled = v;
+                                    _applyFilters(_showDisabled);
+                                  });
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 40),
-                        child: FilledButton.icon(
-                          style: buttonStyle,
-                          onPressed: _showCreateCategoriaDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Nueva categoría'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 40),
-                        child: FilledButton.icon(
-                          style: buttonStyle,
-                          onPressed: _showCreateTratamientoDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Nuevo tratamiento'),
-                        ),
+                      const SizedBox(height: 8),
+                      // Botones en Wrap para que se acomoden automáticamente
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            style: buttonStyle,
+                            onPressed: _showCreateCategoriaDialog,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Nueva categoría'),
+                          ),
+                          FilledButton.icon(
+                            style: buttonStyle,
+                            onPressed: _showCreateTratamientoDialog,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Nuevo tratamiento'),
+                          ),
+                        ],
                       ),
                     ],
                   );

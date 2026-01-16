@@ -36,6 +36,11 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
    List<dynamic> tratamientos = [];
    List<dynamic> categorias = [];
+   // Filtro para la nueva UI de tratamientos
+   int? _selectedCategoriaFilter;
+   final TextEditingController _tratamientoSearchCtrl = TextEditingController();
+   String _tratamientoSearch = '';
+   Timer? _tratamientoSearchDebounce;
    List<dynamic> clientes = [];
    List<dynamic> usuarios = [];
    bool isLoading = true;
@@ -44,7 +49,6 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    String? error; // Error de carga de datos (muestra pantalla completa de error)
    String? validationError; // Error de validación/creación (se muestra inline en el formulario)
    bool _isSubmitting = false; // Flag para evitar envíos múltiples y mostrar loader
-   final Map<int, bool> _expansionState = {}; // Para el estado de expansión de categorías
 
    // Variable para tipo de usuario
    bool _isEmployee = false;
@@ -60,6 +64,15 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      usuarioNombre = null;
      _loadUserType();
      cargarDatos();
+     // listener para el campo de búsqueda de tratamientos
+     _tratamientoSearchCtrl.addListener(() {
+       if (_tratamientoSearchDebounce?.isActive ?? false) _tratamientoSearchDebounce!.cancel();
+       _tratamientoSearchDebounce = Timer(const Duration(milliseconds: 300), () {
+         setState(() {
+           _tratamientoSearch = _tratamientoSearchCtrl.text.trim();
+         });
+       });
+     });
    }
 
    @override
@@ -78,6 +91,8 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    @override
    void dispose() {
      _clientSearchDebounce?.cancel();
+     _tratamientoSearchDebounce?.cancel();
+     _tratamientoSearchCtrl.dispose();
      _sucursalProvider?.removeListener(_onSucursalChanged);
      super.dispose();
    }
@@ -154,190 +169,6 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      }
      return null;
    }
-
-  Widget _buildTratamientosList(ColorScheme colorScheme) {
-    final tratamientosSinCategoria = tratamientos.where((t) {
-      return _getCategoriaIdFromTratamiento(t) == null;
-    }).toList();
-
-    final itemCount = categorias.length + (tratamientosSinCategoria.isNotEmpty ? 1 : 0);
-
-    return ListView.builder(
-      shrinkWrap: true,
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        // Handle "Otros tratamientos"
-        if (index == categorias.length && tratamientosSinCategoria.isNotEmpty) {
-          final categoriaId = -1; // Special ID for this group
-          return ExpansionTile(
-            key: ValueKey('cat_$categoriaId'),
-            leading: Icon(
-              Icons.category_outlined,
-              color: colorScheme.onSurfaceVariant,
-              size: Responsive.isSmallScreen(context) ? 20 : 24,
-            ),
-            title: Text(
-              'Otros tratamientos',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: Responsive.isSmallScreen(context) ? 13 : null,
-                  ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-            tilePadding: EdgeInsets.symmetric(
-              horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
-              vertical: 4,
-            ),
-            childrenPadding: EdgeInsets.symmetric(
-              horizontal: Responsive.isSmallScreen(context) ? 4 : 8,
-            ),
-            initiallyExpanded: _expansionState[categoriaId] ?? false,
-            onExpansionChanged: (isExpanded) {
-              setState(() {
-                _expansionState[categoriaId] = isExpanded;
-              });
-            },
-            children: tratamientosSinCategoria.map<Widget>((t) {
-              final id = t['id'] as int;
-              final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
-              final isSelected = tratamientosSeleccionados.contains(id);
-
-              return CheckboxListTile(
-                key: ValueKey('tratamiento_sin_cat_$id'),
-                dense: Responsive.isSmallScreen(context),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
-                  vertical: 0,
-                ),
-                title: Text(
-                  t['nombreTratamiento'] ?? 'Sin nombre',
-                  style: TextStyle(
-                    fontSize: Responsive.isSmallScreen(context) ? 13 : null,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
-                ),
-                subtitle: Text(
-                  'Bs ${precio.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: Responsive.isSmallScreen(context) ? 11 : null,
-                  ),
-                ),
-                value: isSelected,
-                onChanged: (bool? value) {
-                  setState(() {
-                    if (value == true) {
-                      tratamientosSeleccionados.add(id);
-                    } else {
-                      tratamientosSeleccionados.remove(id);
-                    }
-                    final total = calcularPrecioTotal();
-                    pago = total;
-                    calcularEstadoPago();
-                  });
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-              );
-            }).toList(),
-          );
-        }
-        
-        if (index >= categorias.length) return const SizedBox.shrink();
-
-        // Categorías normales
-        final categoria = categorias[index];
-        final categoriaId = categoria['id'];
-        final categoriaNombre = categoria['nombreCategoria'] ?? 'Sin categoría';
-
-        // Filtrar tratamientos de esta categoría usando la función helper
-        final tratamientosDeCat = tratamientos.where((t) {
-          final catId = _getCategoriaIdFromTratamiento(t);
-          return catId != null && catId == categoriaId;
-        }).toList();
-
-        if (tratamientosDeCat.isEmpty) return const SizedBox.shrink();
-
-        return ExpansionTile(
-          key: ValueKey('cat_$categoriaId'),
-          leading: Icon(
-            Icons.spa,
-            color: colorScheme.primary,
-            size: Responsive.isSmallScreen(context) ? 20 : 24,
-          ),
-          title: Text(
-            categoriaNombre,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                  fontSize: Responsive.isSmallScreen(context) ? 13 : null,
-                ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
-          tilePadding: EdgeInsets.symmetric(
-            horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
-            vertical: 4,
-          ),
-          childrenPadding: EdgeInsets.symmetric(
-            horizontal: Responsive.isSmallScreen(context) ? 4 : 8,
-          ),
-          initiallyExpanded: _expansionState[categoriaId] ?? false,
-          onExpansionChanged: (isExpanded) {
-            setState(() {
-              _expansionState[categoriaId] = isExpanded;
-            });
-          },
-          children: tratamientosDeCat.map<Widget>((t) {
-            final id = t['id'] as int;
-            final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
-            final isSelected = tratamientosSeleccionados.contains(id);
-
-            return CheckboxListTile(
-              key: ValueKey('tratamiento_cat_${categoriaId}_$id'),
-              dense: Responsive.isSmallScreen(context),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: Responsive.isSmallScreen(context) ? 8 : 16,
-                vertical: 0,
-              ),
-              title: Text(
-                t['nombreTratamiento'] ?? 'Sin nombre',
-                style: TextStyle(
-                  color: isSelected ? colorScheme.primary : null,
-                  fontWeight: isSelected ? FontWeight.bold : null,
-                  fontSize: Responsive.isSmallScreen(context) ? 13 : null,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-              subtitle: Text(
-                'Bs ${precio.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: Responsive.isSmallScreen(context) ? 11 : null,
-                ),
-              ),
-              value: isSelected,
-              onChanged: (bool? value) {
-                setState(() {
-                  if (value == true) {
-                    tratamientosSeleccionados.add(id);
-                  } else {
-                    tratamientosSeleccionados.remove(id);
-                  }
-                  // Recalcular el pago y estado
-                  final total = calcularPrecioTotal();
-                  pago = total;
-                  calcularEstadoPago();
-                });
-              },
-              controlAffinity: ListTileControlAffinity.leading,
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
 
    Future<void> cargarDatos() async {
      setState(() {
@@ -734,16 +565,99 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                              ),
                            )
                          else
-                           Container(
-                             constraints: const BoxConstraints(maxHeight: 400),
-                             decoration: BoxDecoration(
-                               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-                               borderRadius: BorderRadius.circular(14),
-                               border: Border.all(
-                                 color: colorScheme.outline.withValues(alpha: 0.2),
+                           Column(
+                             crossAxisAlignment: CrossAxisAlignment.stretch,
+                             children: [
+                               // Dropdown de categorías (filtro)
+                               DropdownButtonFormField<int?>(
+                                 initialValue: _selectedCategoriaFilter,
+                                 decoration: InputDecoration(
+                                   filled: true,
+                                   fillColor: colorScheme.surfaceContainerHighest,
+                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
+                                 ),
+                                 items: [
+                                   const DropdownMenuItem<int?>(value: null, child: Text('Todas las categorías')),
+                                   ...categorias.map<DropdownMenuItem<int>>((c) {
+                                     return DropdownMenuItem(value: c['id'] as int?, child: Text(c['nombreCategoria'] ?? 'Sin nombre'));
+                                   }).toList(),
+                                 ],
+                                 onChanged: (v) => setState(() {
+                                   _selectedCategoriaFilter = v;
+                                 }),
+                                 hint: const Text('Filtrar por categoría'),
                                ),
-                             ),
-                             child: _buildTratamientosList(colorScheme),
+                               const SizedBox(height: 8),
+                               // Buscador de tratamientos
+                               TextField(
+                                 controller: _tratamientoSearchCtrl,
+                                 decoration: InputDecoration(
+                                   hintText: 'Buscar tratamiento...',
+                                   prefixIcon: const Icon(Icons.search),
+                                   filled: true,
+                                   fillColor: colorScheme.surfaceContainerHighest,
+                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
+                                 ),
+                               ),
+                               const SizedBox(height: 8),
+                               Container(
+                                 constraints: const BoxConstraints(maxHeight: 320),
+                                 decoration: BoxDecoration(
+                                   color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                                   borderRadius: BorderRadius.circular(14),
+                                   border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                                 ),
+                                 child: Builder(builder: (context) {
+                                   final searchLower = _tratamientoSearch.toLowerCase();
+                                   final filtered = tratamientos.where((t) {
+                                     final nombre = (t['nombreTratamiento'] ?? '').toString().toLowerCase();
+                                     final catId = _getCategoriaIdFromTratamiento(t);
+                                     final matchesCat = _selectedCategoriaFilter == null || catId == _selectedCategoriaFilter;
+                                     final matchesSearch = searchLower.isEmpty || nombre.contains(searchLower);
+                                     return matchesCat && matchesSearch;
+                                   }).toList();
+
+                                   if (filtered.isEmpty) {
+                                     return Padding(
+                                       padding: const EdgeInsets.all(16.0),
+                                       child: Text('No hay tratamientos que coincidan', style: Theme.of(context).textTheme.bodyMedium),
+                                     );
+                                   }
+
+                                   return ListView.builder(
+                                     shrinkWrap: true,
+                                     itemCount: filtered.length,
+                                     itemBuilder: (context, index) {
+                                       final t = filtered[index];
+                                       final id = t['id'] as int;
+                                       final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
+                                       final isSelected = tratamientosSeleccionados.contains(id);
+                                       return CheckboxListTile(
+                                         key: ValueKey('tratamiento_filtered_$id'),
+                                         dense: Responsive.isSmallScreen(context),
+                                         contentPadding: EdgeInsets.symmetric(horizontal: Responsive.isSmallScreen(context) ? 8 : 16, vertical: 0),
+                                         title: Text(t['nombreTratamiento'] ?? 'Sin nombre', style: TextStyle(color: isSelected ? colorScheme.primary : null, fontWeight: isSelected ? FontWeight.bold : null, fontSize: Responsive.isSmallScreen(context) ? 13 : null), overflow: TextOverflow.ellipsis, maxLines: 2),
+                                         subtitle: Text('Bs ${precio.toStringAsFixed(2)}', style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 11 : null)),
+                                         value: isSelected,
+                                         onChanged: (bool? value) {
+                                           setState(() {
+                                             if (value == true) {
+                                               tratamientosSeleccionados.add(id);
+                                             } else {
+                                               tratamientosSeleccionados.remove(id);
+                                             }
+                                             final total = calcularPrecioTotal();
+                                             pago = total;
+                                             calcularEstadoPago();
+                                           });
+                                         },
+                                         controlAffinity: ListTileControlAffinity.leading,
+                                       );
+                                     },
+                                   );
+                                 }),
+                               ),
+                             ],
                            ),
                          const SizedBox(height: 18),
                          Text('Cliente', style: Theme.of(context).textTheme.labelLarge),
