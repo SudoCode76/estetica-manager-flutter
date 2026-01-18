@@ -467,322 +467,271 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                  horizontal: Responsive.horizontalPadding(context),
                  vertical: Responsive.verticalPadding(context),
                ),
-               child: ClipRRect(
-                 borderRadius: BorderRadius.circular(Responsive.isSmallScreen(context) ? 20 : 28),
-                 child: BackdropFilter(
-                   filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                   child: Container(
-                     decoration: BoxDecoration(
-                       borderRadius: BorderRadius.circular(28),
-                       color: colorScheme.surface.withValues(alpha: 0.12),
-                       boxShadow: [
-                         BoxShadow(
-                           color: Colors.black.withValues(alpha: 0.08),
-                           blurRadius: 30,
-                           offset: const Offset(0, 10),
-                         ),
-                       ],
-                       border: Border.all(color: colorScheme.outline.withValues(alpha: 0.06)),
-                     ),
-                     padding: const EdgeInsets.all(24),
-                     child: Column(
-                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                       children: [
-                         // Fecha
-                         Text('Fecha y hora', style: Theme.of(context).textTheme.labelLarge),
-                         const SizedBox(height: 8),
-                         GestureDetector(
-                           onTap: () async {
-                             final picked = await showDatePicker(
-                               context: context,
-                               initialDate: DateTime.now(),
-                               firstDate: DateTime(2020),
-                               lastDate: DateTime(2100),
-                             );
-                             if (picked != null) {
-                               final time = await showTimePicker(
-                                 context: context,
-                                 initialTime: TimeOfDay.now(),
-                               );
-                               if (time != null) {
-                                 setState(() {
-                                   fecha = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
-                                 });
-                               }
-                             }
-                           },
-                           child: Container(
-                             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                             decoration: BoxDecoration(
-                               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-                               borderRadius: BorderRadius.circular(14),
-                             ),
-                             child: Text(
-                               fecha == null ? 'Seleccionar fecha y hora' : DateFormat('dd/MM/yyyy HH:mm').format(fecha!),
-                               style: const TextStyle(fontSize: 16),
-                             ),
-                           ),
-                         ),
-                         const SizedBox(height: 18),
-                         // Tratamientos agrupados por categoría (permite seleccionar de múltiples categorías)
-                         Row(
-                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                             Text(
-                               'Tratamientos',
-                               style: Theme.of(context).textTheme.labelLarge,
-                             ),
-                             if (tratamientosSeleccionados.isNotEmpty)
-                               Flexible(
-                                 child: Text(
-                                   '${tratamientosSeleccionados.length} seleccionado(s) - Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
-                                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                     color: colorScheme.primary,
-                                     fontWeight: FontWeight.bold,
-                                   ),
-                                   textAlign: TextAlign.right,
-                                   overflow: TextOverflow.ellipsis,
-                                   maxLines: 2,
-                                 ),
-                               ),
-                           ],
-                         ),
-                         const SizedBox(height: 8),
-                         if (tratamientos.isEmpty)
-                           Container(
-                             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                             decoration: BoxDecoration(
-                               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-                               borderRadius: BorderRadius.circular(14),
-                             ),
-                             child: Text(
-                               'Cargando tratamientos...',
-                               style: TextStyle(
-                                 fontSize: 16,
-                                 color: colorScheme.onSurfaceVariant,
-                               ),
-                             ),
-                           )
-                         else
-                           Column(
-                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                             children: [
-                               // Dropdown de categorías (filtro)
-                               DropdownButtonFormField<int?>(
-                                 initialValue: _selectedCategoriaFilter,
-                                 decoration: InputDecoration(
-                                   filled: true,
-                                   fillColor: colorScheme.surfaceContainerHighest,
-                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
-                                 ),
-                                 items: [
-                                   const DropdownMenuItem<int?>(value: null, child: Text('Todas las categorías')),
-                                   ...categorias.map<DropdownMenuItem<int>>((c) {
-                                     return DropdownMenuItem(value: c['id'] as int?, child: Text(c['nombreCategoria'] ?? 'Sin nombre'));
-                                   }).toList(),
-                                 ],
-                                 onChanged: (v) => setState(() {
-                                   _selectedCategoriaFilter = v;
-                                 }),
-                                 hint: const Text('Filtrar por categoría'),
-                               ),
-                               const SizedBox(height: 8),
-                               // Buscador de tratamientos
-                               TextField(
-                                 controller: _tratamientoSearchCtrl,
-                                 decoration: InputDecoration(
-                                   hintText: 'Buscar tratamiento...',
-                                   prefixIcon: const Icon(Icons.search),
-                                   filled: true,
-                                   fillColor: colorScheme.surfaceContainerHighest,
-                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
-                                 ),
-                               ),
-                               const SizedBox(height: 8),
-                               Container(
-                                 constraints: const BoxConstraints(maxHeight: 320),
-                                 decoration: BoxDecoration(
-                                   color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-                                   borderRadius: BorderRadius.circular(14),
-                                   border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-                                 ),
-                                 child: Builder(builder: (context) {
-                                   final searchLower = _tratamientoSearch.toLowerCase();
-                                   final filtered = tratamientos.where((t) {
-                                     final nombre = (t['nombreTratamiento'] ?? '').toString().toLowerCase();
-                                     final catId = _getCategoriaIdFromTratamiento(t);
-                                     final matchesCat = _selectedCategoriaFilter == null || catId == _selectedCategoriaFilter;
-                                     final matchesSearch = searchLower.isEmpty || nombre.contains(searchLower);
-                                     return matchesCat && matchesSearch;
-                                   }).toList();
-
-                                   if (filtered.isEmpty) {
-                                     return Padding(
-                                       padding: const EdgeInsets.all(16.0),
-                                       child: Text('No hay tratamientos que coincidan', style: Theme.of(context).textTheme.bodyMedium),
-                                     );
-                                   }
-
-                                   return ListView.builder(
-                                     shrinkWrap: true,
-                                     itemCount: filtered.length,
-                                     itemBuilder: (context, index) {
-                                       final t = filtered[index];
-                                       final id = t['id'] as int;
-                                       final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
-                                       final isSelected = tratamientosSeleccionados.contains(id);
-                                       return CheckboxListTile(
-                                         key: ValueKey('tratamiento_filtered_$id'),
-                                         dense: Responsive.isSmallScreen(context),
-                                         contentPadding: EdgeInsets.symmetric(horizontal: Responsive.isSmallScreen(context) ? 8 : 16, vertical: 0),
-                                         title: Text(t['nombreTratamiento'] ?? 'Sin nombre', style: TextStyle(color: isSelected ? colorScheme.primary : null, fontWeight: isSelected ? FontWeight.bold : null, fontSize: Responsive.isSmallScreen(context) ? 13 : null), overflow: TextOverflow.ellipsis, maxLines: 2),
-                                         subtitle: Text('Bs ${precio.toStringAsFixed(2)}', style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 11 : null)),
-                                         value: isSelected,
-                                         onChanged: (bool? value) {
-                                           setState(() {
-                                             if (value == true) {
-                                               tratamientosSeleccionados.add(id);
-                                             } else {
-                                               tratamientosSeleccionados.remove(id);
-                                             }
-                                             final total = calcularPrecioTotal();
-                                             pago = total;
-                                             calcularEstadoPago();
-                                           });
-                                         },
-                                         controlAffinity: ListTileControlAffinity.leading,
-                                       );
-                                     },
-                                   );
-                                 }),
+               child: LayoutBuilder(builder: (context, constraints) {
+                 // Calcular ancho máximo para evitar overflow horizontal en pantallas pequeñas
+                 final horizontalPad = Responsive.horizontalPadding(context);
+                 final maxWidth = (constraints.maxWidth - (horizontalPad * 2)).clamp(0.0, Responsive.maxContentWidth(context));
+                 return Center(
+                   child: ConstrainedBox(
+                     constraints: BoxConstraints(maxWidth: maxWidth > 0 ? maxWidth : constraints.maxWidth),
+                     child: ClipRRect(
+                       borderRadius: BorderRadius.circular(Responsive.isSmallScreen(context) ? 20 : 28),
+                       child: BackdropFilter(
+                         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                         child: Container(
+                           decoration: BoxDecoration(
+                             borderRadius: BorderRadius.circular(28),
+                             color: colorScheme.surface.withValues(alpha: 0.12),
+                             boxShadow: [
+                               BoxShadow(
+                                 color: Colors.black.withValues(alpha: 0.08),
+                                 blurRadius: 30,
+                                 offset: const Offset(0, 10),
                                ),
                              ],
+                             border: Border.all(color: colorScheme.outline.withValues(alpha: 0.06)),
                            ),
-                         const SizedBox(height: 18),
-                         Text('Cliente', style: Theme.of(context).textTheme.labelLarge),
-                         const SizedBox(height: 8),
-                         Row(
-                           children: [
-                             Expanded(
-                               child: FilledButton.icon(
-                                 onPressed: () async {
-                                   // Debug: ver qué sucursal tiene el provider
-                                   print('NewTicketScreen: _sucursalProvider = $_sucursalProvider');
-                                   print('NewTicketScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
-                                   print('NewTicketScreen: selectedSucursalName = ${_sucursalProvider?.selectedSucursalName}');
-
-                                   // Validar que haya provider
-                                   if (_sucursalProvider == null) {
-                                     print('NewTicketScreen: ERROR - _sucursalProvider is NULL!');
-                                     ScaffoldMessenger.of(context).showSnackBar(
-                                       const SnackBar(content: Text('Error: Provider no disponible. Intenta reiniciar la app.')),
-                                     );
-                                     return;
-                                   }
-
-                                   // Validar que haya sucursal seleccionada
-                                   if (_sucursalProvider?.selectedSucursalId == null) {
-                                     print('NewTicketScreen: ERROR - selectedSucursalId is NULL!');
-                                     ScaffoldMessenger.of(context).showSnackBar(
-                                       const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de continuar')),
-                                     );
-                                     return;
-                                   }
-
-                                   print('NewTicketScreen: Opening SelectClientScreen with sucursalId=${_sucursalProvider?.selectedSucursalId}');
-                                   final selected = await Navigator.push(
-                                     context,
-                                     MaterialPageRoute(builder: (context) => SelectClientScreen(sucursalId: _sucursalProvider!.selectedSucursalId!)),
+                           padding: EdgeInsets.all(Responsive.isSmallScreen(context) ? 16 : 24),
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.stretch,
+                             children: [
+                               // Fecha
+                               Text('Fecha y hora', style: Theme.of(context).textTheme.labelLarge),
+                               const SizedBox(height: 8),
+                               GestureDetector(
+                                 onTap: () async {
+                                   final picked = await showDatePicker(
+                                     context: context,
+                                     initialDate: DateTime.now(),
+                                     firstDate: DateTime(2020),
+                                     lastDate: DateTime(2100),
                                    );
-                                   if (selected != null && selected is Map) {
-                                     setState(() {
-                                       clienteId = selected['id'];
-                                       clienteNombre = '${selected['nombreCliente'] ?? ''} ${selected['apellidoCliente'] ?? ''}'.trim();
-                                     });
-                                     // volver automáticamente a la pantalla de crear ticket (ya estamos en ella), no hacemos nada más
+                                   if (picked != null) {
+                                     final time = await showTimePicker(
+                                       context: context,
+                                       initialTime: TimeOfDay.now(),
+                                     );
+                                     if (time != null) {
+                                       setState(() {
+                                         fecha = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
+                                       });
+                                     }
                                    }
                                  },
-                                 icon: const Icon(Icons.person_search),
-                                 label: Text(clienteNombre == null ? (clienteId == null ? 'Seleccionar cliente' : 'Cliente seleccionado') : clienteNombre!),
-                               ),
-                             ),
-                             const SizedBox(width: 8),
-                             FilledButton(
-                               onPressed: _showCreateClientDialog,
-                               child: const Icon(Icons.person_add),
-                             ),
-                           ],
-                         ),
-                         const SizedBox(width: 8),
-                         // Usuario
-                         Text('Usuario', style: Theme.of(context).textTheme.labelLarge),
-                         const SizedBox(height: 8),
-                         // Mostrar loading mientras se determina el tipo de usuario
-                         if (isLoadingUserType)
-                           Container(
-                             padding: const EdgeInsets.all(16),
-                             decoration: BoxDecoration(
-                               color: colorScheme.surfaceContainerHighest,
-                               borderRadius: BorderRadius.circular(12),
-                               border: Border.all(
-                                 color: colorScheme.outline.withValues(alpha: 0.5),
-                               ),
-                             ),
-                             child: Row(
-                               children: [
-                                 SizedBox(
-                                   width: 20,
-                                   height: 20,
-                                   child: CircularProgressIndicator(
-                                     strokeWidth: 2,
-                                     color: colorScheme.primary,
+                                 child: Container(
+                                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                   decoration: BoxDecoration(
+                                     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                                     borderRadius: BorderRadius.circular(14),
                                    ),
-                                 ),
-                                 const SizedBox(width: 12),
-                                 Text(
-                                   'Verificando permisos...',
-                                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                     color: colorScheme.onSurfaceVariant,
-                                   ),
-                                 ),
-                               ],
-                             ),
-                           )
-                         // Si es empleado, mostrar solo texto (no puede cambiar)
-                         else if (_isEmployee)
-                           Container(
-                             padding: const EdgeInsets.all(16),
-                             decoration: BoxDecoration(
-                               color: colorScheme.surfaceContainerHighest,
-                               borderRadius: BorderRadius.circular(12),
-                               border: Border.all(
-                                 color: colorScheme.outline.withValues(alpha: 0.5),
-                               ),
-                             ),
-                             child: Row(
-                               children: [
-                                 Icon(Icons.person, color: colorScheme.primary),
-                                 const SizedBox(width: 12),
-                                 Expanded(
                                    child: Text(
-                                     usuarioNombre ?? 'Usuario actual',
-                                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                       color: colorScheme.onSurface,
+                                     fecha == null ? 'Seleccionar fecha y hora' : DateFormat('dd/MM/yyyy HH:mm').format(fecha!),
+                                     style: const TextStyle(fontSize: 16),
+                                   ),
+                                 ),
+                               ),
+                               const SizedBox(height: 18),
+                               // Tratamientos agrupados por categoría (permite seleccionar de múltiples categorías)
+                               Row(
+                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                 crossAxisAlignment: CrossAxisAlignment.start,
+                                 children: [
+                                   Text(
+                                     'Tratamientos',
+                                     style: Theme.of(context).textTheme.labelLarge,
+                                   ),
+                                   if (tratamientosSeleccionados.isNotEmpty)
+                                     Flexible(
+                                       child: Text(
+                                         '${tratamientosSeleccionados.length} seleccionado(s) - Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                           color: colorScheme.primary,
+                                           fontWeight: FontWeight.bold,
+                                         ),
+                                         textAlign: TextAlign.right,
+                                         overflow: TextOverflow.ellipsis,
+                                         maxLines: 2,
+                                       ),
+                                     ),
+                                 ],
+                               ),
+                               const SizedBox(height: 8),
+                               if (tratamientos.isEmpty)
+                                 Container(
+                                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                   decoration: BoxDecoration(
+                                     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                                     borderRadius: BorderRadius.circular(14),
+                                   ),
+                                   child: Text(
+                                     'Cargando tratamientos...',
+                                     style: TextStyle(
+                                       fontSize: 16,
+                                       color: colorScheme.onSurfaceVariant,
                                      ),
                                    ),
+                                 )
+                               else
+                                 Column(
+                                   crossAxisAlignment: CrossAxisAlignment.stretch,
+                                   children: [
+                                     // Dropdown de categorías (filtro)
+                                     DropdownButtonFormField<int?>(
+                                       initialValue: _selectedCategoriaFilter,
+                                       isExpanded: true,
+                                       decoration: InputDecoration(
+                                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: Responsive.isSmallScreen(context) ? 12 : 14),
+                                         filled: true,
+                                         fillColor: colorScheme.surfaceContainerHighest,
+                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
+                                       ),
+                                       items: [
+                                         const DropdownMenuItem<int?>(value: null, child: Text('Todas las categorías')),
+                                         ...categorias.map<DropdownMenuItem<int>>((c) {
+                                           return DropdownMenuItem(value: c['id'] as int?, child: Text(c['nombreCategoria'] ?? 'Sin nombre'));
+                                         }).toList(),
+                                       ],
+                                       onChanged: (v) => setState(() {
+                                         _selectedCategoriaFilter = v;
+                                       }),
+                                       hint: const Text('Filtrar por categoría'),
+                                     ),
+                                     const SizedBox(height: 8),
+                                     // Buscador de tratamientos
+                                     TextField(
+                                       controller: _tratamientoSearchCtrl,
+                                       decoration: InputDecoration(
+                                         hintText: 'Buscar tratamiento...',
+                                         prefixIcon: const Icon(Icons.search),
+                                         filled: true,
+                                         fillColor: colorScheme.surfaceContainerHighest,
+                                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
+                                       ),
+                                       // Evitar que el campo crezca más de lo disponible
+                                       maxLines: 1,
+                                     ),
+                                     const SizedBox(height: 8),
+                                     Container(
+                                       constraints: BoxConstraints(maxHeight: Responsive.isSmallScreen(context) ? 300 : 360),
+                                       decoration: BoxDecoration(
+                                         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                                         borderRadius: BorderRadius.circular(14),
+                                         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                                       ),
+                                       child: Builder(builder: (context) {
+                                         final searchLower = _tratamientoSearch.toLowerCase();
+                                         final filtered = tratamientos.where((t) {
+                                           final nombre = (t['nombreTratamiento'] ?? '').toString().toLowerCase();
+                                           final catId = _getCategoriaIdFromTratamiento(t);
+                                           final matchesCat = _selectedCategoriaFilter == null || catId == _selectedCategoriaFilter;
+                                           final matchesSearch = searchLower.isEmpty || nombre.contains(searchLower);
+                                           return matchesCat && matchesSearch;
+                                         }).toList();
+
+                                         if (filtered.isEmpty) {
+                                           return Padding(
+                                             padding: const EdgeInsets.all(16.0),
+                                             child: Text('No hay tratamientos que coincidan', style: Theme.of(context).textTheme.bodyMedium),
+                                           );
+                                         }
+
+                                         return ListView.builder(
+                                           shrinkWrap: true,
+                                           itemCount: filtered.length,
+                                           itemBuilder: (context, index) {
+                                             final t = filtered[index];
+                                             final id = t['id'] as int;
+                                             final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
+                                             final isSelected = tratamientosSeleccionados.contains(id);
+                                             return CheckboxListTile(
+                                               key: ValueKey('tratamiento_filtered_$id'),
+                                               dense: Responsive.isSmallScreen(context),
+                                               contentPadding: EdgeInsets.symmetric(horizontal: Responsive.isSmallScreen(context) ? 8 : 16, vertical: 0),
+                                               title: Text(t['nombreTratamiento'] ?? 'Sin nombre', style: TextStyle(color: isSelected ? colorScheme.primary : null, fontWeight: isSelected ? FontWeight.bold : null, fontSize: Responsive.isSmallScreen(context) ? 13 : null), overflow: TextOverflow.ellipsis, maxLines: 2),
+                                               subtitle: Text('Bs ${precio.toStringAsFixed(2)}', style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 11 : null)),
+                                               value: isSelected,
+                                               onChanged: (bool? value) {
+                                                 setState(() {
+                                                   if (value == true) {
+                                                     tratamientosSeleccionados.add(id);
+                                                   } else {
+                                                     tratamientosSeleccionados.remove(id);
+                                                   }
+                                                   final total = calcularPrecioTotal();
+                                                   pago = total;
+                                                   calcularEstadoPago();
+                                                 });
+                                               },
+                                               controlAffinity: ListTileControlAffinity.leading,
+                                             );
+                                           },
+                                         );
+                                       }),
+                                     ),
+                                   ],
                                  ),
-                                 Icon(Icons.lock, size: 16, color: colorScheme.onSurfaceVariant),
-                               ],
-                             ),
-                           )
-                         // Si es admin, mostrar dropdown para seleccionar
-                         else
-                           Builder(
-                             builder: (context) {
-                               // Si está cargando usuarios, mostrar un indicador
-                               if (isLoadingUsuarios) {
-                                 return Container(
+                               const SizedBox(height: 18),
+                               Text('Cliente', style: Theme.of(context).textTheme.labelLarge),
+                               const SizedBox(height: 8),
+                               Row(
+                                 children: [
+                                   Expanded(
+                                     child: FilledButton.icon(
+                                       onPressed: () async {
+                                         // Debug: ver qué sucursal tiene el provider
+                                         print('NewTicketScreen: _sucursalProvider = $_sucursalProvider');
+                                         print('NewTicketScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+                                         print('NewTicketScreen: selectedSucursalName = ${_sucursalProvider?.selectedSucursalName}');
+
+                                         // Validar que haya provider
+                                         if (_sucursalProvider == null) {
+                                           print('NewTicketScreen: ERROR - _sucursalProvider is NULL!');
+                                           ScaffoldMessenger.of(context).showSnackBar(
+                                             const SnackBar(content: Text('Error: Provider no disponible. Intenta reiniciar la app.')),
+                                           );
+                                           return;
+                                         }
+
+                                         // Validar que haya sucursal seleccionada
+                                         if (_sucursalProvider?.selectedSucursalId == null) {
+                                           print('NewTicketScreen: ERROR - selectedSucursalId is NULL!');
+                                           ScaffoldMessenger.of(context).showSnackBar(
+                                             const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de continuar')),
+                                           );
+                                           return;
+                                         }
+
+                                         print('NewTicketScreen: Opening SelectClientScreen with sucursalId=${_sucursalProvider?.selectedSucursalId}');
+                                         final selected = await Navigator.push(
+                                           context,
+                                           MaterialPageRoute(builder: (context) => SelectClientScreen(sucursalId: _sucursalProvider!.selectedSucursalId!)),
+                                         );
+                                         if (selected != null && selected is Map) {
+                                           setState(() {
+                                             clienteId = selected['id'];
+                                             clienteNombre = '${selected['nombreCliente'] ?? ''} ${selected['apellidoCliente'] ?? ''}'.trim();
+                                           });
+                                           // volver automáticamente a la pantalla de crear ticket (ya estamos en ella), no hacemos nada más
+                                         }
+                                       },
+                                       icon: const Icon(Icons.person_search),
+                                       label: Text(clienteNombre == null ? (clienteId == null ? 'Seleccionar cliente' : 'Cliente seleccionado') : clienteNombre!),
+                                     ),
+                                   ),
+                                   const SizedBox(width: 8),
+                                   FilledButton(
+                                     onPressed: _showCreateClientDialog,
+                                     child: const Icon(Icons.person_add),
+                                   ),
+                                 ],
+                               ),
+                               const SizedBox(width: 8),
+                               // Usuario
+                               Text('Usuario', style: Theme.of(context).textTheme.labelLarge),
+                               const SizedBox(height: 8),
+                               // Mostrar loading mientras se determina el tipo de usuario
+                               if (isLoadingUserType)
+                                 Container(
                                    padding: const EdgeInsets.all(16),
                                    decoration: BoxDecoration(
                                      color: colorScheme.surfaceContainerHighest,
@@ -803,224 +752,289 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                        ),
                                        const SizedBox(width: 12),
                                        Text(
-                                         'Cargando usuarios...',
+                                         'Verificando permisos...',
                                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                            color: colorScheme.onSurfaceVariant,
                                          ),
                                        ),
                                      ],
                                    ),
-                                 );
-                               }
-
-                               // Eliminar usuarios duplicados por ID
-                               final uniqueUsuarios = <int, Map<String, dynamic>>{};
-                               for (var u in usuarios) {
-                                 if (u['id'] != null) {
-                                   uniqueUsuarios[u['id'] as int] = u;
-                                 }
-                               }
-                               final usuariosList = uniqueUsuarios.values.toList();
-
-                               // SOLUCIÓN SIMPLE: SIEMPRE usar null como value para evitar el error
-                               // Esto fuerza al admin a seleccionar manualmente
-                               print('NewTicket: Creando dropdown con ${usuariosList.length} usuarios, usuarioId actual=$usuarioId');
-
-                               return DropdownButtonFormField<int>(
-                                 initialValue: null, // SIEMPRE null para evitar errores
-                                 decoration: InputDecoration(
-                                   filled: true,
-                                   fillColor: colorScheme.surfaceContainerHighest,
-                                   border: OutlineInputBorder(
+                                 )
+                               // Si es empleado, mostrar solo texto (no puede cambiar)
+                               else if (_isEmployee)
+                                 Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     color: colorScheme.surfaceContainerHighest,
                                      borderRadius: BorderRadius.circular(12),
-                                     borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
-                                   ),
-                                 ),
-                                 items: usuariosList.isEmpty
-                                     ? [
-                                         DropdownMenuItem<int>(
-                                           value: null,
-                                           child: Text('No hay usuarios disponibles'),
-                                         )
-                                       ]
-                                     : usuariosList.map<DropdownMenuItem<int>>((u) {
-                                         return DropdownMenuItem(
-                                           value: u['id'],
-                                           child: Text(u['username'] ?? u['email'] ?? ''),
-                                         );
-                                       }).toList(),
-                                 onChanged: usuariosList.isEmpty ? null : (v) => setState(() => usuarioId = v),
-                                 hint: const Text('Seleccionar usuario'),
-                               );
-                             }
-                           ),
-                         const SizedBox(height: 18),
-                         // Mostrar precio total de tratamientos
-                         if (tratamientosSeleccionados.isNotEmpty)
-                           Container(
-                             padding: const EdgeInsets.all(16),
-                             decoration: BoxDecoration(
-                               color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                               borderRadius: BorderRadius.circular(14),
-                               border: Border.all(
-                                 color: colorScheme.primary.withValues(alpha: 0.2),
-                               ),
-                             ),
-                             child: Row(
-                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                               crossAxisAlignment: CrossAxisAlignment.center,
-                               children: [
-                                 Flexible(
-                                   flex: 2,
-                                   child: Text(
-                                     'Total de tratamientos:',
-                                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                       fontWeight: FontWeight.bold,
+                                     border: Border.all(
+                                       color: colorScheme.outline.withValues(alpha: 0.5),
                                      ),
-                                     overflow: TextOverflow.ellipsis,
                                    ),
+                                   child: Row(
+                                     children: [
+                                       Icon(Icons.person, color: colorScheme.primary),
+                                       const SizedBox(width: 12),
+                                       Expanded(
+                                         child: Text(
+                                           usuarioNombre ?? 'Usuario actual',
+                                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                             color: colorScheme.onSurface,
+                                           ),
+                                         ),
+                                       ),
+                                       Icon(Icons.lock, size: 16, color: colorScheme.onSurfaceVariant),
+                                     ],
+                                   ),
+                                 )
+                               // Si es admin, mostrar dropdown para seleccionar
+                               else
+                                 Builder(
+                                   builder: (context) {
+                                     // Si está cargando usuarios, mostrar un indicador
+                                     if (isLoadingUsuarios) {
+                                       return Container(
+                                         padding: const EdgeInsets.all(16),
+                                         decoration: BoxDecoration(
+                                           color: colorScheme.surfaceContainerHighest,
+                                           borderRadius: BorderRadius.circular(12),
+                                           border: Border.all(
+                                             color: colorScheme.outline.withValues(alpha: 0.5),
+                                           ),
+                                         ),
+                                         child: Row(
+                                           children: [
+                                             SizedBox(
+                                               width: 20,
+                                               height: 20,
+                                               child: CircularProgressIndicator(
+                                                 strokeWidth: 2,
+                                                 color: colorScheme.primary,
+                                               ),
+                                             ),
+                                             const SizedBox(width: 12),
+                                             Text(
+                                               'Cargando usuarios...',
+                                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                                 color: colorScheme.onSurfaceVariant,
+                                               ),
+                                             ),
+                                           ],
+                                         ),
+                                       );
+                                     }
+
+                                     // Eliminar usuarios duplicados por ID
+                                     final uniqueUsuarios = <int, Map<String, dynamic>>{};
+                                     for (var u in usuarios) {
+                                       if (u['id'] != null) {
+                                         uniqueUsuarios[u['id'] as int] = u;
+                                       }
+                                     }
+                                     final usuariosList = uniqueUsuarios.values.toList();
+
+                                     // SOLUCIÓN SIMPLE: SIEMPRE usar null como value para evitar el error
+                                     // Esto fuerza al admin a seleccionar manualmente
+                                     print('NewTicket: Creando dropdown con ${usuariosList.length} usuarios, usuarioId actual=$usuarioId');
+
+                                     return DropdownButtonFormField<int>(
+                                       initialValue: null, // SIEMPRE null para evitar errores
+                                       decoration: InputDecoration(
+                                         filled: true,
+                                         fillColor: colorScheme.surfaceContainerHighest,
+                                         border: OutlineInputBorder(
+                                           borderRadius: BorderRadius.circular(12),
+                                           borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
+                                         ),
+                                       ),
+                                       items: usuariosList.isEmpty
+                                           ? [
+                                               DropdownMenuItem<int>(
+                                                 value: null,
+                                                 child: Text('No hay usuarios disponibles'),
+                                               )
+                                             ]
+                                           : usuariosList.map<DropdownMenuItem<int>>((u) {
+                                               return DropdownMenuItem(
+                                                 value: u['id'],
+                                                 child: Text(u['username'] ?? u['email'] ?? ''),
+                                               );
+                                             }).toList(),
+                                       onChanged: usuariosList.isEmpty ? null : (v) => setState(() => usuarioId = v),
+                                       hint: const Text('Seleccionar usuario'),
+                                     );
+                                   }
                                  ),
-                                 const SizedBox(width: 8),
-                                 Flexible(
-                                   flex: 1,
-                                   child: Text(
-                                     'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
-                                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                       color: colorScheme.primary,
-                                       fontWeight: FontWeight.bold,
+                               const SizedBox(height: 18),
+                               // Mostrar precio total de tratamientos
+                               if (tratamientosSeleccionados.isNotEmpty)
+                                 Container(
+                                   padding: const EdgeInsets.all(16),
+                                   decoration: BoxDecoration(
+                                     color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                                     borderRadius: BorderRadius.circular(14),
+                                     border: Border.all(
+                                       color: colorScheme.primary.withValues(alpha: 0.2),
                                      ),
-                                     textAlign: TextAlign.right,
-                                     overflow: TextOverflow.ellipsis,
+                                   ),
+                                   child: Row(
+                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                     crossAxisAlignment: CrossAxisAlignment.center,
+                                     children: [
+                                       Flexible(
+                                         flex: 2,
+                                         child: Text(
+                                           'Total de tratamientos:',
+                                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                             fontWeight: FontWeight.bold,
+                                           ),
+                                           overflow: TextOverflow.ellipsis,
+                                         ),
+                                       ),
+                                       const SizedBox(width: 8),
+                                       Flexible(
+                                         flex: 1,
+                                         child: Text(
+                                           'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                             color: colorScheme.primary,
+                                             fontWeight: FontWeight.bold,
+                                           ),
+                                           textAlign: TextAlign.right,
+                                           overflow: TextOverflow.ellipsis,
+                                         ),
+                                       ),
+                                     ],
                                    ),
                                  ),
-                               ],
-                             ),
-                           ),
-                         if (tratamientosSeleccionados.isNotEmpty) const SizedBox(height: 18),
-                         // Pago
-                         Text('Pago realizado (Bs)', style: Theme.of(context).textTheme.labelLarge),
-                         const SizedBox(height: 8),
-                         TextFormField(
-                           initialValue: pago?.toString() ?? '',
-                           keyboardType: TextInputType.number,
-                           decoration: const InputDecoration(
-                             hintText: 'Monto pagado',
-                           ),
-                           onChanged: (v) {
-                             setState(() {
-                               pago = double.tryParse(v) ?? 0;
-                               calcularEstadoPago();
-                             });
-                           },
-                         ),
-                         const SizedBox(height: 18),
-                         // Estado de pago y saldo (responsive)
-                         Wrap(
-                           spacing: 12,
-                           runSpacing: 6,
-                           crossAxisAlignment: WrapCrossAlignment.center,
-                           children: [
-                             Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                               decoration: BoxDecoration(
-                                 color: estadoPago == 'Completo' ? Colors.green.withValues(alpha: 0.12) : Colors.orange.withValues(alpha: 0.08),
-                                 borderRadius: BorderRadius.circular(12),
+                               if (tratamientosSeleccionados.isNotEmpty) const SizedBox(height: 18),
+                               // Pago
+                               Text('Pago realizado (Bs)', style: Theme.of(context).textTheme.labelLarge),
+                               const SizedBox(height: 8),
+                               TextFormField(
+                                 initialValue: pago?.toString() ?? '',
+                                 keyboardType: TextInputType.number,
+                                 decoration: const InputDecoration(
+                                   hintText: 'Monto pagado',
+                                 ),
+                                 onChanged: (v) {
+                                   setState(() {
+                                     pago = double.tryParse(v) ?? 0;
+                                     calcularEstadoPago();
+                                   });
+                                 },
                                ),
-                               child: Row(
-                                 mainAxisSize: MainAxisSize.min,
+                               const SizedBox(height: 18),
+                               // Estado de pago y saldo (responsive)
+                               Wrap(
+                                 spacing: 12,
+                                 runSpacing: 6,
+                                 crossAxisAlignment: WrapCrossAlignment.center,
                                  children: [
-                                   Text('Estado de pago: ', style: Theme.of(context).textTheme.bodyMedium),
-                                   Text(estadoPago, style: TextStyle(color: estadoPago == 'Completo' ? Colors.green : Colors.orange, fontWeight: FontWeight.bold)),
+                                   Container(
+                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                     decoration: BoxDecoration(
+                                       color: estadoPago == 'Completo' ? Colors.green.withValues(alpha: 0.12) : Colors.orange.withValues(alpha: 0.08),
+                                       borderRadius: BorderRadius.circular(12),
+                                     ),
+                                     child: Row(
+                                       mainAxisSize: MainAxisSize.min,
+                                       children: [
+                                         Text('Estado de pago: ', style: Theme.of(context).textTheme.bodyMedium),
+                                         Text(estadoPago, style: TextStyle(color: estadoPago == 'Completo' ? Colors.green : Colors.orange, fontWeight: FontWeight.bold)),
+                                       ],
+                                     ),
+                                   ),
+                                   Container(
+                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                     decoration: BoxDecoration(
+                                       color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.08),
+                                       borderRadius: BorderRadius.circular(12),
+                                     ),
+                                     child: Text('Saldo pendiente: Bs ${saldoPendiente.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                   ),
                                  ],
                                ),
-                             ),
-                             Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                               decoration: BoxDecoration(
-                                 color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.08),
-                                 borderRadius: BorderRadius.circular(12),
-                               ),
-                               child: Text('Saldo pendiente: Bs ${saldoPendiente.toStringAsFixed(2)}', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                             ),
-                           ],
-                         ),
-                         const SizedBox(height: 24),
-                         // Mensaje de error de validación
-                         if (validationError != null)
-                           Container(
-                             margin: const EdgeInsets.only(bottom: 16),
-                             padding: const EdgeInsets.all(12),
-                             decoration: BoxDecoration(
-                               color: Theme.of(context).colorScheme.errorContainer,
-                               borderRadius: BorderRadius.circular(12),
-                               border: Border.all(
-                                 color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
-                               ),
-                             ),
-                             child: Row(
-                               children: [
-                                 Icon(
-                                   Icons.error_outline,
-                                   color: Theme.of(context).colorScheme.onErrorContainer,
-                                   size: 24,
-                                 ),
-                                 const SizedBox(width: 12),
-                                 Expanded(
-                                   child: Text(
-                                     validationError!,
-                                     style: TextStyle(
-                                       color: Theme.of(context).colorScheme.onErrorContainer,
-                                       fontWeight: FontWeight.w500,
+                               const SizedBox(height: 24),
+                               // Mensaje de error de validación
+                               if (validationError != null)
+                                 Container(
+                                   margin: const EdgeInsets.only(bottom: 16),
+                                   padding: const EdgeInsets.all(12),
+                                   decoration: BoxDecoration(
+                                     color: Theme.of(context).colorScheme.errorContainer,
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: Border.all(
+                                       color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
                                      ),
                                    ),
-                                 ),
-                                 IconButton(
-                                   icon: Icon(
-                                     Icons.close,
-                                     color: Theme.of(context).colorScheme.onErrorContainer,
-                                     size: 20,
+                                   child: Row(
+                                     children: [
+                                       Icon(
+                                         Icons.error_outline,
+                                         color: Theme.of(context).colorScheme.onErrorContainer,
+                                         size: 24,
+                                       ),
+                                       const SizedBox(width: 12),
+                                       Expanded(
+                                         child: Text(
+                                           validationError!,
+                                           style: TextStyle(
+                                             color: Theme.of(context).colorScheme.onErrorContainer,
+                                             fontWeight: FontWeight.w500,
+                                           ),
+                                         ),
+                                       ),
+                                       IconButton(
+                                         icon: Icon(
+                                           Icons.close,
+                                           color: Theme.of(context).colorScheme.onErrorContainer,
+                                           size: 20,
+                                         ),
+                                         onPressed: () {
+                                           setState(() { validationError = null; });
+                                         },
+                                         padding: EdgeInsets.zero,
+                                         constraints: const BoxConstraints(),
+                                       ),
+                                     ],
                                    ),
-                                   onPressed: () {
-                                     setState(() { validationError = null; });
-                                   },
-                                   padding: EdgeInsets.zero,
-                                   constraints: const BoxConstraints(),
                                  ),
-                               ],
-                             ),
-                           ),
-                         FilledButton.icon(
-                           onPressed: _isSubmitting ? null : crearTicket,
-                           icon: _isSubmitting ? SizedBox(
-                             width: Responsive.isSmallScreen(context) ? 16 : 18,
-                             height: Responsive.isSmallScreen(context) ? 16 : 18,
-                             child: const CircularProgressIndicator(strokeWidth: 2),
-                           ) : Icon(
-                             Icons.save,
-                             size: Responsive.isSmallScreen(context) ? 18 : 20,
-                           ),
-                           label: Text(
-                             _isSubmitting ? 'Guardando...' : 'Guardar Ticket',
-                             style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 14 : 16),
-                           ),
-                           style: FilledButton.styleFrom(
-                             padding: EdgeInsets.symmetric(
-                               vertical: Responsive.isSmallScreen(context) ? 14 : 16,
-                             ),
-                             textStyle: TextStyle(
-                               fontSize: Responsive.isSmallScreen(context) ? 16 : 18,
-                               fontWeight: FontWeight.bold,
-                             ),
-                             shape: RoundedRectangleBorder(
-                               borderRadius: BorderRadius.circular(Responsive.isSmallScreen(context) ? 12 : 16),
-                             ),
+                               FilledButton.icon(
+                                 onPressed: _isSubmitting ? null : crearTicket,
+                                 icon: _isSubmitting ? SizedBox(
+                                   width: Responsive.isSmallScreen(context) ? 16 : 18,
+                                   height: Responsive.isSmallScreen(context) ? 16 : 18,
+                                   child: const CircularProgressIndicator(strokeWidth: 2),
+                                 ) : Icon(
+                                   Icons.save,
+                                   size: Responsive.isSmallScreen(context) ? 18 : 20,
+                                 ),
+                                 label: Text(
+                                   _isSubmitting ? 'Guardando...' : 'Guardar Ticket',
+                                   style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 14 : 16),
+                                 ),
+                                 style: FilledButton.styleFrom(
+                                   padding: EdgeInsets.symmetric(
+                                     vertical: Responsive.isSmallScreen(context) ? 14 : 16,
+                                   ),
+                                   textStyle: TextStyle(
+                                     fontSize: Responsive.isSmallScreen(context) ? 16 : 18,
+                                     fontWeight: FontWeight.bold,
+                                   ),
+                                   shape: RoundedRectangleBorder(
+                                     borderRadius: BorderRadius.circular(Responsive.isSmallScreen(context) ? 12 : 16),
+                                   ),
+                                 ),
+                               ),
+                             ],
                            ),
                          ),
-                       ],
+                       ),
                      ),
                    ),
-                 ),
-               ),
+                 );
+               }),
              ),
      );
    }
