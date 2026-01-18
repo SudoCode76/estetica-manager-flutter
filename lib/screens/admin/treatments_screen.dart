@@ -378,6 +378,9 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   Widget _buildCategoryListItem(Map<String, dynamic> c, ColorScheme cs, TextTheme tt) {
     final int count = _countTratamientosPorCategoria(c['id']);
     final bool selected = _selectedCategoriaId == c['id'];
+    final bool activo = c['estadoCategoria'] == true || c['estadoCategoria'] == null;
+    final double op = activo ? 1.0 : 0.6;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -390,39 +393,54 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
-        child: Row(
-          children: [
-            Expanded(child: Text(c['nombreCategoria'] ?? '-', style: tt.bodyLarge)),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    // Edit
-                    Container(
-                      decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
-                      child: IconButton(
-                        icon: Icon(Icons.edit, size: 18, color: cs.onSurfaceVariant),
-                        onPressed: () => _showEditCategoriaDialog(c),
+        child: Opacity(
+          opacity: op,
+          child: Row(
+            children: [
+              Expanded(child: Text(c['nombreCategoria'] ?? '-', style: tt.bodyLarge)),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    children: [
+                      // Edit
+                      Container(
+                        decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
+                        child: IconButton(
+                          icon: Icon(Icons.edit, size: 18, color: cs.onSurfaceVariant),
+                          onPressed: () => _showEditCategoriaDialog(c),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Trash = desactivar
-                    Container(
-                      decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
-                      child: IconButton(
-                        icon: Icon(Icons.delete, size: 18, color: cs.onErrorContainer),
-                        onPressed: () => _toggleCategoriaEstado(c),
+                      const SizedBox(width: 8),
+                      // Trash = desactivar OR restore = reactivar
+                      Container(
+                        decoration: BoxDecoration(color: activo ? cs.errorContainer : cs.primaryContainer, shape: BoxShape.circle),
+                        child: IconButton(
+                          icon: Icon(activo ? Icons.delete : Icons.restore, size: 18, color: activo ? cs.onErrorContainer : cs.onPrimaryContainer),
+                          onPressed: () => _toggleCategoriaEstado(c),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text('$count tratamientos', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-              ],
-            ),
-          ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('$count tratamientos', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                      if (!activo) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
+                          child: Text('Desactivada', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -513,7 +531,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   }
 
   Widget _buildTratamientoItem(Map<String, dynamic> t, ColorScheme cs, TextTheme tt) {
-    final bool activo = t['estadoTratamiento'] == true || t['estadoTratamiento'] == null;
+    final bool activoTrat = t['estadoTratamiento'] == true || t['estadoTratamiento'] == null;
     final String categoriaNombre = _getCategoriaNombreFromTratamiento(t);
     final String precio = t['precio']?.toString() ?? '-';
 
@@ -562,11 +580,11 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
             ),
             const SizedBox(width: 8),
             Container(
-              decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: activoTrat ? cs.errorContainer : cs.primaryContainer, shape: BoxShape.circle),
               child: IconButton(
                 constraints: const BoxConstraints.tightFor(width: 36, height: 36),
                 padding: const EdgeInsets.all(6),
-                icon: Icon(Icons.delete, size: 18, color: cs.onErrorContainer),
+                icon: Icon(activoTrat ? Icons.delete : Icons.restore, size: 18, color: activoTrat ? cs.onErrorContainer : cs.onPrimaryContainer),
                 onPressed: () => _toggleTratamientoEstado(t),
               ),
             ),
@@ -576,51 +594,74 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
         final statusChip = Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: activo ? cs.primary.withAlpha(25) : cs.error.withAlpha(25),
+            color: activoTrat ? cs.primary.withAlpha(25) : cs.error.withAlpha(25),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(activo ? 'Activo' : 'Inactivo', style: tt.bodySmall?.copyWith(color: activo ? cs.primary : cs.error)),
+          child: Text(activoTrat ? 'Activo' : 'Inactivo', style: tt.bodySmall?.copyWith(color: activoTrat ? cs.primary : cs.error)),
         );
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
-            child: narrow
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      infoSection,
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          actions,
-                          const SizedBox(width: 12),
-                          statusChip,
-                        ],
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(child: infoSection),
-                      const SizedBox(width: 8),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          actions,
-                          const SizedBox(height: 8),
-                          statusChip,
-                        ],
-                      ),
-                    ],
-                  ),
+        final double opTrat = activoTrat ? 1.0 : 0.6;
+
+        return Opacity(
+          opacity: opTrat,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
+              child: narrow
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        infoSection,
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            actions,
+                            const SizedBox(width: 12),
+                            statusChip,
+                            if (!activoTrat)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
+                                  child: Text('Desactivado', style: tt.bodySmall?.copyWith(color: cs.onSurface)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: infoSection),
+                        const SizedBox(width: 8),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            actions,
+                            const SizedBox(height: 8),
+                            statusChip,
+                            if (!activoTrat)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
+                                  child: Text('Desactivado', style: tt.bodySmall?.copyWith(color: cs.onSurface)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+            ),
           ),
         );
       },
@@ -661,6 +702,20 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                       ),
                     ),
                     const SizedBox(width: 8),
+                    // icono mostrar/ocultar desactivados
+                    IconButton(
+                      tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
+                      icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () {
+                        setState(() {
+                          _showDisabled = !_showDisabled;
+                          _applyFilters();
+                          _applyCategorySearch(_categorySearchCtrl.text);
+                          _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
                     const SizedBox(width: 56),
                   ],
                 ),
@@ -693,6 +748,19 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                     });
                   },
                 ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
+                icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
+                onPressed: () {
+                  setState(() {
+                    _showDisabled = !_showDisabled;
+                    _applyFilters();
+                    _applyCategorySearch(_categorySearchCtrl.text);
+                    _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                  });
+                },
               ),
               const SizedBox(width: 8),
               const SizedBox(width: 56),
