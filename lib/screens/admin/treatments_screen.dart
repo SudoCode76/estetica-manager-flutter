@@ -8,8 +8,9 @@ class TreatmentsScreen extends StatefulWidget {
   State<TreatmentsScreen> createState() => _TreatmentsScreenState();
 }
 
-class _TreatmentsScreenState extends State<TreatmentsScreen> {
+class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerProviderStateMixin {
   final ApiService _api = ApiService();
+  late TabController _tabController;
 
   List<dynamic> _categoriasAll = [];
   List<dynamic> _tratamientosAll = [];
@@ -32,12 +33,18 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     _loadAll();
     _categorySearchCtrl.addListener(() => _applyCategorySearch(_categorySearchCtrl.text));
     _treatmentSearchCtrl.addListener(() => _applyTreatmentSearch(_treatmentSearchCtrl.text));
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      // Rebuild when tab index changes (swipe or programmatic)
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _categorySearchCtrl.dispose();
     _treatmentSearchCtrl.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -425,32 +432,64 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _categorySearchCtrl,
-                decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar categorías', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+        LayoutBuilder(builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 480;
+          if (narrow) {
+            return Column(
+              children: [
+                TextField(
+                  controller: _categorySearchCtrl,
+                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar categorías', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
+                      icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () {
+                        setState(() {
+                          _showDisabled = !_showDisabled;
+                          _applyFilters();
+                          _applyCategorySearch(_categorySearchCtrl.text);
+                          _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                        });
+                      },
+                    ),
+                    const Spacer(),
+                    const SizedBox(width: 56),
+                  ],
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _categorySearchCtrl,
+                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar categorías', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
-              icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
-              onPressed: () {
-                setState(() {
-                  _showDisabled = !_showDisabled;
-                  _applyFilters();
-                  _applyCategorySearch(_categorySearchCtrl.text);
-                  _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                });
-              },
-            ),
-            const SizedBox(width: 8),
-            // dejamos el botones Añadir solo como espacio (FAB abajo)
-            const SizedBox(width: 56),
-          ],
-        ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
+                icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
+                onPressed: () {
+                  setState(() {
+                    _showDisabled = !_showDisabled;
+                    _applyFilters();
+                    _applyCategorySearch(_categorySearchCtrl.text);
+                    _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                  });
+                },
+              ),
+              const SizedBox(width: 8),
+              // dejamos el botones Añadir solo como espacio (FAB abajo)
+              const SizedBox(width: 56),
+            ],
+          );
+        }),
         const SizedBox(height: 8),
         Expanded(
           child: Card(
@@ -549,37 +588,74 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _treatmentSearchCtrl,
-                decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar tratamientos', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+        LayoutBuilder(builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 520;
+          if (narrow) {
+            return Column(
+              children: [
+                TextField(
+                  controller: _treatmentSearchCtrl,
+                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar tratamientos', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int?>(
+                        isExpanded: true,
+                        initialValue: _treatmentCategoryFilter,
+                        decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                        items: [
+                          const DropdownMenuItem<int?>(value: null, child: Text('Todas')),
+                          ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))),
+                        ],
+                        onChanged: (v) {
+                          setState(() {
+                            _treatmentCategoryFilter = v;
+                            _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const SizedBox(width: 56),
+                  ],
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _treatmentSearchCtrl,
+                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar tratamientos', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 160,
-              child: DropdownButtonFormField<int?>(
-                isExpanded: true,
-                initialValue: _treatmentCategoryFilter,
-                decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                items: [
-                  const DropdownMenuItem<int?>(value: null, child: Text('Todas')),
-                  ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))),
-                ],
-                onChanged: (v) {
-                  setState(() {
-                    _treatmentCategoryFilter = v;
-                    _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                  });
-                },
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 160,
+                child: DropdownButtonFormField<int?>(
+                  isExpanded: true,
+                  initialValue: _treatmentCategoryFilter,
+                  decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('Todas')),
+                    ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))),
+                  ],
+                  onChanged: (v) {
+                    setState(() {
+                      _treatmentCategoryFilter = v;
+                      _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                    });
+                  },
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            const SizedBox(width: 56),
-          ],
-        ),
+              const SizedBox(width: 8),
+              const SizedBox(width: 56),
+            ],
+          );
+        }),
         const SizedBox(height: 8),
         Expanded(
           child: Card(
@@ -606,106 +682,86 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     final mq = MediaQuery.of(context);
     final isNarrow = mq.size.width < 600;
 
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: _refresh,
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                  DefaultTabController(
-                    length: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Control segmentado personalizado (pill) en lugar de TabBar para replicar diseño
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Builder(builder: (tcContext) {
-                            final controller = DefaultTabController.of(tcContext);
-                            final currentIndex = controller.index;
-                            return Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(32)),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                children: List.generate(2, (i) {
-                                  final bool selected = i == currentIndex;
-                                  final String label = i == 0 ? 'Categorías' : 'Tratamientos';
-                                  return Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => controller.animateTo(i),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                            decoration: BoxDecoration(
-                                              color: selected ? Theme.of(context).cardColor : Colors.transparent,
-                                              borderRadius: BorderRadius.circular(24),
-                                            ),
-                                            child: Center(child: Text(label, style: selected ? tt.bodyMedium?.copyWith(color: cs.primary, fontWeight: FontWeight.w600) : tt.bodyMedium)),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          // pequeña línea debajo del texto seleccionado
-                                          AnimatedContainer(
-                                            duration: const Duration(milliseconds: 200),
-                                            height: selected ? 3 : 3,
-                                            width: selected ? 28 : 0,
-                                            decoration: BoxDecoration(color: selected ? cs.primary : Colors.transparent, borderRadius: BorderRadius.circular(2)),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ),
-                            );
-                          }),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: mq.size.height * 0.75,
-                          child: TabBarView(
-                            children: [
-                              _loading ? const Center(child: CircularProgressIndicator()) : _buildCategoriesTab(cs, tt, isNarrow),
-                              _loading ? const Center(child: CircularProgressIndicator()) : _buildTreatmentsTab(cs, tt, isNarrow),
-                            ],
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final tabIndex = _tabController.index;
+          if (tabIndex == 0) {
+            await _showCreateCategoriaDialog();
+          } else {
+            await _showCreateTratamientoDialog();
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Añadir'),
+        backgroundColor: cs.primaryContainer,
+        foregroundColor: cs.onPrimaryContainer,
+        elevation: 6,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 16.0),
+            child: Column(
+              children: [
+                // Control segmentado personalizado (pill)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(32)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.max,
+                      children: List.generate(2, (i) {
+                        final bool selected = i == _tabController.index;
+                        final String label = i == 0 ? 'Categorías' : 'Tratamientos';
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => _tabController.animateTo(i),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: selected ? Theme.of(context).cardColor : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  child: Center(child: Text(label, style: selected ? tt.bodyMedium?.copyWith(color: cs.primary, fontWeight: FontWeight.w600) : tt.bodyMedium)),
+                                ),
+                                const SizedBox(height: 6),
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  height: 3,
+                                  width: selected ? 28 : 0,
+                                  decoration: BoxDecoration(color: selected ? cs.primary : Colors.transparent, borderRadius: BorderRadius.circular(2)),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        );
+                      }),
                     ),
                   ),
-                  if (_saving) const LinearProgressIndicator(),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _loading ? const Center(child: CircularProgressIndicator()) : _buildCategoriesTab(cs, tt, isNarrow),
+                      _loading ? const Center(child: CircularProgressIndicator()) : _buildTreatmentsTab(cs, tt, isNarrow),
+                    ],
+                  ),
+                ),
+                if (_saving) const LinearProgressIndicator(),
+              ],
             ),
-
-            // FAB posicionado abajo a la derecha
-            Positioned(
-              right: 18,
-              bottom: 18,
-              child: FloatingActionButton.extended(
-                onPressed: () async {
-                  // abrir diálogo según pestaña seleccionada: si estamos en tratamientos crear tratamiento, si en categorías crear categoría
-                  final tabIndex = DefaultTabController.of(context).index;
-                  if (tabIndex == 0) {
-                    await _showCreateCategoriaDialog();
-                  } else {
-                    await _showCreateTratamientoDialog();
-                  }
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Añadir'),
-                backgroundColor: cs.primaryContainer,
-                foregroundColor: cs.onPrimaryContainer,
-                elevation: 6,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
