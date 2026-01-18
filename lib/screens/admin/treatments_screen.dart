@@ -368,23 +368,56 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
   }
 
   // UI builders
-  Widget _buildCategoryListItem(Map<String, dynamic> c, TextTheme tt) {
+  Widget _buildCategoryListItem(Map<String, dynamic> c, ColorScheme cs, TextTheme tt) {
     final int count = _countTratamientosPorCategoria(c['id']);
-    return ListTile(
-      title: Text(c['nombreCategoria'] ?? '-', style: tt.bodyMedium),
-      subtitle: Text('$count tratamientos', style: tt.bodySmall),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () => _showEditCategoriaDialog(c)),
-          IconButton(icon: Icon((c['estadoCategoria'] == true) ? Icons.toggle_on : Icons.toggle_off, size: 22, color: (c['estadoCategoria'] == true) ? Colors.green : null), onPressed: () => _toggleCategoriaEstado(c)),
+    final bool selected = _selectedCategoriaId == c['id'];
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: selected ? Border.all(color: cs.primaryContainer, width: 2) : null,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
-      onTap: () async {
-        setState(() => _selectedCategoriaId = c['id']);
-        final tr = await _api.getTratamientos(categoriaId: c['id']);
-        setState(() => _tratamientos = _filterTratamientosList(tr));
-      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(child: Text(c['nombreCategoria'] ?? '-', style: tt.bodyLarge)),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    // Edit
+                    Container(
+                      decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
+                      child: IconButton(
+                        icon: Icon(Icons.edit, size: 18, color: cs.onSurfaceVariant),
+                        onPressed: () => _showEditCategoriaDialog(c),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Trash = desactivar
+                    Container(
+                      decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
+                      child: IconButton(
+                        icon: Icon(Icons.delete, size: 18, color: cs.onErrorContainer),
+                        onPressed: () => _toggleCategoriaEstado(c),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('$count tratamientos', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -414,7 +447,8 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
               },
             ),
             const SizedBox(width: 8),
-            FilledButton.icon(onPressed: _showCreateCategoriaDialog, icon: const Icon(Icons.add), label: const Text('Nueva')),
+            // dejamos el botones Añadir solo como espacio (FAB abajo)
+            const SizedBox(width: 56),
           ],
         ),
         const SizedBox(height: 8),
@@ -422,17 +456,19 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
           child: Card(
             child: _categorias.isEmpty
                 ? Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Text('No hay categorías', style: tt.bodyMedium)))
-                : ListView.separated(
+                : ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: _categorias.length,
-                    separatorBuilder: (_, __) => const Divider(height: 0.5),
                     itemBuilder: (context, index) {
                       final c = _categorias[index] as Map<String, dynamic>;
-                      return _buildCategoryListItem(c, tt);
+                      return _buildCategoryListItem(c, cs, tt);
                     },
                   ),
           ),
         ),
+        const SizedBox(height: 12),
+        Center(child: Text('Total de ${_categorias.length} categorías registradas', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))),
+        const SizedBox(height: 60), // espacio para FAB
       ],
     );
   }
@@ -441,25 +477,71 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     final bool activo = t['estadoTratamiento'] == true || t['estadoTratamiento'] == null;
     final String categoriaNombre = _getCategoriaNombreFromTratamiento(t);
     final String precio = t['precio']?.toString() ?? '-';
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      leading: CircleAvatar(
-        backgroundColor: activo ? Colors.green.withAlpha(31) : cs.error.withAlpha(31),
-        child: Icon(activo ? Icons.check : Icons.block, color: activo ? Colors.green : cs.error, size: 18),
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))],
       ),
-      title: Text(t['nombreTratamiento'] ?? '-', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const SizedBox(height: 4), Text('Categoría: $categoriaNombre', style: tt.bodySmall), const SizedBox(height: 2), Text('Precio: \$$precio', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))]),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) async {
-          if (v == 'editar') await _showEditTratamientoDialog(t);
-          if (v == 'toggle') await _toggleTratamientoEstado(t);
-        },
-        itemBuilder: (_) => [
-          const PopupMenuItem(value: 'editar', child: Text('Editar')),
-          PopupMenuItem(value: 'toggle', child: Text((t['estadoTratamiento'] == true) ? 'Desactivar' : 'Activar')),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
+        child: Row(
+          children: [
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t['nombreTratamiento'] ?? '-', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text('Categoría: $categoriaNombre', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                      const SizedBox(width: 12),
+                      Text('\$$precio', style: tt.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+            // Actions: edit + trash (trash = desactivar)
+            Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
+                      child: IconButton(
+                        icon: Icon(Icons.edit, size: 18, color: cs.onSurfaceVariant),
+                        onPressed: () => _showEditTratamientoDialog(t),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
+                      child: IconButton(
+                        icon: Icon(Icons.delete, size: 18, color: cs.onErrorContainer),
+                        onPressed: () => _toggleTratamientoEstado(t),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Estado indicativo pequeño
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: activo ? cs.primary.withAlpha(25) : cs.error.withAlpha(25), borderRadius: BorderRadius.circular(12)),
+                  child: Text(activo ? 'Activo' : 'Inactivo', style: tt.bodySmall?.copyWith(color: activo ? cs.primary : cs.error)),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      onTap: () async => await _showEditTratamientoDialog(t),
     );
   }
 
@@ -495,7 +577,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            FilledButton.icon(onPressed: _showCreateTratamientoDialog, icon: const Icon(Icons.add), label: const Text('Nuevo')),
+            const SizedBox(width: 56),
           ],
         ),
         const SizedBox(height: 8),
@@ -510,6 +592,9 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
                   ),
           ),
         ),
+        const SizedBox(height: 12),
+        Center(child: Text('Total de ${_tratamientos.length} tratamientos registrados', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))),
+        const SizedBox(height: 60),
       ],
     );
   }
@@ -524,40 +609,103 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _refresh,
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            children: [
-              DefaultTabController(
-                length: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: TabBar(
-                        labelColor: cs.onPrimaryContainer,
-                        unselectedLabelColor: cs.onSurfaceVariant,
-                        indicator: BoxDecoration(borderRadius: BorderRadius.circular(8), color: cs.primaryContainer),
-                        tabs: const [Tab(text: 'Categorías'), Tab(text: 'Tratamientos')],
-                      ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                children: [
+                  DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Control segmentado personalizado (pill) en lugar de TabBar para replicar diseño
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Builder(builder: (tcContext) {
+                            final controller = DefaultTabController.of(tcContext);
+                            final currentIndex = controller.index;
+                            return Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(32)),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.max,
+                                children: List.generate(2, (i) {
+                                  final bool selected = i == currentIndex;
+                                  final String label = i == 0 ? 'Categorías' : 'Tratamientos';
+                                  return Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => controller.animateTo(i),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: selected ? Theme.of(context).cardColor : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(24),
+                                            ),
+                                            child: Center(child: Text(label, style: selected ? tt.bodyMedium?.copyWith(color: cs.primary, fontWeight: FontWeight.w600) : tt.bodyMedium)),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          // pequeña línea debajo del texto seleccionado
+                                          AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            height: selected ? 3 : 3,
+                                            width: selected ? 28 : 0,
+                                            decoration: BoxDecoration(color: selected ? cs.primary : Colors.transparent, borderRadius: BorderRadius.circular(2)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: mq.size.height * 0.75,
+                          child: TabBarView(
+                            children: [
+                              _loading ? const Center(child: CircularProgressIndicator()) : _buildCategoriesTab(cs, tt, isNarrow),
+                              _loading ? const Center(child: CircularProgressIndicator()) : _buildTreatmentsTab(cs, tt, isNarrow),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: mq.size.height * 0.75,
-                      child: TabBarView(
-                        children: [
-                          _loading ? const Center(child: CircularProgressIndicator()) : _buildCategoriesTab(cs, tt, isNarrow),
-                          _loading ? const Center(child: CircularProgressIndicator()) : _buildTreatmentsTab(cs, tt, isNarrow),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  if (_saving) const LinearProgressIndicator(),
+                ],
               ),
-              if (_saving) const LinearProgressIndicator(),
-            ],
-          ),
+            ),
+
+            // FAB posicionado abajo a la derecha
+            Positioned(
+              right: 18,
+              bottom: 18,
+              child: FloatingActionButton.extended(
+                onPressed: () async {
+                  // abrir diálogo según pestaña seleccionada: si estamos en tratamientos crear tratamiento, si en categorías crear categoría
+                  final tabIndex = DefaultTabController.of(context).index;
+                  if (tabIndex == 0) {
+                    await _showCreateCategoriaDialog();
+                  } else {
+                    await _showCreateTratamientoDialog();
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Añadir'),
+                backgroundColor: cs.primaryContainer,
+                foregroundColor: cs.onPrimaryContainer,
+                elevation: 6,
+              ),
+            ),
+          ],
         ),
       ),
     );
