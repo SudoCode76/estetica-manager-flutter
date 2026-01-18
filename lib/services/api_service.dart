@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -274,25 +272,50 @@ class ApiService {
   // Obtener todos los tratamientos
   Future<List<dynamic>> getTratamientos({int? categoriaId}) async {
     final headers = await _getHeaders();
-    final List<String> params = ['populate=*'];
+    // Construir parámetros base (populate + filtro opcional)
+    final baseParams = <String>['populate=*'];
+    if (categoriaId != null) baseParams.add('filters[categoria_tratamiento][id][\$eq]=$categoriaId');
 
-    if (categoriaId != null) {
-      params.add('filters[categoria_tratamiento][id][\$eq]=$categoriaId');
-    }
-
-    final endpoint = '$_baseUrl/tratamientos?${params.join('&')}';
-    print('getTratamientos: llamando a $endpoint');
+    final List<dynamic> allRaw = [];
+    int page = 1;
+    const int pageSize = 100; // paginar en bloques razonables
 
     try {
-      final response = await _getWithTimeout(Uri.parse(endpoint), headers, seconds: 10);
-      if (response.statusCode == 200) {
+      while (true) {
+        final params = List<String>.from(baseParams);
+        params.add('pagination[page]=$page');
+        params.add('pagination[pageSize]=$pageSize');
+        final endpoint = '$_baseUrl/tratamientos?${params.join('&')}';
+        print('getTratamientos: llamando a $endpoint');
+
+        final response = await _getWithTimeout(Uri.parse(endpoint), headers, seconds: 12);
+        if (response.statusCode != 200) {
+          print('getTratamientos error ${response.statusCode}: ${response.body}');
+          throw Exception('Failed to load tratamientos: ${response.statusCode}');
+        }
+
         final data = jsonDecode(response.body);
-        final raw = data['data'] ?? [];
-        return _normalizeItems(raw);
-      } else {
-        print('getTratamientos error ${response.statusCode}: ${response.body}');
-        throw Exception('Failed to load tratamientos');
+        final raw = List<dynamic>.from(data['data'] ?? []);
+        allRaw.addAll(raw);
+
+        // Si Strapi devuelve meta.pagination, comprobar si hay más páginas
+        if (data is Map && data.containsKey('meta') && data['meta'] is Map) {
+          final meta = data['meta'] as Map<String, dynamic>;
+          final pagination = meta['pagination'];
+          if (pagination is Map) {
+            final currentPage = (pagination['page'] ?? pagination['currentPage'] ?? page) as int;
+            final pageCount = (pagination['pageCount'] ?? pagination['totalPages'] ?? 1) as int;
+            if (currentPage < pageCount) {
+              page += 1;
+              continue; // fetch next page
+            }
+          }
+        }
+
+        break; // no pagination info or last page
       }
+
+      return _normalizeItems(allRaw);
     } catch (e) {
       print('Exception getTratamientos: $e');
       throw Exception('Failed to load tratamientos: $e');
@@ -696,8 +719,7 @@ class ApiService {
                 // Intentar varios formatos para enlazar la relación
                 final candidates = <Map<String, dynamic>>[];
                 candidates.add({'ticket': ticketVal});
-                // si ticketVal es numérico, intentar como objeto {id: num}
-                if (ticketVal is int) candidates.add({'ticket': {'id': ticketVal}});
+                // si ticketVal es numérico, candidates.add({'ticket': {'id': ticketVal}});
                 // si teníamos documentId original en pago, intentar también con ese string
                 if (pago.containsKey('ticket') && pago['ticket'] is String) candidates.add({'ticket': pago['ticket']});
 
