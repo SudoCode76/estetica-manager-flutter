@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/screens/admin/reporte_diario_screen.dart';
-import 'package:app_estetica/screens/admin/reporte_rango_screen.dart';
+import 'reporte_ventas_screen.dart';
 import 'package:app_estetica/config/responsive.dart';
 
 class ReportsScreen extends StatelessWidget {
@@ -59,25 +58,14 @@ class ReportsScreen extends StatelessWidget {
                 mainAxisSpacing: Responsive.spacing(context, 12),
                 children: [
                   _ReportCard(
-                    icon: Icons.calendar_today,
-                    title: 'Reporte Diario',
-                    subtitle: 'Ingresos y deudas por día',
+                    icon: Icons.analytics_outlined,
+                    title: 'Reporte de Ventas',
+                    subtitle: 'Diario y Mensual',
                     colorScheme: colorScheme,
                     isSmallScreen: isSmallScreen,
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const ReporteDiarioScreen()),
-                    ),
-                  ),
-                  _ReportCard(
-                    icon: Icons.calendar_month,
-                    title: 'Reporte por Rango / Mensual',
-                    subtitle: 'Ingresos y deudas por rango de fechas',
-                    colorScheme: colorScheme,
-                    isSmallScreen: isSmallScreen,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ReporteRangoScreen()),
+                      MaterialPageRoute(builder: (context) => const ReporteVentasScreen()),
                     ),
                   ),
                 ],

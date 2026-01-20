@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:app_estetica/screens/admin/clients_screen.dart';
-import 'package:app_estetica/screens/admin/reports_screen.dart';
+import 'package:app_estetica/screens/admin/reporte_ventas_screen.dart';
 import 'package:app_estetica/screens/admin/settings_screen.dart';
 import 'package:app_estetica/screens/admin/tickets_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
@@ -45,7 +45,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
     TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
     PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
-    ReportsScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
+    ReporteVentasScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
     EmployeesScreen(key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}')),
     const SettingsScreen(),
   ];

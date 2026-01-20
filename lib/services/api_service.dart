@@ -914,6 +914,49 @@ class ApiService {
     }
   }
 
+  /// Obtiene pagos (transacciones) paginados. Retorna un Map con keys: 'items' (List) y 'meta' (map de pagination)
+  Future<Map<String, dynamic>> getPagosPaginated({String? start, String? end, int? sucursalId, int page = 1, int pageSize = 30}) async {
+    final headers = await _getHeaders();
+    final baseUrl = '$_baseUrl/pagos';
+
+    final List<String> params = [
+      'populate[ticket][populate]=cliente,sucursal',
+      'populate[metodo]=true',
+      'pagination[page]=$page',
+      'pagination[pageSize]=$pageSize',
+    ];
+
+    if (sucursalId != null) {
+      params.add('filters[ticket][sucursal][id][\$eq]=$sucursalId');
+    }
+
+    if (start != null && end != null) {
+      // Filtrar por createdAt entre start y end (formato YYYY-MM-DD)
+      params.add('filters[createdAt][\$gte]=${start}T00:00:00.000Z');
+      params.add('filters[createdAt][\$lte]=${end}T23:59:59.999Z');
+    }
+
+    final endpoint = '$baseUrl?${params.join('&')}';
+    print('ApiService.getPagosPaginated: calling $endpoint');
+
+    try {
+      final response = await _getWithTimeout(Uri.parse(endpoint), headers, seconds: 12);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final raw = data['data'] ?? [];
+        final items = _normalizeItems(List<dynamic>.from(raw));
+        final meta = data['meta'] ?? {};
+        return {'items': items, 'meta': meta};
+      } else {
+        print('getPagosPaginated failed ${response.statusCode}: ${response.body}');
+        throw Exception('Error obteniendo pagos: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Exception getPagosPaginated: $e');
+      throw Exception('Error al obtener pagos: $e');
+    }
+  }
+
   // ------------------------------
   // Funciones de Reportes (cliente-side)
   // ------------------------------
