@@ -15,9 +15,10 @@ class TicketsScreen extends StatefulWidget {
   State<TicketsScreen> createState() => _TicketsScreenState();
 }
 
-class _TicketsScreenState extends State<TicketsScreen> {
+class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProviderStateMixin {
   final ApiService api = ApiService();
   final TextEditingController _searchController = TextEditingController();
+  late TabController _tabController;
   String search = '';
   String? errorMsg;
   bool showAtendidos = false; // false = pendientes, true = atendidos
@@ -29,6 +30,17 @@ class _TicketsScreenState extends State<TicketsScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) {
+      setState(() {
+        showAtendidos = _tabController.index == 1;
+      });
+      _reloadTicketsForCurrentFilters();
+    }
   }
 
   @override
@@ -161,6 +173,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     _sucursalProvider?.removeListener(_onSucursalChanged);
     super.dispose();
@@ -238,36 +251,32 @@ class _TicketsScreenState extends State<TicketsScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Filtro de estado (Pendientes / Atendidos)
-                Row(
-                  children: [
-                    Expanded(
-                      child: SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment<bool>(
-                            value: false,
-                            label: Text('Pendientes'),
-                            icon: Icon(Icons.pending_actions),
-                          ),
-                          ButtonSegment<bool>(
-                            value: true,
-                            label: Text('Atendidos'),
-                            icon: Icon(Icons.check_circle),
-                          ),
-                        ],
-                        selected: {showAtendidos},
-                        onSelectionChanged: (Set<bool> newSelection) async {
-                          setState(() {
-                            showAtendidos = newSelection.first;
-                          });
-                          await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
-                        },
-                        style: const ButtonStyle(
-                          visualDensity: VisualDensity.comfortable,
-                        ),
-                      ),
+                // Pestañas de estado (Pendiente / Atendido) - mismo estilo que reportes
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 50),
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    indicator: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(28),
                     ),
-                  ],
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicatorPadding: const EdgeInsets.all(4),
+                    labelColor: colorScheme.onPrimary,
+                    unselectedLabelColor: colorScheme.onSurfaceVariant,
+                    dividerColor: Colors.transparent,
+                    labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
+                    tabs: const [
+                      Tab(text: 'Pendiente'),
+                      Tab(text: 'Atendido'),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 // Indicador de filtro por fecha y botón para ver histórico
