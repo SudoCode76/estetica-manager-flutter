@@ -877,35 +877,44 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                        color: colorScheme.primary.withValues(alpha: 0.2),
                                      ),
                                    ),
-                                   child: Row(
-                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                     crossAxisAlignment: CrossAxisAlignment.center,
-                                     children: [
-                                       Flexible(
-                                         flex: 2,
-                                         child: Text(
-                                           'Total de tratamientos:',
-                                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                             fontWeight: FontWeight.bold,
+                                   child: LayoutBuilder(builder: (context, box) {
+                                     // Usamos LayoutBuilder para ajustar el ancho del monto.
+                                     return Row(
+                                       children: [
+                                         // Label flexible que puede ocupar varias líneas si es necesario
+                                         Expanded(
+                                           child: Text(
+                                             'Total de tratamientos:',
+                                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                               fontWeight: FontWeight.bold,
+                                             ),
+                                             maxLines: 2,
+                                             overflow: TextOverflow.ellipsis,
                                            ),
-                                           overflow: TextOverflow.ellipsis,
                                          ),
-                                       ),
-                                       const SizedBox(width: 8),
-                                       Flexible(
-                                         flex: 1,
-                                         child: Text(
-                                           'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
-                                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                             color: colorScheme.primary,
-                                             fontWeight: FontWeight.bold,
+                                         const SizedBox(width: 8),
+                                         // Monto con ancho restringido y FittedBox para escalar el texto y evitar cortes
+                                         ConstrainedBox(
+                                           constraints: BoxConstraints(
+                                             minWidth: 80,
+                                             maxWidth: box.maxWidth * 0.45,
                                            ),
-                                           textAlign: TextAlign.right,
-                                           overflow: TextOverflow.ellipsis,
+                                           child: FittedBox(
+                                             fit: BoxFit.scaleDown,
+                                             alignment: Alignment.centerRight,
+                                             child: Text(
+                                               'Bs ${calcularPrecioTotal().toStringAsFixed(2)}',
+                                               style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                 color: colorScheme.primary,
+                                                 fontWeight: FontWeight.bold,
+                                               ),
+                                               textAlign: TextAlign.right,
+                                             ),
+                                           ),
                                          ),
-                                       ),
-                                     ],
-                                   ),
+                                       ],
+                                     );
+                                   }),
                                  ),
                                if (tratamientosSeleccionados.isNotEmpty) const SizedBox(height: 18),
                                // Pago
