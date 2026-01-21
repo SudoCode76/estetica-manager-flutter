@@ -375,72 +375,115 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   }
 
   // UI builders
-  Widget _buildCategoryListItem(Map<String, dynamic> c, ColorScheme cs, TextTheme tt) {
+  Widget _buildCategoryListItem(Map<String, dynamic> c, ColorScheme cs, TextTheme tt, bool isNarrow) {
     final int count = _countTratamientosPorCategoria(c['id']);
     final bool selected = _selectedCategoriaId == c['id'];
     final bool activo = c['estadoCategoria'] == true || c['estadoCategoria'] == null;
-    final double op = activo ? 1.0 : 0.6;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: EdgeInsets.symmetric(horizontal: isNarrow ? 4 : 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: activo ? cs.surface : cs.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: selected ? Border.all(color: cs.primaryContainer, width: 2) : null,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
+        border: selected ? Border.all(color: cs.primary, width: 2) : Border.all(color: cs.outlineVariant.withValues(alpha: 0.3), width: 1),
+        boxShadow: activo ? [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ] : null,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
-        child: Opacity(
-          opacity: op,
-          child: Row(
-            children: [
-              Expanded(child: Text(c['nombreCategoria'] ?? '-', style: tt.bodyLarge)),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      // Edit
-                      Container(
-                        decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
-                        child: IconButton(
-                          icon: Icon(Icons.edit, size: 18, color: cs.onSurfaceVariant),
-                          onPressed: () => _showEditCategoriaDialog(c),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Trash = desactivar OR restore = reactivar
-                      Container(
-                        decoration: BoxDecoration(color: activo ? cs.errorContainer : cs.primaryContainer, shape: BoxShape.circle),
-                        child: IconButton(
-                          icon: Icon(activo ? Icons.delete : Icons.restore, size: 18, color: activo ? cs.onErrorContainer : cs.onPrimaryContainer),
-                          onPressed: () => _toggleCategoriaEstado(c),
-                        ),
-                      ),
-                    ],
+        padding: EdgeInsets.all(isNarrow ? 12.0 : 16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    c['nombreCategoria'] ?? '-',
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: activo ? cs.onSurface : cs.onSurfaceVariant,
+                      fontSize: isNarrow ? 15 : null,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text('$count tratamientos', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                      if (!activo) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
-                          child: Text('Desactivada', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                        ),
-                      ],
-                    ],
+                ),
+                const SizedBox(width: 8),
+                // Botones de acción
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit_outlined, size: 18),
+                      onPressed: () => _showEditCategoriaDialog(c),
+                      style: IconButton.styleFrom(
+                        backgroundColor: cs.primaryContainer.withValues(alpha: 0.5),
+                        foregroundColor: cs.primary,
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      tooltip: 'Editar',
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(activo ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18),
+                      onPressed: () => _toggleCategoriaEstado(c),
+                      style: IconButton.styleFrom(
+                        backgroundColor: activo ? cs.errorContainer.withValues(alpha: 0.5) : cs.primaryContainer.withValues(alpha: 0.5),
+                        foregroundColor: activo ? cs.error : cs.primary,
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      tooltip: activo ? 'Desactivar' : 'Reactivar',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: activo ? cs.secondaryContainer : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-              ),
-            ],
-          ),
+                  child: Text(
+                    '$count tratamiento${count != 1 ? 's' : ''}',
+                    style: tt.bodySmall?.copyWith(
+                      color: activo ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      fontSize: isNarrow ? 11 : null,
+                    ),
+                  ),
+                ),
+                if (!activo)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: cs.errorContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Desactivada',
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.error,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isNarrow ? 11 : null,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -450,64 +493,63 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 480;
-          if (narrow) {
-            return Column(
-              children: [
-                TextField(
-                  controller: _categorySearchCtrl,
-                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar categorías', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
-                      icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () {
-                        setState(() {
-                          _showDisabled = !_showDisabled;
-                          _applyFilters();
-                          _applyCategorySearch(_categorySearchCtrl.text);
-                          _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                        });
-                      },
-                    ),
-                    const Spacer(),
-                    const SizedBox(width: 56),
-                  ],
-                ),
-              ],
-            );
-          }
-          return Row(
+        // Barra de búsqueda y controles mejorada
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 0 : 4.0, vertical: 8.0),
+          child: Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _categorySearchCtrl,
-                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar categorías', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                  ),
+                  child: TextField(
+                    controller: _categorySearchCtrl,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.search, color: cs.onSurfaceVariant, size: isNarrow ? 20 : 24),
+                      hintText: 'Buscar categorías...',
+                      hintStyle: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontSize: isNarrow ? 14 : null,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: isNarrow ? 12 : 14),
+                    ),
+                    style: TextStyle(fontSize: isNarrow ? 14 : null),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
-                icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
-                onPressed: () {
-                  setState(() {
-                    _showDisabled = !_showDisabled;
-                    _applyFilters();
-                    _applyCategorySearch(_categorySearchCtrl.text);
-                    _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                  });
-                },
+              SizedBox(width: isNarrow ? 8 : 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: _showDisabled ? cs.primaryContainer : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    _showDisabled ? Icons.visibility : Icons.visibility_off_outlined,
+                    color: _showDisabled ? cs.primary : cs.onSurfaceVariant,
+                    size: isNarrow ? 20 : 24,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _showDisabled = !_showDisabled;
+                      _applyFilters();
+                      _applyCategorySearch(_categorySearchCtrl.text);
+                      _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                    });
+                  },
+                  padding: EdgeInsets.all(isNarrow ? 8 : 12),
+                  constraints: BoxConstraints(minWidth: isNarrow ? 40 : 48, minHeight: isNarrow ? 40 : 48),
+                  tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
+                ),
               ),
-              const SizedBox(width: 8),
-              // dejamos el botones Añadir solo como espacio (FAB abajo)
-              const SizedBox(width: 56),
             ],
-          );
-        }),
+          ),
+        ),
         const SizedBox(height: 8),
         Expanded(
           child: Card(
@@ -518,153 +560,183 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                     itemCount: _categorias.length,
                     itemBuilder: (context, index) {
                       final c = _categorias[index] as Map<String, dynamic>;
-                      return _buildCategoryListItem(c, cs, tt);
+                      return _buildCategoryListItem(c, cs, tt, isNarrow);
                     },
                   ),
           ),
         ),
-        const SizedBox(height: 12),
-        Center(child: Text('Total de ${_categorias.length} categorías registradas', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))),
-        const SizedBox(height: 60), // espacio para FAB
+        SizedBox(height: isNarrow ? 8 : 12),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Total de ${_categorias.length} categorías registradas',
+              style: tt.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontSize: isNarrow ? 11 : null,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        SizedBox(height: isNarrow ? 72 : 60), // espacio para FAB
       ],
     );
   }
 
-  Widget _buildTratamientoItem(Map<String, dynamic> t, ColorScheme cs, TextTheme tt) {
+  Widget _buildTratamientoItem(Map<String, dynamic> t, ColorScheme cs, TextTheme tt, bool isNarrow) {
     final bool activoTrat = t['estadoTratamiento'] == true || t['estadoTratamiento'] == null;
     final String categoriaNombre = _getCategoriaNombreFromTratamiento(t);
     final String precio = t['precio']?.toString() ?? '-';
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 520;
-
-        final infoSection = Column(
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: isNarrow ? 4 : 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: activoTrat ? cs.surface : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3), width: 1),
+        boxShadow: activoTrat ? [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ] : null,
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isNarrow ? 12.0 : 16.0),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              t['nombreTratamiento'] ?? '-',
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Categoría: $categoriaNombre',
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    maxLines: 1,
+                    t['nombreTratamiento'] ?? '-',
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: activoTrat ? cs.onSurface : cs.onSurfaceVariant,
+                      fontSize: isNarrow ? 15 : null,
+                    ),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text('\$$precio', style: tt.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
+                // Botones de acción
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      onPressed: () => _showEditTratamientoDialog(t),
+                      style: IconButton.styleFrom(
+                        backgroundColor: cs.primaryContainer.withValues(alpha: 0.5),
+                        foregroundColor: cs.primary,
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      tooltip: 'Editar',
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(activoTrat ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18),
+                      onPressed: () => _toggleTratamientoEstado(t),
+                      style: IconButton.styleFrom(
+                        backgroundColor: activoTrat ? cs.errorContainer.withValues(alpha: 0.5) : cs.primaryContainer.withValues(alpha: 0.5),
+                        foregroundColor: activoTrat ? cs.error : cs.primary,
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      tooltip: activoTrat ? 'Desactivar' : 'Reactivar',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                // Badge de categoría
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: activoTrat ? cs.secondaryContainer : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.label_outline,
+                        size: 12,
+                        color: activoTrat ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          categoriaNombre,
+                          style: tt.bodySmall?.copyWith(
+                            color: activoTrat ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            fontSize: isNarrow ? 11 : null,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Badge de precio
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: activoTrat ? cs.tertiaryContainer : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.attach_money,
+                        size: 12,
+                        color: activoTrat ? cs.onTertiaryContainer : cs.onSurfaceVariant,
+                      ),
+                      Text(
+                        precio,
+                        style: tt.bodySmall?.copyWith(
+                          color: activoTrat ? cs.onTertiaryContainer : cs.onSurfaceVariant,
+                          fontWeight: FontWeight.bold,
+                          fontSize: isNarrow ? 11 : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!activoTrat)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: cs.errorContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Desactivado',
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.error,
+                        fontWeight: FontWeight.w600,
+                        fontSize: isNarrow ? 11 : null,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ],
-        );
-
-        final actions = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
-              child: IconButton(
-                constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-                padding: const EdgeInsets.all(6),
-                icon: Icon(Icons.edit, size: 18, color: cs.onSurfaceVariant),
-                onPressed: () => _showEditTratamientoDialog(t),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              decoration: BoxDecoration(color: activoTrat ? cs.errorContainer : cs.primaryContainer, shape: BoxShape.circle),
-              child: IconButton(
-                constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-                padding: const EdgeInsets.all(6),
-                icon: Icon(activoTrat ? Icons.delete : Icons.restore, size: 18, color: activoTrat ? cs.onErrorContainer : cs.onPrimaryContainer),
-                onPressed: () => _toggleTratamientoEstado(t),
-              ),
-            ),
-          ],
-        );
-
-        final statusChip = Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: activoTrat ? cs.primary.withAlpha(25) : cs.error.withAlpha(25),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(activoTrat ? 'Activo' : 'Inactivo', style: tt.bodySmall?.copyWith(color: activoTrat ? cs.primary : cs.error)),
-        );
-
-        final double opTrat = activoTrat ? 1.0 : 0.6;
-
-        return Opacity(
-          opacity: opTrat,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14),
-              child: narrow
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        infoSection,
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            actions,
-                            const SizedBox(width: 12),
-                            statusChip,
-                            if (!activoTrat)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8.0),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
-                                  child: Text('Desactivado', style: tt.bodySmall?.copyWith(color: cs.onSurface)),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(child: infoSection),
-                        const SizedBox(width: 8),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            actions,
-                            const SizedBox(height: 8),
-                            statusChip,
-                            if (!activoTrat)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12)),
-                                  child: Text('Desactivado', style: tt.bodySmall?.copyWith(color: cs.onSurface)),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -672,40 +744,49 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 520;
-          if (narrow) {
-            return Column(
-              children: [
-                TextField(
-                  controller: _treatmentSearchCtrl,
-                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar tratamientos', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int?>(
-                        isExpanded: true,
-                        initialValue: _treatmentCategoryFilter,
-                        decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                        items: [
-                          const DropdownMenuItem<int?>(value: null, child: Text('Todas')),
-                          ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))),
-                        ],
-                        onChanged: (v) {
-                          setState(() {
-                            _treatmentCategoryFilter = v;
-                            _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                          });
-                        },
+        // Barra de búsqueda y controles mejorada
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isNarrow ? 0 : 4.0, vertical: 8.0),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                      ),
+                      child: TextField(
+                        controller: _treatmentSearchCtrl,
+                        decoration: InputDecoration(
+                          prefixIcon: Icon(Icons.search, color: cs.onSurfaceVariant, size: isNarrow ? 20 : 24),
+                          hintText: 'Buscar tratamientos...',
+                          hintStyle: TextStyle(
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                            fontSize: isNarrow ? 14 : null,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: isNarrow ? 12 : 14),
+                        ),
+                        style: TextStyle(fontSize: isNarrow ? 14 : null),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // icono mostrar/ocultar desactivados
-                    IconButton(
-                      tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
-                      icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
+                  ),
+                  SizedBox(width: isNarrow ? 8 : 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _showDisabled ? cs.primaryContainer : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        _showDisabled ? Icons.visibility : Icons.visibility_off_outlined,
+                        color: _showDisabled ? cs.primary : cs.onSurfaceVariant,
+                        size: isNarrow ? 20 : 24,
+                      ),
                       onPressed: () {
                         setState(() {
                           _showDisabled = !_showDisabled;
@@ -714,32 +795,53 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                           _applyTreatmentSearch(_treatmentSearchCtrl.text);
                         });
                       },
+                      padding: EdgeInsets.all(isNarrow ? 8 : 12),
+                      constraints: BoxConstraints(minWidth: isNarrow ? 40 : 48, minHeight: isNarrow ? 40 : 48),
+                      tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
                     ),
-                    const SizedBox(width: 8),
-                    const SizedBox(width: 56),
-                  ],
-                ),
-              ],
-            );
-          }
-          return Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _treatmentSearchCtrl,
-                  decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Buscar tratamientos', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 160,
+              const SizedBox(height: 12),
+              // Filtro de categoría
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                ),
+                padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: 4),
                 child: DropdownButtonFormField<int?>(
-                  isExpanded: true,
                   initialValue: _treatmentCategoryFilter,
-                  decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    prefixIcon: Icon(Icons.filter_list, size: isNarrow ? 20 : 24),
+                    contentPadding: EdgeInsets.symmetric(vertical: isNarrow ? 6 : 8),
+                  ),
+                  hint: Text(
+                    'Filtrar por categoría',
+                    style: TextStyle(fontSize: isNarrow ? 14 : null),
+                  ),
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: isNarrow ? 14 : null,
+                  ),
+                  isExpanded: true,
                   items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('Todas')),
-                    ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(value: c['id'], child: Text(c['nombreCategoria'] ?? '-'))),
+                    DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text(
+                        'Todas las categorías',
+                        style: TextStyle(fontSize: isNarrow ? 14 : null),
+                      ),
+                    ),
+                    ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(
+                      value: c['id'],
+                      child: Text(
+                        c['nombreCategoria'] ?? '-',
+                        style: TextStyle(fontSize: isNarrow ? 14 : null),
+                      ),
+                    )),
                   ],
                   onChanged: (v) {
                     setState(() {
@@ -749,24 +851,9 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                   },
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
-                icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off),
-                onPressed: () {
-                  setState(() {
-                    _showDisabled = !_showDisabled;
-                    _applyFilters();
-                    _applyCategorySearch(_categorySearchCtrl.text);
-                    _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                  });
-                },
-              ),
-              const SizedBox(width: 8),
-              const SizedBox(width: 56),
             ],
-          );
-        }),
+          ),
+        ),
         const SizedBox(height: 8),
         Expanded(
           child: Card(
@@ -775,13 +862,25 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(0, 8, 0, 140), // espacio extra abajo para FAB
                     itemCount: _tratamientos.length,
-                    itemBuilder: (context, index) => _buildTratamientoItem(_tratamientos[index] as Map<String, dynamic>, cs, tt),
+                    itemBuilder: (context, index) => _buildTratamientoItem(_tratamientos[index] as Map<String, dynamic>, cs, tt, isNarrow),
                   ),
           ),
         ),
-        const SizedBox(height: 12),
-        Center(child: Text('Total de ${_tratamientos.length} tratamientos registrados', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant))),
-        const SizedBox(height: 60),
+        SizedBox(height: isNarrow ? 8 : 12),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Total de ${_tratamientos.length} tratamientos registrados',
+              style: tt.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontSize: isNarrow ? 11 : null,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        SizedBox(height: isNarrow ? 72 : 60),
       ],
     );
   }
@@ -795,72 +894,73 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final tabIndex = _tabController.index;
-          if (tabIndex == 0) {
-            await _showCreateCategoriaDialog();
-          } else {
-            await _showCreateTratamientoDialog();
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Añadir'),
-        backgroundColor: cs.primaryContainer,
-        foregroundColor: cs.onPrimaryContainer,
-        elevation: 6,
-      ),
+      floatingActionButton: isNarrow
+        ? FloatingActionButton(
+            onPressed: () async {
+              final tabIndex = _tabController.index;
+              if (tabIndex == 0) {
+                await _showCreateCategoriaDialog();
+              } else {
+                await _showCreateTratamientoDialog();
+              }
+            },
+            child: const Icon(Icons.add),
+            backgroundColor: cs.primary,
+            foregroundColor: cs.onPrimary,
+            elevation: 4,
+          )
+        : FloatingActionButton.extended(
+            onPressed: () async {
+              final tabIndex = _tabController.index;
+              if (tabIndex == 0) {
+                await _showCreateCategoriaDialog();
+              } else {
+                await _showCreateTratamientoDialog();
+              }
+            },
+            icon: const Icon(Icons.add),
+            label: Text(_tabController.index == 0 ? 'Nueva Categoría' : 'Nuevo Tratamiento'),
+            backgroundColor: cs.primary,
+            foregroundColor: cs.onPrimary,
+            elevation: 4,
+          ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refresh,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 16.0),
-            child: Column(
-              children: [
-                // Control segmentado personalizado (pill)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(32)),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      children: List.generate(2, (i) {
-                        final bool selected = i == _tabController.index;
-                        final String label = i == 0 ? 'Categorías' : 'Tratamientos';
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => _tabController.animateTo(i),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: selected ? Theme.of(context).cardColor : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                  child: Center(child: Text(label, style: selected ? tt.bodyMedium?.copyWith(color: cs.primary, fontWeight: FontWeight.w600) : tt.bodyMedium)),
-                                ),
-                                const SizedBox(height: 6),
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  height: 3,
-                                  width: selected ? 28 : 0,
-                                  decoration: BoxDecoration(color: selected ? cs.primary : Colors.transparent, borderRadius: BorderRadius.circular(2)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
+          child: Column(
+            children: [
+              // TabBar con diseño moderno (mismo que Reportes/Tickets)
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: isNarrow ? 16 : 50, vertical: 12),
+                height: isNarrow ? 48 : 56,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(isNarrow ? 24 : 28),
                 ),
-                const SizedBox(height: 8),
-                Expanded(
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(isNarrow ? 24 : 28),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicatorPadding: const EdgeInsets.all(4),
+                  labelColor: cs.onPrimary,
+                  unselectedLabelColor: cs.onSurfaceVariant,
+                  dividerColor: Colors.transparent,
+                  labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: isNarrow ? 14 : 16),
+                  unselectedLabelStyle: TextStyle(fontWeight: FontWeight.normal, fontSize: isNarrow ? 14 : 16),
+                  tabs: const [
+                    Tab(text: 'Categorías'),
+                    Tab(text: 'Tratamientos'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8.0 : 12.0),
                   child: TabBarView(
                     controller: _tabController,
                     children: [
@@ -869,9 +969,9 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                     ],
                   ),
                 ),
-                if (_saving) const LinearProgressIndicator(),
-              ],
-            ),
+              ),
+              if (_saving) const LinearProgressIndicator(),
+            ],
           ),
         ),
       ),
