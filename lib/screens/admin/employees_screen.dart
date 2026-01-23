@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/api_service.dart';
 import '../../providers/sucursal_provider.dart';
 
@@ -18,6 +21,13 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
 
   // Provider de sucursal
   SucursalProvider? _sucursalProvider;
+
+  // Diagnostic fields
+  int? _diagProviderId;
+  int? _diagPrefsId;
+  bool _diagAuthPresent = false;
+  int? _lastFetchedCount;
+  Map<String, dynamic>? _lastFetchedSample;
 
   @override
   void initState() {
@@ -55,22 +65,86 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       _error = null;
     });
 
-    final sucId = _sucursalProvider?.selectedSucursalId;
+    var sucId = _sucursalProvider?.selectedSucursalId;
+    _diagProviderId = sucId;
+    print('EmployeesScreen: provider.selectedSucursalId = $sucId');
+    // Si provider no tiene sucursal, intentar fallback desde SharedPreferences
+    if (sucId == null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final prefId = prefs.getInt('selectedSucursalId');
+        print('EmployeesScreen: prefs.selectedSucursalId = $prefId');
+        _diagPrefsId = prefId;
+        if (prefId != null) {
+          sucId = prefId;
+          // intentar establecer en provider si existe
+          if (_sucursalProvider != null) {
+            _sucursalProvider!.setSucursal(prefId, prefs.getString('selectedSucursalName') ?? '');
+          }
+        }
+      } catch (e) {
+        print('EmployeesScreen: error leyendo prefs fallback: $e');
+      }
+    }
+
+    // Chequear si hay JWT en session o prefs
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      _diagAuthPresent = session?.accessToken?.isNotEmpty ?? false;
+      if (!_diagAuthPresent) {
+        final prefs = await SharedPreferences.getInstance();
+        _diagAuthPresent = (prefs.getString('jwt') ?? '').isNotEmpty;
+      }
+    } catch (_) {
+      _diagAuthPresent = false;
+    }
+
     if (sucId == null) {
       // No hay sucursal seleccionada: limpiar lista y mostrar mensaje
       setState(() {
         _employees = [];
         _loading = false;
-        _error = 'No hay sucursal seleccionada. Selecciona una sucursal en el menú lateral.';
+        _error = null; // mostramos UI con botón para abrir el drawer
       });
       return;
     }
 
     try {
       final users = await _api.getUsuarios(sucursalId: sucId);
+      _lastFetchedCount = users.length;
+      _lastFetchedSample = users.isNotEmpty && users.first is Map ? Map<String, dynamic>.from(users.first) : null;
+      print('EmployeesScreen: fetched users count=${users.length}');
+      // Si no hay resultados para la sucursal, intentar fetch sin filtro para diagnosticar
+      if (users.isEmpty) {
+        try {
+          final all = await _api.getUsuarios();
+          _lastFetchedCount = all.length;
+          _lastFetchedSample = all.first is Map ? Map<String, dynamic>.from(all.first) : null;
+          print('EmployeesScreen: fetched ALL users count=${all.length} (diagnóstico)');
+          if (all.isNotEmpty) {
+            print('EmployeesScreen: ejemplo user[0]=${all.first}');
+            // Avisar en UI que no hay empleados para la sucursal pero sí existen usuarios globales
+            setState(() {
+              _error = 'No se encontraron empleados para la sucursal seleccionada. Hay ${all.length} usuarios en total (revisa sucursal_id de los perfiles).';
+              _employees = [];
+              _loading = false;
+            });
+            return;
+          }
+        } catch (diagErr) {
+          print('EmployeesScreen: diagnostic fetch failed: $diagErr');
+        }
+      }
       setState(() {
-        // Asegurar que solo queden empleados
-        _employees = users.where((u) => u['tipoUsuario'] == 'empleado').map<Map<String, dynamic>>((u) => Map<String, dynamic>.from(u)).toList();
+        // Mostrar usuarios con roles relevantes (administrador, empleado, vendedor, gerente)
+        final allowed = {'administrador', 'admin', 'empleado', 'vendedor', 'gerente'};
+        _employees = users.where((u) {
+          final t = (u['tipoUsuario'] ?? u['tipo_usuario'] ?? '').toString().toLowerCase();
+          // Si tipo vacío, incluir (posible perfil incompleto)
+          if (t.isEmpty) return true;
+          return allowed.contains(t);
+        }).map<Map<String, dynamic>>((u) => Map<String, dynamic>.from(u)).toList();
+        print('EmployeesScreen: filtered usuarios (roles allowed) count=${_employees.length}');
       });
     } catch (e) {
       setState(() => _error = e.toString());
@@ -89,6 +163,60 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }).toList();
   }
 
+  void _showEmployeeDialog(Map<String, dynamic>? employee) {
+    showDialog(
+      context: context,
+      builder: (context) => _EmployeeDialog(
+        employee: employee,
+        onSaved: () {
+          Navigator.pop(context);
+          _loadEmployees();
+        },
+      ),
+    );
+  }
+
+  void _confirmDelete(Map<String, dynamic> employee) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+          const SizedBox(width: 8),
+          Text('Eliminar Empleado', style: theme.textTheme.titleMedium)
+        ]),
+        content: Text('¿Seguro que deseas eliminar a "${employee['username'] ?? employee['email']}"? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteEmployee(employee);
+            },
+            child: const Text('Eliminar'),
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.error, foregroundColor: colorScheme.onError),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteEmployee(Map<String, dynamic> employee) async {
+    try {
+      final id = employee['documentId'] ?? employee['id']?.toString();
+      if (id == null) throw Exception('ID de usuario no disponible');
+      await ApiService().eliminarUsuarioFunction(id.toString());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Empleado eliminado'), backgroundColor: Colors.green));
+      _loadEmployees();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -101,6 +229,11 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         surfaceTintColor: colorScheme.surfaceTint,
         backgroundColor: colorScheme.surface,
         actions: [
+          IconButton(
+            tooltip: 'Diag',
+            icon: const Icon(Icons.bug_report_outlined),
+            onPressed: () => _showDebugDialog(),
+          ),
           if (!_loading)
             IconButton.filledTonal(
               onPressed: _loadEmployees,
@@ -112,6 +245,31 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       ),
       body: Column(
         children: [
+          // Si no hay sucursal seleccionada, mostrar call-to-action en la parte superior
+          if (_sucursalProvider?.selectedSucursalId == null)
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text('No hay sucursal seleccionada. Elige una sucursal en el menú lateral para ver los empleados.', style: theme.textTheme.bodyMedium),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () {
+                      final sk = ScaffoldKeyInherited.of(context);
+                      if (sk != null && sk.currentState != null) {
+                        sk.currentState!.openDrawer();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abre el menú lateral y selecciona una sucursal')));
+                      }
+                    },
+                    icon: const Icon(Icons.location_on),
+                    label: const Text('Seleccionar'),
+                  ),
+                ],
+              ),
+            ),
+
           // Header compacto con contador
           Container(
             margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
@@ -193,9 +351,6 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
               onChanged: (value) => setState(() => _searchQuery = value),
               decoration: InputDecoration(
                 hintText: 'Buscar por nombre o email',
-                hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                ),
                 prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
@@ -314,164 +469,51 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     );
   }
 
-  void _showEmployeeDialog(Map<String, dynamic>? employee) {
-    showDialog(
-      context: context,
-      builder: (context) => _EmployeeDialog(
-        employee: employee,
-        onSaved: () {
-          Navigator.pop(context);
-          _loadEmployees();
-        },
-      ),
-    );
-  }
-
-  void _confirmDelete(Map<String, dynamic> employee) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
+  // Mostrar diálogo de diagnóstico (está en el scope de _EmployeesScreenState)
+  void _showDebugDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.warning_amber_rounded,
-                size: 28,
-                color: colorScheme.error,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: Text('Eliminar Empleado')),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '¿Estás seguro de eliminar este empleado?',
-              style: theme.textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          colorScheme.primaryContainer,
-                          colorScheme.primaryContainer.withValues(alpha: 0.7),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        (employee['username'] ?? 'E').toString()[0].toUpperCase(),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          employee['username'] ?? '',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          employee['email'] ?? '',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Esta acción no se puede deshacer.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.error,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+        title: const Text('Diagnóstico'),
+        content: FutureBuilder<Map<String, dynamic>>(
+          future: _gatherDiagnostics(),
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) return const SizedBox(width: 300, height: 120, child: Center(child: CircularProgressIndicator()));
+            if (snap.hasError) return Text('Error diagnóstico: \\${snap.error}');
+            final data = snap.data ?? {};
+            return SingleChildScrollView(child: SelectableText(JsonEncoder.withIndent('  ').convert(data)));
+          },
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton.icon(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _deleteEmployee(employee);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-              foregroundColor: colorScheme.onError,
-            ),
-            icon: const Icon(Icons.delete_rounded),
-            label: const Text('Eliminar'),
-          ),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
         ],
       ),
     );
   }
 
-  Future<void> _deleteEmployee(Map<String, dynamic> employee) async {
+  // Recolectar datos de diagnóstico (usa el provider desde el BuildContext)
+  Future<Map<String, dynamic>> _gatherDiagnostics() async {
+    final api = ApiService();
+    final provider = SucursalInherited.of(context);
+    final providerSuc = provider?.selectedSucursalId;
+    final prefs = await SharedPreferences.getInstance();
+    final prefSuc = prefs.getInt('selectedSucursalId');
+    final auth = await api.debugAuthCheck();
+    final sucursales = await api.debugGetSucursalesDetailed();
+    List<dynamic> usuarios = [];
     try {
-      await _api.deleteUser(employee['documentId']);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${employee['username']} eliminado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadEmployees();
-      }
+      usuarios = await api.getUsuarios(sucursalId: providerSuc ?? prefSuc);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      usuarios = ['error: $e'];
     }
+    return {
+      'provider_selectedSucursalId': providerSuc,
+      'prefs_selectedSucursalId': prefSuc,
+      'debugAuthCheck': auth,
+      'debugSucursales': sucursales,
+      'usuarios_sample_count_or_error': usuarios is List ? usuarios.length : usuarios,
+      'usuarios_sample_first': usuarios is List && usuarios.isNotEmpty ? usuarios.first : null,
+    };
   }
 }
 
@@ -857,6 +899,9 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
   bool _blocked = false;
   bool _loading = false;
   bool _obscurePassword = true;
+  String _tipoUsuario = 'empleado';
+  String? _currentUserType;
+  bool _canSetRole = false;
 
   @override
   void initState() {
@@ -866,7 +911,19 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
       _emailController.text = widget.employee!['email'] ?? '';
       _confirmed = widget.employee!['confirmed'] ?? true;
       _blocked = widget.employee!['blocked'] ?? false;
+      _tipoUsuario = widget.employee!['tipoUsuario'] ?? 'empleado';
     }
+
+    // Leer userType desde SharedPreferences para permitir que solo administradores cambien el rol
+    SharedPreferences.getInstance().then((prefs) {
+      final ut = prefs.getString('userType') ?? '';
+      setState(() {
+        _currentUserType = ut;
+        _canSetRole = (ut == 'admin' || ut == 'administrador' || ut == 'gerente');
+      });
+    }).catchError((e) {
+      print('Error leyendo userType desde prefs: $e');
+    });
   }
 
   @override
@@ -1009,9 +1066,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                         }
                         return null;
                       },
-                    ),
-
-                  if (!isEdit) const SizedBox(height: 14),
+                    ), // <-- COMMA agregado para separar elementos en la lista de children
 
                   // Switches compactos
                   Container(
@@ -1063,6 +1118,25 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 14),
+
+                  // Selección de tipo de usuario (solo visible para administradores o al editar si ya tiene rol)
+                  if (_canSetRole || widget.employee != null)
+                    DropdownButtonFormField<String>(
+                      value: _tipoUsuario,
+                      decoration: InputDecoration(
+                        labelText: 'Tipo de usuario',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'administrador', child: Text('Administrador')),
+                        DropdownMenuItem(value: 'empleado', child: Text('Empleado')),
+                      ],
+                      onChanged: _canSetRole ? (v) => setState(() => _tipoUsuario = v ?? 'empleado') : null,
+                    ),
 
                   const SizedBox(height: 20),
 
@@ -1123,15 +1197,13 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
           if (mounted) setState(() => _loading = false);
           return;
         }
-        // Crear
-        await api.createUser(
-          username: _usernameController.text,
+        // Crear usando la function de Supabase que definiste
+        await api.crearUsuarioFunction(
           email: _emailController.text,
           password: _passwordController.text,
-          tipoUsuario: 'empleado',
-          confirmed: _confirmed,
-          blocked: _blocked,
+          nombre: _usernameController.text,
           sucursalId: selectedSucursalId,
+          tipoUsuario: _tipoUsuario ?? 'empleado',
         );
       }
 
@@ -1157,5 +1229,5 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
       if (mounted) setState(() => _loading = false);
     }
   }
-}
 
+}
