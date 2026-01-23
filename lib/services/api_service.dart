@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_estetica/config/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
 
@@ -30,8 +32,21 @@ class ApiService {
   }
 
   Future<Map<String, String>> _getHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jwt = prefs.getString('jwt') ?? '';
+    // Primero intentar obtener el token desde el cliente de Supabase (mejor para timing tras login)
+    String jwt = '';
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null && session.accessToken != null) {
+        jwt = session.accessToken!;
+      }
+    } catch (_) {
+      // Supabase no inicializado o no disponible; fallback a SharedPreferences
+    }
+
+    if (jwt.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      jwt = prefs.getString('jwt') ?? '';
+    }
     final headers = {'Content-Type': 'application/json'};
     if (jwt.isNotEmpty) {
       headers['Authorization'] = 'Bearer $jwt';
@@ -562,17 +577,60 @@ class ApiService {
 
   // Obtener todas las sucursales
   Future<List<dynamic>> getSucursales() async {
-    final url = Uri.parse('$_baseUrl/sucursals');
-    final headers = await _getHeaders();
+    // Nota: Intento con Supabase client se omite porque algunas versiones del cliente no exponen `.execute()`
+    // y puede producir errores de compilación. Usamos directamente Supabase REST (anon/jwt) y fallback a Strapi.
+
+    // 1) Intentar Supabase REST (anon key o jwt)
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final jwt = prefs.getString('jwt') ?? '';
+      final supabaseUrl = '${SupabaseConfig.supabaseUrl}/rest/v1/sucursales?select=*';
+      final url = Uri.parse(supabaseUrl);
+      final headers = <String, String>{
+        'apikey': SupabaseConfig.supabaseAnonKey,
+        'Content-Type': 'application/json',
+      };
+      if (jwt.isNotEmpty) headers['Authorization'] = 'Bearer $jwt';
+
+      print('ApiService.getSucursales: intentando Supabase REST -> $url');
+      final response = await _getWithTimeout(url, headers);
+      print('ApiService.getSucursales: Supabase REST status=${response.statusCode}');
+      print('ApiService.getSucursales: Supabase REST body=${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        final normalized = data.map((e) {
+          if (e is Map<String, dynamic>) {
+            return {
+              'id': e['id'],
+              'nombreSucursal': e['nombreSucursal'] ?? e['nombre'] ?? e['nombre_sucursal']
+            };
+          }
+          return e;
+        }).toList();
+        print('ApiService.getSucursales: Supabase REST returned ${normalized.length} items');
+        return normalized;
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        print('ApiService.getSucursales: Acceso denegado desde Supabase REST (verificar RLS/policies)');
+      } else {
+        print('ApiService.getSucursales: Supabase REST responded ${response.statusCode}');
+      }
+    } catch (e) {
+      print('ApiService.getSucursales: Error al intentar desde Supabase REST: $e');
+    }
+
+    // 2) Fallback a Strapi (comportamiento original)
+    try {
+      final url = Uri.parse('$_baseUrl/sucursals');
+      final headers = await _getHeaders();
+      print('ApiService.getSucursales: intentando Strapi -> $url');
       final response = await _getWithTimeout(url, headers);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return _normalizeItems(data['data'] ?? []);
       } else {
-        throw Exception('Error al obtener sucursales');
+        throw Exception('Error al obtener sucursales (Strapi): ${response.statusCode} body: ${response.body}');
       }
-    } catch(e) {
+    } catch (e) {
       throw Exception('Error al obtener sucursales: $e');
     }
   }
@@ -1527,6 +1585,52 @@ class ApiService {
       print('Error en deleteUser: $e');
       rethrow;
     }
+  }
+
+  /// Debug: obtener sucursales con detalle de cada intento (para diagnóstico)
+  Future<Map<String, dynamic>> debugGetSucursalesDetailed() async {
+    final result = <String, dynamic>{
+      'supabase_rest': null,
+      'strapi': null,
+    };
+
+    // Supabase REST
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jwt = prefs.getString('jwt') ?? '';
+      final supabaseUrl = '${SupabaseConfig.supabaseUrl}/rest/v1/sucursales?select=*';
+      final url = Uri.parse(supabaseUrl);
+      final headers = <String, String>{
+        'apikey': SupabaseConfig.supabaseAnonKey,
+        'Content-Type': 'application/json',
+      };
+      if (jwt.isNotEmpty) headers['Authorization'] = 'Bearer $jwt';
+
+      final response = await _getWithTimeout(url, headers, seconds: 10);
+      result['supabase_rest'] = {
+        'status': response.statusCode,
+        'body': response.body,
+        'headers': headers,
+      };
+    } catch (e) {
+      result['supabase_rest'] = {'error': e.toString()};
+    }
+
+    // Strapi fallback
+    try {
+      final url = Uri.parse('$_baseUrl/sucursals');
+      final headers = await _getHeaders();
+      final response = await _getWithTimeout(url, headers, seconds: 10);
+      result['strapi'] = {
+        'status': response.statusCode,
+        'body': response.body,
+        'headers': headers,
+      };
+    } catch (e) {
+      result['strapi'] = {'error': e.toString()};
+    }
+
+    return result;
   }
 }
 

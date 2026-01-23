@@ -231,6 +231,46 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       print('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     } catch (e) {
       print('AdminHomeScreen: Error loading sucursales: $e');
+
+      // Llamar a la función de debug para obtener detalles e informar al usuario
+      try {
+        final debug = await _api.debugGetSucursalesDetailed();
+        print('AdminHomeScreen: debugGetSucursalesDetailed: $debug');
+
+        if (mounted) {
+          showDialog<void>(
+            context: context,
+            builder: (context) {
+              final sup = debug['supabase_rest'];
+              final str = debug['strapi'];
+              String supMsg = sup == null ? 'No hay respuesta' : 'Status: ${sup['status']}\nBody: ${sup['body']}';
+              String strMsg = str == null ? 'No hay respuesta' : (str['status'] != null ? 'Status: ${str['status']}\nBody: ${str['body']}' : 'Error: ${str['error']}');
+
+              return AlertDialog(
+                title: const Text('Error cargando sucursales (diagnóstico)'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Supabase REST:'),
+                      Text(supMsg),
+                      const SizedBox(height: 12),
+                      const Text('Strapi (fallback):'),
+                      Text(strMsg),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+                ],
+              );
+            },
+          );
+        }
+      } catch (debugErr) {
+        print('AdminHomeScreen: Error al ejecutar debugGetSucursalesDetailed: $debugErr');
+      }
+
       // Intentar cargar desde caché local
       final cached = await _loadSucursalesCache();
       if (cached != null && cached.isNotEmpty) {
