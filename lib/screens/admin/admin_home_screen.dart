@@ -10,6 +10,7 @@ import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/services/supabase_auth_service.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -304,19 +305,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             FilledButton(
               onPressed: () async {
                 Navigator.pop(context);
-                // Limpiar sucursal del provider
-                _sucursalProvider?.clearSucursal();
-                // Limpiar SharedPreferences
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('jwt');
-                await prefs.remove('user');
-                await prefs.remove('userType');
-                await prefs.remove('selectedSucursalId');
-                await prefs.remove('selectedSucursalName');
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
+
+                try {
+                  // Cerrar sesión con Supabase (esto limpia SharedPreferences también)
+                  await SupabaseAuthService().signOut();
+
+                  // Limpiar sucursal del provider
+                  _sucursalProvider?.clearSucursal();
+
+                  if (mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  }
+                } catch (e) {
+                  print('Error al cerrar sesión: $e');
+                  // Aún así navegar al login
+                  if (mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  }
+                }
               },
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.error,

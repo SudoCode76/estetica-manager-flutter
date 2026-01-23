@@ -1,8 +1,6 @@
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/services/supabase_auth_service.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:app_estetica/config/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,7 +13,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _apiService = ApiService();
+  final _authService = SupabaseAuthService();
   final _formKey = GlobalKey<FormState>();
   String? _errorMessage;
   bool _isLoading = false;
@@ -60,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     try {
       print('=== Iniciando login con email: ${_emailController.text} ===');
-      final result = await _apiService.login(
+      final result = await _authService.login(
         _emailController.text,
         _passwordController.text,
       );
@@ -72,41 +70,55 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       
       final userType = user['tipoUsuario'];
       print('=== Tipo de usuario: $userType ===');
-      
-      final jwt = result['jwt'];
-      print('=== JWT obtenido: ${jwt != null ? "Sí" : "No"} ===');
 
       // Guardar sesión en SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('jwt', jwt ?? '');
-      await prefs.setString('user', jsonEncode(user));
-      await prefs.setString('userType', userType ?? '');
-      
+      await _authService.saveSessionToPrefs(result);
+
       print('=== Datos guardados en SharedPreferences ===');
 
       if (!mounted) return;
 
-      if (userType == 'administrador') {
+      // Navegar según el tipo de usuario
+      if (userType == 'admin' || userType == 'administrador' || userType == 'gerente') {
         print('=== Navegando a AdminHomeScreen ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
         );
-      } else if (userType == 'empleado') {
+      } else if (userType == 'empleado' || userType == 'vendedor') {
         print('=== Navegando a AdminHomeScreen (modo empleado) ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen(isEmployee: true)),
         );
       } else {
-        print('=== Tipo de usuario desconocido: $userType ===');
-        setState(() {
-          _errorMessage = 'Tipo de usuario desconocido.';
-          _isLoading = false;
-        });
+        print('=== Tipo de usuario desconocido: $userType, usando modo administrador ===');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
+        );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('=== ERROR EN LOGIN: $e ===');
+      print('=== STACK TRACE: $stackTrace ===');
       setState(() {
-        _errorMessage = 'Error al iniciar sesión. Verifique sus credenciales.';
+        if (e.toString().contains('Credenciales inválidas') ||
+            e.toString().contains('Invalid login credentials') ||
+            e.toString().contains('invalid')) {
+          _errorMessage = 'Email o contraseña incorrectos.';
+        } else if (e.toString().contains('NetworkException') ||
+                   e.toString().contains('SocketException') ||
+                   e.toString().contains('Connection')) {
+          _errorMessage = 'Error de conexión. Verifique su internet.';
+        } else if (e.toString().contains('timeout')) {
+          _errorMessage = 'Tiempo de espera agotado. Intente nuevamente.';
+        } else {
+          // Mostrar el error específico para debugging
+          final errorMsg = e.toString();
+          if (errorMsg.length > 100) {
+            _errorMessage = 'Error: ${errorMsg.substring(0, 100)}...';
+          } else {
+            _errorMessage = 'Error: $errorMsg';
+          }
+          print('=== Error específico mostrado al usuario: $_errorMessage ===');
+        }
         _isLoading = false;
       });
     }
