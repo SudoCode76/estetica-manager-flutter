@@ -146,6 +146,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Future<void> _initializeForUserType() async {
     print('AdminHomeScreen: _initializeForUserType started, isEmployee=${widget.isEmployee}');
 
+    // Cargar datos del usuario siempre (necesario tanto para admin como employee)
+    print('AdminHomeScreen: Cargando datos del usuario (común)');
+    await _loadEmployeeData();
+
     if (widget.isEmployee) {
       // Para empleado: primero limpiar cualquier sucursal anterior
       print('AdminHomeScreen: Limpiando sucursal anterior...');
@@ -456,8 +460,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       );
     }
 
-    final username = widget.isEmployee ? (_employeeData?['username'] ?? 'Empleado') : 'Administrador';
-    final rolLabel = widget.isEmployee ? 'Empleado' : 'Administrador';
+    final username = _employeeData != null ? (_employeeData?['username'] ?? (_employeeData?['email'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador'))) : (widget.isEmployee ? 'Empleado' : 'Administrador');
+    final rolLabel = _employeeData != null ? (_employeeData?['tipoUsuario'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador')) : (widget.isEmployee ? 'Empleado' : 'Administrador');
 
     return Scaffold(
       key: _scaffoldKey,
