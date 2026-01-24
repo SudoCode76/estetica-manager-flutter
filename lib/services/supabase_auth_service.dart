@@ -269,9 +269,21 @@ class SupabaseAuthService {
     final prefs = await SharedPreferences.getInstance();
     final user = loginResult['user'];
     final jwt = loginResult['jwt'];
-    
+    final sessionObj = loginResult['session'];
+    String? refreshToken;
+    try {
+      if (sessionObj != null && sessionObj is Map && sessionObj['refresh_token'] != null) {
+        refreshToken = sessionObj['refresh_token'];
+      } else if (loginResult['refreshToken'] != null) {
+        refreshToken = loginResult['refreshToken'];
+      }
+    } catch (_) {}
+
     await prefs.setString('jwt', jwt ?? '');
     await prefs.setString('user', jsonEncode(user));
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await prefs.setString('refreshToken', refreshToken);
+    }
     await prefs.setString('userType', user['tipoUsuario'] ?? '');
     
     // Guardar datos de sucursal si están disponibles
@@ -282,6 +294,25 @@ class SupabaseAuthService {
       await prefs.setString('selectedSucursalName', user['sucursal']['nombreSucursal']);
     }
     
+    // Si el usuario es administrador, guardar su JWT también como adminToken para usar en las Functions.
+    try {
+      if (jwt != null && jwt.toString().isNotEmpty && (user['tipoUsuario']?.toString().toLowerCase() ?? '') == 'administrador') {
+        // Importar ApiService aquí para evitar circularidad en top-level
+        // Nota: este guardado es para facilitar las llamadas a las Edge Functions desde la app.
+        try {
+          // Guardar admin token directamente en SharedPreferences (evita circular import con ApiService)
+          final prefs2 = await SharedPreferences.getInstance();
+          await prefs2.setString('adminToken', jwt.toString());
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            await prefs2.setString('adminRefreshToken', refreshToken);
+          }
+          print('saveSessionToPrefs: admin token saved in prefs because user is administrador');
+        } catch (e) {
+          print('saveSessionToPrefs: could not save admin token in prefs: $e');
+        }
+      }
+    } catch (_) {}
+
     print('=== Sesión guardada en SharedPreferences ===');
   }
 

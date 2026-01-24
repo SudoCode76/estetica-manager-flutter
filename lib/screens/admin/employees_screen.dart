@@ -164,10 +164,35 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   }
 
   void _showEmployeeDialog(Map<String, dynamic>? employee) {
+    // Si es edición, primero obtener perfil actualizado (incluye email)
+    if (employee != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => FutureBuilder<Map<String, dynamic>?>(
+          future: ApiService().getUsuarioById(employee['id']?.toString() ?? employee['documentId']?.toString() ?? ''),
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+            if (snap.hasError) return AlertDialog(title: const Text('Error'), content: Text('No se pudo obtener el perfil: ${snap.error}'), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))]);
+            final full = snap.data ?? employee;
+            return _EmployeeDialog(
+              employee: full,
+              onSaved: () {
+                Navigator.pop(context);
+                _loadEmployees();
+              },
+            );
+          },
+        ),
+      );
+      return;
+    }
+
+    // Crear nuevo
     showDialog(
       context: context,
       builder: (context) => _EmployeeDialog(
-        employee: employee,
+        employee: null,
         onSaved: () {
           Navigator.pop(context);
           _loadEmployees();
@@ -896,7 +921,6 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _confirmed = true;
-  bool _blocked = false;
   bool _loading = false;
   bool _obscurePassword = true;
   String _tipoUsuario = 'empleado';
@@ -910,7 +934,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
       _usernameController.text = widget.employee!['username'] ?? '';
       _emailController.text = widget.employee!['email'] ?? '';
       _confirmed = widget.employee!['confirmed'] ?? true;
-      _blocked = widget.employee!['blocked'] ?? false;
+      // _blocked = widget.employee!['blocked'] ?? false;
       _tipoUsuario = widget.employee!['tipoUsuario'] ?? 'empleado';
     }
 
@@ -1028,6 +1052,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                       fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     ),
                     keyboardType: TextInputType.emailAddress,
+                    enabled: !isEdit, // Solo editable al crear
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Ingrese un email';
@@ -1041,15 +1066,16 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
 
                   const SizedBox(height: 14),
 
-                  // Contraseña (solo para crear)
-                  if (!isEdit)
+                  // Contraseña (OBLIGATORIA para crear, opcional para editar)
+                  if (!isEdit) ...[
+                    // Campo de contraseña para CREAR nuevo usuario
                     TextFormField(
                       controller: _passwordController,
                       decoration: InputDecoration(
                         labelText: 'Contraseña',
                         prefixIcon: const Icon(Icons.lock_rounded),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -1066,7 +1092,66 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                         }
                         return null;
                       },
-                    ), // <-- COMMA agregado para separar elementos en la lista de children
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  // Cambiar contraseña (solo para editar)
+                  if (isEdit) ...[
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Nueva contraseña (opcional)',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      ),
+                      obscureText: _obscurePassword,
+                      onChanged: (v) => setState(() {}), // Rebuild para habilitar botón
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        FilledButton.tonal(
+                          onPressed: _passwordController.text.isEmpty || _loading
+                              ? null
+                              : () async {
+                                  // Llamar a la function para cambiar password
+                                  try {
+                                    setState(() => _loading = true);
+                                    final id = widget.employee!['documentId'] ?? widget.employee!['id']?.toString();
+                                    if (id == null) throw Exception('ID no disponible');
+
+                                    // OBTENER TOKEN FRESCO del SDK
+                                    final session = Supabase.instance.client.auth.currentSession;
+                                    if (session == null || session.isExpired) {
+                                      throw Exception('Sesión expirada. Vuelve a iniciar sesión');
+                                    }
+
+                                    await ApiService().editarPasswordFunction(id.toString(), _passwordController.text);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contraseña actualizada'), backgroundColor: Colors.green));
+                                    // Limpiar campo
+                                    _passwordController.clear();
+                                    setState(() {});
+                                  } catch (e) {
+                                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cambiando contraseña: $e'), backgroundColor: Colors.red));
+                                  } finally {
+                                    if (mounted) setState(() => _loading = false);
+                                  }
+                                },
+                          child: const Text('Cambiar contraseña'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   // Switches compactos
                   Container(
@@ -1098,6 +1183,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         ),
                         Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                        // Reemplazamos el switch de 'bloqueado' por un botón para eliminar el usuario directamente
                         ListTile(
                           leading: Container(
                             padding: const EdgeInsets.all(6),
@@ -1105,13 +1191,39 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                               color: colorScheme.errorContainer,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Icon(Icons.block_rounded, size: 18, color: colorScheme.error),
+                            child: Icon(Icons.delete_outline, size: 18, color: colorScheme.error),
                           ),
-                          title: Text('Cuenta bloqueada', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                          subtitle: Text('No puede acceder', style: theme.textTheme.bodySmall),
-                          trailing: Switch(
-                            value: _blocked,
-                            onChanged: (value) => setState(() => _blocked = value),
+                          title: Text('Eliminar usuario', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                          subtitle: Text('Eliminará la cuenta del sistema (acción irreversible)', style: theme.textTheme.bodySmall),
+                          trailing: FilledButton.tonal(
+                            onPressed: () async {
+                              final id = widget.employee!['documentId'] ?? widget.employee!['id']?.toString();
+                              if (id == null) {
+                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ID de usuario no disponible')));
+                                return;
+                              }
+                              final confirmedDelete = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                                title: const Text('Confirmar eliminación'),
+                                content: Text('¿Seguro que deseas eliminar al usuario "${widget.employee!['username'] ?? widget.employee!['email']}"? Esta acción no se puede deshacer.'),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Eliminar'))],
+                              ));
+                              if (confirmedDelete == true) {
+                                try {
+                                  setState(() => _loading = true);
+                                  await ApiService().eliminarUsuarioFunction(id.toString());
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usuario eliminado'), backgroundColor: Colors.green));
+                                  widget.onSaved();
+                                  Navigator.pop(context);
+                                } catch (e) {
+                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error eliminando usuario: $e'), backgroundColor: Colors.red));
+                                } finally {
+                                  if (mounted) setState(() => _loading = false);
+                                }
+                              }
+                            },
+                            child: const Text('Eliminar'),
+                            style: FilledButton.styleFrom(backgroundColor: colorScheme.errorContainer, foregroundColor: colorScheme.error),
                           ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         ),
@@ -1180,23 +1292,24 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
 
       if (widget.employee != null) {
         // Actualizar
+        final sucId = widget.employee!['sucursal'] is Map ? widget.employee!['sucursal']['id'] : widget.employee!['sucursal_id'];
         await api.updateUser(
           widget.employee!['documentId'],
           username: _usernameController.text,
           email: _emailController.text,
-          confirmed: _confirmed,
-          blocked: _blocked,
+          tipoUsuario: _tipoUsuario,
+          sucursalId: sucId is int ? sucId : (sucId != null ? int.tryParse(sucId.toString()) : null),
         );
       } else {
-        // Obtener sucursal seleccionada desde el provider
-        final provider = SucursalInherited.of(context);
-        final selectedSucursalId = provider?.selectedSucursalId;
-        if (selectedSucursalId == null) {
-          // No permitimos crear empleado sin sucursal asignada
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de crear el empleado'), backgroundColor: Colors.orange));
-          if (mounted) setState(() => _loading = false);
-          return;
-        }
+         // Obtener sucursal seleccionada desde el provider
+         final provider = SucursalInherited.of(context);
+         final selectedSucursalId = provider?.selectedSucursalId;
+         if (selectedSucursalId == null) {
+           // No permitimos crear empleado sin sucursal asignada
+           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de crear el empleado'), backgroundColor: Colors.orange));
+           if (mounted) setState(() => _loading = false);
+           return;
+         }
         // Crear usando la function de Supabase que definiste
         await api.crearUsuarioFunction(
           email: _emailController.text,
@@ -1208,6 +1321,22 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
       }
 
       if (mounted) {
+        // Si estamos editando, intentar también actualizar flag 'confirmed' solamente si el backend la soporta.
+        if (widget.employee != null) {
+          try {
+            final origConfirmed = widget.employee!['confirmed'] ?? true;
+            if (origConfirmed != _confirmed) {
+              try {
+                await api.updateUserWithFlags2(widget.employee!['documentId'], username: null, email: null, confirmed: _confirmed);
+              } catch (e) {
+                final msg = e.toString();
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo actualizar flag confirmed: $msg'), backgroundColor: Colors.orange));
+              }
+            }
+          } catch (_) {}
+
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.employee != null ? 'Empleado actualizado' : 'Empleado creado'),

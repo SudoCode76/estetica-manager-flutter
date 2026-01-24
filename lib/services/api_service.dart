@@ -65,7 +65,32 @@ class ApiService {
         final prefs = await SharedPreferences.getInstance();
         jwt = prefs.getString('jwt') ?? '';
       }
-      if (jwt.isEmpty) throw Exception('No hay token JWT: inicia sesión para realizar esta operación.');
+
+      if (jwt.isEmpty) {
+        // Intentar refrescar la sesión usando el cliente de Supabase (si hay refresh token disponible)
+        try {
+          print('_ensureJwtExists: no jwt found, attempting Supabase.client.auth.refreshSession()');
+          final resp = await Supabase.instance.client.auth.refreshSession();
+          final newSession = resp.session;
+          if (newSession != null && (newSession.accessToken?.isNotEmpty ?? false)) {
+            final prefs = await SharedPreferences.getInstance();
+            final newAccess = newSession.accessToken ?? '';
+            final newRefresh = newSession.refreshToken ?? '';
+            await prefs.setString('jwt', newAccess);
+            if (newRefresh.isNotEmpty) await prefs.setString('refreshToken', newRefresh);
+            print('_ensureJwtExists: session refreshed and saved to prefs (jwt len=${newAccess.length})');
+            return;
+          }
+        } catch (e) {
+          print('_ensureJwtExists: refreshSession failed: $e');
+        }
+
+        // Como último recurso, intentar refrescar admin token si existe refresh token admin
+        final refreshedAdmin = await _tryRefreshAdminToken();
+        if (refreshedAdmin) return;
+
+        throw Exception('No hay token JWT: inicia sesión para realizar esta operación.');
+      }
     } catch (e) {
       rethrow;
     }
@@ -176,76 +201,110 @@ class ApiService {
 
   Future<List<dynamic>> getSucursales() async {
     try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/sucursales?select=*');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 10);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List<dynamic>;
-        // normalize minimal fields
-        return data.map((e) {
-          if (e is Map<String, dynamic>) return {'id': e['id'], 'nombreSucursal': e['nombreSucursal'] ?? e['nombre_sucursal'] ?? e['name']};
-          return e;
-        }).toList();
-      }
-      throw Exception('Error obteniendo sucursales: ${resp.statusCode} ${resp.body}');
+      // Usar el SDK de supabase_flutter
+      final data = await Supabase.instance.client
+          .from('sucursales')
+          .select('*');
+
+      return (data as List<dynamic>).map((e) {
+        if (e is Map<String, dynamic>) {
+          return {
+            'id': e['id'],
+            'nombreSucursal': e['nombreSucursal'] ?? e['nombre_sucursal'] ?? e['name']
+          };
+        }
+        return e;
+      }).toList();
     } catch (e) {
       print('getSucursales error: $e');
       rethrow;
     }
   }
 
-  Future<List<dynamic>> getUsuarios({int? sucursalId, String? query}) async {
+    Future<List<dynamic>> getUsuarios({int? sucursalId, String? query}) async {
     try {
-      final headers = await _getHeaders();
-      final params = <String>[];
-      if (sucursalId != null) params.add('sucursal_id=eq.$sucursalId');
-      if (query != null && query.isNotEmpty) params.add('username=ilike.*${Uri.encodeComponent(query)}*');
-      // Construir query correctamente asegurando select=*
-      String queryString;
-      if (params.isEmpty) queryString = '?select=*';
-      else queryString = '?select=*&' + params.join('&');
-      final endpoint = '${SupabaseConfig.supabaseUrl}/rest/v1/profiles$queryString';
-      final url = Uri.parse(endpoint);
-      print('getUsuarios: GET $endpoint (Authorization present=${headers.containsKey('Authorization')})');
-      final resp = await _getWithTimeout(url, headers, seconds: 10);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List<dynamic>;
-        final normalized = data.map((e) {
-          if (e is Map<String, dynamic>) {
-            return {
-              'id': e['id'],
-              'documentId': e['id']?.toString(),
-              'username': e['username'] ?? e['user_metadata']?['username'] ?? '',
-              'email': e['email'] ?? e['user_metadata']?['email'] ?? '',
-              'tipoUsuario': e['tipo_usuario'] ?? e['tipoUsuario'] ?? 'empleado',
-              'sucursal': e['sucursal_id'] != null ? {'id': e['sucursal_id'], 'nombreSucursal': null} : null,
-              'confirmed': e['confirmed'] ?? true,
-              'blocked': e['blocked'] ?? false,
-              'createdAt': e['created_at'] ?? e['createdAt'],
-            };
-          }
-          return e;
-        }).toList();
+      // Usar el SDK de supabase_flutter para consultar la tabla profiles
+      var queryBuilder = Supabase.instance.client
+          .from('profiles')
+          .select('*, email');
 
-        // Enriquecer con nombres de sucursal si es posible
-        try {
-          final sucList = await getSucursales();
-          final mapSuc = {for (var s in sucList) s['id']: s['nombreSucursal']};
-          for (final u in normalized) {
-            final sid = u['sucursal']?['id'];
-            if (sid != null && mapSuc.containsKey(sid)) u['sucursal'] = {'id': sid, 'nombreSucursal': mapSuc[sid]};
-          }
-        } catch (_) {}
-
-        return normalized;
+      if (sucursalId != null) {
+        queryBuilder = queryBuilder.eq('sucursal_id', sucursalId);
       }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener usuarios');
-      throw Exception('Error al obtener usuarios: ${resp.statusCode} ${resp.body}');
+
+      if (query != null && query.isNotEmpty) {
+        queryBuilder = queryBuilder.ilike('username', '%$query%');
+      }
+
+      print('getUsuarios: fetching profiles for sucursal=$sucursalId');
+      final data = await queryBuilder;
+
+      final normalized = (data as List<dynamic>).map((e) {
+        if (e is Map<String, dynamic>) {
+          return {
+            'id': e['id'],
+            'documentId': e['id']?.toString(),
+            'username': e['username'] ?? e['user_metadata']?['username'] ?? '',
+            'email': e['email'] ?? e['user_metadata']?['email'] ?? '',
+            'tipoUsuario': e['tipo_usuario'] ?? e['tipoUsuario'] ?? 'empleado',
+            'sucursal': e['sucursal_id'] != null ? {'id': e['sucursal_id'], 'nombreSucursal': null} : null,
+            'confirmed': e['confirmed'] ?? true,
+            'blocked': e['blocked'] ?? false,
+            'createdAt': e['created_at'] ?? e['createdAt'],
+          };
+        }
+        return e;
+      }).toList();
+
+      // Enriquecer con nombres de sucursal si es posible
+      try {
+        final sucList = await getSucursales();
+        final mapSuc = {for (var s in sucList) s['id']: s['nombreSucursal']};
+        for (final u in normalized) {
+          final sid = u['sucursal']?['id'];
+          if (sid != null && mapSuc.containsKey(sid)) u['sucursal'] = {'id': sid, 'nombreSucursal': mapSuc[sid]};
+        }
+      } catch (_) {}
+
+      return normalized;
     } catch (e) {
       print('getUsuarios error: $e');
       rethrow;
     }
-  }
+    }
+
+    /// Devuelve un solo usuario (perfil) por id, incluyendo email cuando esté disponible.
+    Future<Map<String, dynamic>?> getUsuarioById(String id) async {
+    try {
+      final headers = await _getHeaders();
+      final endpoint = '${SupabaseConfig.supabaseUrl}/rest/v1/profiles?id=eq.${Uri.encodeComponent(id)}&select=*,email';
+      final url = Uri.parse(endpoint);
+      final resp = await _getWithTimeout(url, headers, seconds: 10);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data is List && data.isNotEmpty) {
+          final e = data.first as Map<String, dynamic>;
+          return {
+            'id': e['id'],
+            'documentId': e['id']?.toString(),
+            'username': e['username'] ?? e['user_metadata']?['username'] ?? '',
+            'email': e['email'] ?? e['user_metadata']?['email'] ?? '',
+            'tipoUsuario': e['tipo_usuario'] ?? e['user_metadata']?['tipo_usuario'] ?? 'empleado',
+            'sucursal': e['sucursal_id'] != null ? {'id': e['sucursal_id'], 'nombreSucursal': null} : null,
+            'confirmed': e['confirmed'] ?? true,
+            'blocked': e['blocked'] ?? false,
+            'createdAt': e['created_at'] ?? e['createdAt'],
+          };
+        }
+        return null;
+      }
+      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener usuario');
+      throw Exception('Error al obtener usuario: ${resp.statusCode} ${resp.body}');
+    } catch (e) {
+      print('getUsuarioById error: $e');
+      rethrow;
+    }
+    }
 
   Future<Map<String, dynamic>> createUser({
     required String username,
@@ -302,28 +361,29 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> updateUser(String documentId, {String? username, String? email, bool? confirmed, bool? blocked}) async {
+  Future<Map<String, dynamic>> updateUser(String documentId,
+      {String? username, String? email, String? tipoUsuario, int? sucursalId, bool? confirmed, bool? blocked}) async {
     try {
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final id = documentId.toString();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/profiles?id=eq.$id');
       final payload = <String, dynamic>{};
       if (username != null) payload['username'] = username;
-      if (email != null) payload['email'] = email;
-      if (confirmed != null) payload['confirmed'] = confirmed;
-      if (blocked != null) payload['blocked'] = blocked;
-      if (payload.isEmpty) throw Exception('No hay campos para actualizar');
-      final resp = await _patchWithTimeout(url, headers, jsonEncode(payload), seconds: 10);
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        if (resp.body.trim().isEmpty) return payload;
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-        return payload;
+      // NO actualizar email aquí - ese campo no existe en profiles, solo viene de auth.users
+      if (tipoUsuario != null) payload['tipo_usuario'] = tipoUsuario;
+      if (sucursalId != null) payload['sucursal_id'] = sucursalId;
+
+      if (payload.isEmpty) {
+        throw Exception('No hay campos válidos para actualizar en profiles');
       }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al actualizar perfil');
-      throw Exception('Error al actualizar perfil: ${resp.statusCode} ${resp.body}');
+
+      // Usar el SDK de supabase_flutter
+      final data = await Supabase.instance.client
+          .from('profiles')
+          .update(payload)
+          .eq('id', documentId)
+          .select()
+          .single();
+
+      print('updateUser: updated profile for id=$documentId');
+      return Map<String, dynamic>.from(data);
     } catch (e) {
       print('updateUser error: $e');
       rethrow;
@@ -851,23 +911,106 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> callFunction(String functionName, Map<String, dynamic> body, {int seconds = 12}) async {
+  Future<Map<String, dynamic>> callFunction(String functionName, Map<String, dynamic> body, {int seconds = 12, bool preferFunctionsToken = false}) async {
+    final url = Uri.parse('${SupabaseConfig.supabaseUrl}/functions/v1/$functionName');
     try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/functions/v1/$functionName');
-      final headers = await _getHeaders();
-      // Asegurar Content-Type
-      headers['Content-Type'] = 'application/json';
+      // Preparar headers: usar Anon Key en Authorization (como en Postman) y Content-Type
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'apikey': SupabaseConfig.supabaseAnonKey,
+        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+      };
+
+      // Si el caller pidió explícitamente preferFunctionsToken y hay uno configurado, usarlo.
+      if (preferFunctionsToken) {
+        final runtimeToken = await _getRuntimeFunctionsAuthToken();
+        if (runtimeToken.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $runtimeToken';
+          print('callFunction: using functionsAuthToken (runtime) for Authorization header (len=${runtimeToken.length})');
+        } else {
+          print('callFunction: preferFunctionsToken requested but no functionsAuthToken found at compile-time or runtime');
+        }
+      }
+
+      // Log básico (no imprimir tokens completos)
+      try {
+        if (body.containsKey('token_admin')) {
+          final t = body['token_admin']?.toString() ?? '';
+          final mask = t.isEmpty ? '<empty>' : '${t.substring(0, 8)}... (len=${t.length})';
+          print('callFunction: body.token_admin=$mask');
+        }
+      } catch (_) {}
+
       final resp = await _postWithTimeout(url, headers, jsonEncode(body), seconds: seconds);
       print('ApiService.callFunction $functionName -> status=${resp.statusCode} body=${resp.body}');
+
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         if (resp.body.trim().isEmpty) return {};
         final parsed = jsonDecode(resp.body);
         if (parsed is Map<String, dynamic>) return parsed;
         return {'result': parsed};
       }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado llamando function $functionName');
-      throw Exception('Error al llamar function $functionName: ${resp.statusCode} ${resp.body}');
+
+      // Errores comunes
+      if (resp.statusCode == 401 || resp.statusCode == 403) {
+        final bodyText = resp.body;
+        if (bodyText.contains('Invalid JWT')) {
+          // Intentar reintentar con functionsAuthToken en header si está disponible y aún no se usó
+          if (SupabaseConfig.functionsAuthToken.isNotEmpty && !(preferFunctionsToken)) {
+            try {
+              print('callFunction: Invalid JWT detected. Retrying with functionsAuthToken in Authorization header...');
+              final altHeaders = Map<String, String>.from(headers);
+              altHeaders['Authorization'] = 'Bearer ${SupabaseConfig.functionsAuthToken}';
+              final retryResp = await _postWithTimeout(url, altHeaders, jsonEncode(body), seconds: seconds);
+              print('callFunction retry with functionsAuthToken -> status=${retryResp.statusCode} body=${retryResp.body}');
+              if (retryResp.statusCode == 200 || retryResp.statusCode == 201) {
+                if (retryResp.body.trim().isEmpty) return {};
+                final parsed = jsonDecode(retryResp.body);
+                if (parsed is Map<String, dynamic>) return parsed;
+                return {'result': parsed};
+              }
+            } catch (e) {
+              print('callFunction retry with functionsAuthToken failed: $e');
+            }
+          }
+
+          // Intentar refrescar admin token si tenemos refresh token guardado y reintentar una vez (mantener compatibilidad con body token_admin)
+          print('callFunction: detected Invalid JWT for function $functionName. Attempting to refresh admin token...');
+          final refreshed = await _tryRefreshAdminToken();
+          if (refreshed) {
+            final prefs = await SharedPreferences.getInstance();
+            final newAdmin = prefs.getString('adminToken') ?? '';
+            if (newAdmin.isNotEmpty) {
+              try {
+                final retryBody = Map<String, dynamic>.from(body);
+                retryBody['token_admin'] = newAdmin;
+                final retryResp = await _postWithTimeout(url, headers, jsonEncode(retryBody), seconds: seconds);
+                print('callFunction retry after refresh -> status=${retryResp.statusCode} body=${retryResp.body}');
+                if (retryResp.statusCode == 200 || retryResp.statusCode == 201) {
+                  if (retryResp.body.trim().isEmpty) return {};
+                  final parsed = jsonDecode(retryResp.body);
+                  if (parsed is Map<String, dynamic>) return parsed;
+                  return {'result': parsed};
+                }
+              } catch (e) {
+                print('callFunction retry after refresh failed: $e');
+              }
+            }
+          }
+          throw Exception('No autorizado llamando function $functionName (status: ${resp.statusCode}, body: ${resp.body}). La Edge Function devolvió Invalid JWT. Asegúrate de enviar token_admin correcto en el body o configura SUPABASE_FUNCTIONS_AUTH_TOKEN.');
+        }
+        throw Exception('No autorizado llamando function $functionName (status: ${resp.statusCode}, body: ${resp.body}).');
+      }
+
+      throw Exception('Error llamando function $functionName: ${resp.statusCode} ${resp.body}');
     } catch (e) {
+      // Distinción para errores de red (web CORS, fetch fail)
+      final msg = e.toString();
+      if (msg.contains('Failed to fetch') || msg.contains('Network request failed') || msg.contains('XMLHttpRequest') || msg.contains('CORS')) {
+        final more = 'Error llamando function "${functionName}": "Failed to fetch" — probable error de CORS/preflight cuando la app corre en web. Asegúrate de que la Edge Function devuelva las cabeceras CORS y responda a OPTIONS.';
+        print('callFunction error for $functionName (likely CORS): $e');
+        throw Exception(more);
+      }
       print('callFunction error for $functionName: $e');
       rethrow;
     }
@@ -882,16 +1025,15 @@ class ApiService {
     required String tipoUsuario,
   }) async {
     try {
-      // Intentar obtener JWT del session o prefs y añadirlo en el body como token_admin para compatibilidad
-      String jwt = '';
-      try {
-        final session = Supabase.instance.client.auth.currentSession;
-        jwt = session?.accessToken ?? '';
-      } catch (_) {}
-      if (jwt.isEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        jwt = prefs.getString('jwt') ?? '';
+      // OBTENER TOKEN FRESCO del SDK justo antes de la llamada
+      final session = Supabase.instance.client.auth.currentSession;
+
+      // Validación de seguridad por si la sesión murió
+      if (session == null || session.isExpired) {
+        throw Exception('La sesión ha caducado. Vuelve a iniciar sesión');
       }
+
+      final String tokenFrescoAdmin = session.accessToken;
 
       final body = {
         'email': email,
@@ -899,10 +1041,29 @@ class ApiService {
         'nombre': nombre,
         'sucursal_id': sucursalId,
         'tipo_usuario': tipoUsuario,
-        'token_admin': jwt,
+        'token_admin': tokenFrescoAdmin, // Token fresco del SDK
       };
-      final res = await callFunction('crear-usuario', body);
-      return res;
+
+      try {
+        final mask = tokenFrescoAdmin.isEmpty ? '<empty>' : '${tokenFrescoAdmin.substring(0, 8)}... (len=${tokenFrescoAdmin.length})';
+        print('crearUsuarioFunction: calling crear-usuario with FRESH token_admin=$mask and email=$email');
+      } catch (_) {}
+
+      // Usar el SDK de supabase_flutter en vez de http manual
+      final response = await Supabase.instance.client.functions.invoke(
+        'crear-usuario',
+        body: body,
+      );
+
+      print('crearUsuarioFunction: status=${response.status} data=${response.data}');
+
+      if (response.status == 200 || response.status == 201) {
+        if (response.data == null) return {};
+        if (response.data is Map<String, dynamic>) return response.data as Map<String, dynamic>;
+        return {'result': response.data};
+      }
+
+      throw Exception('Error creando usuario: status=${response.status} data=${response.data}');
     } catch (e) {
       print('crearUsuarioFunction error: $e');
       rethrow;
@@ -912,21 +1073,42 @@ class ApiService {
   /// Wrapper: Eliminar usuario usando la Supabase Function 'eliminar-usuario'
   Future<Map<String, dynamic>> eliminarUsuarioFunction(String idUsuario) async {
     try {
-      String jwt = '';
-      try {
-        final session = Supabase.instance.client.auth.currentSession;
-        jwt = session?.accessToken ?? '';
-      } catch (_) {}
-      if (jwt.isEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        jwt = prefs.getString('jwt') ?? '';
+      // OBTENER TOKEN FRESCO del SDK justo antes de la llamada
+      final session = Supabase.instance.client.auth.currentSession;
+
+      // Validación de seguridad por si la sesión murió
+      if (session == null || session.isExpired) {
+        throw Exception('La sesión ha caducado. Vuelve a iniciar sesión');
       }
+
+      final String tokenFrescoAdmin = session.accessToken;
+
       final body = {
         'id_a_borrar': idUsuario,
-        'token_admin': jwt,
+        'token_admin': tokenFrescoAdmin, // Token fresco del SDK
       };
-      final res = await callFunction('eliminar-usuario', body);
-      return res;
+
+      // Log masking token_admin for diagnostics (do not print full token)
+      try {
+        final mask = tokenFrescoAdmin.isEmpty ? '<empty>' : '${tokenFrescoAdmin.substring(0, 8)}... (len=${tokenFrescoAdmin.length})';
+        print('eliminarUsuarioFunction: calling eliminar-usuario with FRESH token_admin=$mask and id=$idUsuario');
+      } catch (_) {}
+
+      // Usar el SDK de supabase_flutter en vez de http manual
+      final response = await Supabase.instance.client.functions.invoke(
+        'eliminar-usuario',
+        body: body,
+      );
+
+      print('eliminarUsuarioFunction: status=${response.status} data=${response.data}');
+
+      if (response.status == 200 || response.status == 201) {
+        if (response.data == null) return {};
+        if (response.data is Map<String, dynamic>) return response.data as Map<String, dynamic>;
+        return {'result': response.data};
+      }
+
+      throw Exception('Error eliminando usuario: status=${response.status} data=${response.data}');
     } catch (e) {
       print('eliminarUsuarioFunction error: $e');
       rethrow;
@@ -936,25 +1118,180 @@ class ApiService {
   /// Wrapper: Editar password usando la Supabase Function 'editar-password'
   Future<Map<String, dynamic>> editarPasswordFunction(String idUsuario, String nuevaPassword) async {
     try {
-      String jwt = '';
-      try {
-        final session = Supabase.instance.client.auth.currentSession;
-        jwt = session?.accessToken ?? '';
-      } catch (_) {}
-      if (jwt.isEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        jwt = prefs.getString('jwt') ?? '';
+      // OBTENER TOKEN FRESCO del SDK justo antes de la llamada
+      final session = Supabase.instance.client.auth.currentSession;
+
+      // Validación de seguridad por si la sesión murió
+      if (session == null || session.isExpired) {
+        throw Exception('La sesión ha caducado. Vuelve a iniciar sesión');
       }
+
+      final String tokenFrescoAdmin = session.accessToken;
+
       final body = {
         'id_usuario': idUsuario,
         'nueva_password': nuevaPassword,
-        'token_admin': jwt,
+        'token_admin': tokenFrescoAdmin, // Token fresco del SDK
       };
-      final res = await callFunction('editar-password', body);
-      return res;
+
+      try {
+        final mask = tokenFrescoAdmin.isEmpty ? '<empty>' : '${tokenFrescoAdmin.substring(0, 8)}... (len=${tokenFrescoAdmin.length})';
+        print('editarPasswordFunction: calling editar-password with FRESH token_admin=$mask and id=$idUsuario');
+      } catch (_) {}
+
+      // Usar el SDK de supabase_flutter en vez de http manual
+      final response = await Supabase.instance.client.functions.invoke(
+        'editar-password',
+        body: body,
+      );
+
+      print('editarPasswordFunction: status=${response.status} data=${response.data}');
+
+      if (response.status == 200 || response.status == 201) {
+        if (response.data == null) return {};
+        if (response.data is Map<String, dynamic>) return response.data as Map<String, dynamic>;
+        return {'result': response.data};
+      }
+
+      throw Exception('Error editando password: status=${response.status} data=${response.data}');
     } catch (e) {
       print('editarPasswordFunction error: $e');
       rethrow;
+    }
+  }
+
+  Future<bool> deleteCategoria(dynamic documentId) async {
+    try {
+      await _ensureJwtExists();
+      final id = documentId.toString();
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/categoriaTratamiento?id=eq.$id');
+      final headers = await _getHeaders();
+      final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
+      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al eliminar categoría');
+      return false;
+    } catch (e) {
+      print('deleteCategoria error: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteTratamiento(dynamic documentId) async {
+    try {
+      await _ensureJwtExists();
+      final id = documentId.toString();
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento?id=eq.$id');
+      final headers = await _getHeaders();
+      final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
+      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al eliminar tratamiento');
+      return false;
+    } catch (e) {
+      print('deleteTratamiento error: $e');
+      rethrow;
+    }
+  }
+
+  /// Guarda el admin token en SharedPreferences para reintentos en Edge Functions.
+  Future<void> saveAdminToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('adminToken', token);
+      // también actualizamos jwt por compatibilidad
+      if (token.isNotEmpty) await prefs.setString('jwt', token);
+      print('saveAdminToken: adminToken saved (len=${token.length})');
+    } catch (e) {
+      print('saveAdminToken error: $e');
+    }
+  }
+
+
+  /// Decide qué token usar como token_admin cuando llamamos a las Edge Functions.
+  /// Prioridad:
+  /// 1) SupabaseConfig.functionsAuthToken (si está configurado en código)
+  /// 2) adminToken guardado en SharedPreferences
+  /// 3) jwt de sesión actual de Supabase
+  Future<String> _chooseTokenAdmin() async {
+    try {
+      if (SupabaseConfig.functionsAuthToken.isNotEmpty) return SupabaseConfig.functionsAuthToken;
+      final prefs = await SharedPreferences.getInstance();
+      final storedAdmin = prefs.getString('adminToken') ?? '';
+      if (storedAdmin.isNotEmpty) return storedAdmin;
+      // fallback a jwt en prefs o sesión
+      try {
+        final session = Supabase.instance.client.auth.currentSession;
+        final jwt = session?.accessToken;
+        if (jwt != null && jwt.isNotEmpty) return jwt;
+      } catch (_) {}
+      final jwtPrefs = prefs.getString('jwt') ?? '';
+      return jwtPrefs;
+    } catch (e) {
+      print('_chooseTokenAdmin error: $e');
+      return '';
+    }
+  }
+
+  /// Intenta refrescar el admin token usando el refresh token guardado en SharedPreferences.
+  /// Retorna true si se obtuvo y guardó un adminToken nuevo.
+  Future<bool> _tryRefreshAdminToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final refresh = prefs.getString('adminRefreshToken') ?? prefs.getString('refreshToken') ?? '';
+      if (refresh.isEmpty) {
+        print('_tryRefreshAdminToken: no refresh token found in prefs');
+        return false;
+      }
+
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/auth/v1/token?grant_type=refresh_token');
+      final headers = <String, String>{
+        'apikey': SupabaseConfig.supabaseAnonKey,
+        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      };
+      final body = 'refresh_token=${Uri.encodeComponent(refresh)}';
+      final resp = await _postWithTimeout(url, headers, body, seconds: 8);
+      print('_tryRefreshAdminToken -> status=${resp.statusCode} body=${resp.body}');
+      if (resp.statusCode == 200) {
+        final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
+        final newAccess = parsed['access_token']?.toString() ?? '';
+        final newRefresh = parsed['refresh_token']?.toString() ?? '';
+        if (newAccess.isNotEmpty) {
+          await prefs.setString('adminToken', newAccess);
+          await prefs.setString('jwt', newAccess);
+          if (newRefresh.isNotEmpty) await prefs.setString('adminRefreshToken', newRefresh);
+          print('_tryRefreshAdminToken: refreshed adminToken saved (len=${newAccess.length})');
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      print('_tryRefreshAdminToken error: $e');
+      return false;
+    }
+  }
+
+  /// Lee el token de funciones óptimo: primero la constante compile-time, luego SharedPreferences.
+  Future<String> _getRuntimeFunctionsAuthToken() async {
+    try {
+      if (SupabaseConfig.functionsAuthToken.isNotEmpty) return SupabaseConfig.functionsAuthToken;
+      final prefs = await SharedPreferences.getInstance();
+      final t = prefs.getString('functionsAuthToken') ?? '';
+      return t;
+    } catch (e) {
+      print('_getRuntimeFunctionsAuthToken error: $e');
+      return '';
+    }
+  }
+
+  /// Guarda temporalmente el token de funciones en SharedPreferences (solo para desarrollo/depuración).
+  /// No recomendado para producción.
+  Future<void> saveFunctionsAuthToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('functionsAuthToken', token);
+      print('saveFunctionsAuthToken: token saved (len=${token.length})');
+    } catch (e) {
+      print('saveFunctionsAuthToken error: $e');
     }
   }
 }
