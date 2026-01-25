@@ -13,15 +13,29 @@ class SesionesScreen extends StatefulWidget {
   State<SesionesScreen> createState() => _SesionesScreenState();
 }
 
-class _SesionesScreenState extends State<SesionesScreen> {
+class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProviderStateMixin {
   DateTime _selectedDate = DateTime.now();
   SucursalProvider? _sucursalProvider;
   bool _localeInitialized = false;
+  late TabController _tabController;
+  String _filtroEstado = 'agendada'; // 'agendada' o 'realizada'
+  bool _isFirstLoad = true; // Bandera para controlar primera carga
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _initializeLocale();
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) {
+      setState(() {
+        _filtroEstado = _tabController.index == 0 ? 'agendada' : 'realizada';
+      });
+      _loadAgenda();
+    }
   }
 
   Future<void> _initializeLocale() async {
@@ -46,18 +60,29 @@ class _SesionesScreenState extends State<SesionesScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final provider = SucursalInherited.of(context);
-    if (provider != _sucursalProvider) {
+    final providerChanged = provider != _sucursalProvider;
+
+    if (providerChanged) {
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
-      if (_localeInitialized) {
-        _loadAgenda();
-      }
+    }
+
+    // Cargar agenda en primera vez o cuando cambia el provider
+    if ((_isFirstLoad || providerChanged) && _localeInitialized) {
+      _isFirstLoad = false;
+      // Usar addPostFrameCallback para evitar llamar durante el build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadAgenda();
+        }
+      });
     }
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _sucursalProvider?.removeListener(_onSucursalChanged);
     super.dispose();
   }
@@ -80,11 +105,12 @@ class _SesionesScreenState extends State<SesionesScreen> {
       return;
     }
 
-    print('SesionesScreen: Loading agenda for date=${_selectedDate.toString()} and sucursal=$sucursalId');
+    print('SesionesScreen: Loading agenda for date=${_selectedDate.toString()} and sucursal=$sucursalId, estado=$_filtroEstado');
 
     await context.read<TicketProvider>().fetchAgenda(
       _selectedDate,
       sucursalId: sucursalId,
+      estadoSesion: _filtroEstado, // Pasar estado para filtrar en la query
     );
   }
 
@@ -199,6 +225,31 @@ class _SesionesScreenState extends State<SesionesScreen> {
             ),
           ),
 
+          // Tabs para filtrar por estado
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: colorScheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              labelColor: colorScheme.onPrimary,
+              unselectedLabelColor: colorScheme.onSurfaceVariant,
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              tabs: const [
+                Tab(text: 'Agendadas'),
+                Tab(text: 'Realizadas'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
           // Lista de sesiones
           Expanded(
             child: Consumer<TicketProvider>(
@@ -249,13 +300,15 @@ class _SesionesScreenState extends State<SesionesScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.event_busy,
+                          _filtroEstado == 'agendada' ? Icons.event_note : Icons.check_circle_outline,
                           size: 72,
                           color: colorScheme.outlineVariant,
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          'No hay sesiones programadas',
+                          _filtroEstado == 'agendada'
+                              ? 'No hay sesiones agendadas'
+                              : 'No hay sesiones realizadas',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
@@ -263,7 +316,7 @@ class _SesionesScreenState extends State<SesionesScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'No hay citas agendadas para esta fecha',
+                          'No hay citas para esta fecha',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                           ),

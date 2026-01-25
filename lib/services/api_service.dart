@@ -1216,8 +1216,15 @@ class ApiService {
 
   // ------------------ NUEVA ARQUITECTURA DE TICKETS/SESIONES/PAGOS ------------------
 
+  /// Helper para obtener inicio y fin del día
+  (String, String) _getRangoDia(DateTime fecha) {
+    final start = DateTime(fecha.year, fecha.month, fecha.day).toIso8601String();
+    final end = DateTime(fecha.year, fecha.month, fecha.day, 23, 59, 59).toIso8601String();
+    return (start, end);
+  }
+
   /// 1. Obtener agenda diaria (vista de sesiones programadas)
-  Future<List<dynamic>> obtenerAgenda(DateTime fecha, {int? sucursalId}) async {
+  Future<List<dynamic>> obtenerAgenda(DateTime fecha, {int? sucursalId, String? estadoSesion}) async {
     try {
       // Si no hay sucursal seleccionada, retornar lista vacía
       if (sucursalId == null) {
@@ -1225,24 +1232,57 @@ class ApiService {
         return [];
       }
 
-      final start = DateTime(fecha.year, fecha.month, fecha.day).toIso8601String();
-      final end = DateTime(fecha.year, fecha.month, fecha.day, 23, 59, 59).toIso8601String();
+      final (inicioDia, finDia) = _getRangoDia(fecha);
 
       // Construir query con filtros
       var query = Supabase.instance.client
           .from('vista_agenda_diaria')
           .select()
-          .eq('sucursal_id', sucursalId)  // Filtro por sucursal
-          .gte('fecha_hora_inicio', start)
-          .lte('fecha_hora_inicio', end);
+          .eq('sucursal_id', sucursalId)
+          .gte('fecha_hora_inicio', inicioDia)
+          .lte('fecha_hora_inicio', finDia);
+
+      // Filtrar por estado si se especifica
+      if (estadoSesion != null) {
+        query = query.eq('estado_sesion', estadoSesion);
+      }
 
       // Aplicar orden y ejecutar
       final response = await query.order('fecha_hora_inicio', ascending: true);
 
-      print('obtenerAgenda: fetched ${(response as List).length} sesiones for sucursal $sucursalId');
+      print('obtenerAgenda: fetched ${(response as List).length} sesiones for sucursal $sucursalId, estado=$estadoSesion');
       return response as List<dynamic>;
     } catch (e) {
       print('obtenerAgenda error: $e');
+      rethrow;
+    }
+  }
+
+  /// 1B. Obtener tickets del día actual (para pantalla de tickets)
+  Future<List<dynamic>> getTicketsDelDia({
+    required DateTime fecha,
+    required int sucursalId,
+  }) async {
+    try {
+      final (inicioDia, finDia) = _getRangoDia(fecha);
+
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
+            *, 
+            cliente:cliente_id(nombrecliente, apellidocliente),
+            sesiones:sesion(
+              tratamiento:tratamiento_id(nombretratamiento)
+            )
+          ''')
+          .eq('sucursal_id', sucursalId)
+          .gte('created_at', inicioDia)
+          .lte('created_at', finDia)
+          .order('created_at', ascending: false);
+
+      return response as List<dynamic>;
+    } catch (e) {
+      print('getTicketsDelDia error: $e');
       rethrow;
     }
   }
@@ -1394,16 +1434,14 @@ class ApiService {
     }
   }
 
-  /// 6. Marcar sesión como atendida
+  /// 6. Marcar sesión como atendida/realizada
   Future<bool> marcarSesionAtendida(String sesionId) async {
     try {
-      await _ensureJwtExists();
-
       await Supabase.instance.client
           .from('sesion')
           .update({
-            'atendida': true,
-            'fecha_atencion': DateTime.now().toIso8601String(),
+            'estado_sesion': 'realizada',
+            //'fecha_atencion': DateTime.now().toIso8601String(),
           })
           .eq('id', sesionId);
 

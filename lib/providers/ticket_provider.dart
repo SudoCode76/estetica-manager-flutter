@@ -65,30 +65,21 @@ class TicketProvider extends ChangeNotifier {
         return _tickets;
       }
 
-      print('TicketProvider: Fetching tickets/agenda for sucursalId=$sucursalId, estadoTicket=$estadoTicket');
+      print('TicketProvider: Fetching tickets del día for sucursalId=$sucursalId');
 
-      // Usar la nueva arquitectura: obtener agenda del día (sesiones programadas)
-      // Si estadoTicket es true (atendidos), mostrar sesiones atendidas
-      // Si estadoTicket es false/null (pendientes), mostrar sesiones pendientes
-      final data = await _api.obtenerAgenda(DateTime.now(), sucursalId: sucursalId);
+      // Usar getTicketsDelDia para obtener tickets creados hoy
+      final data = await _api.getTicketsDelDia(
+        fecha: DateTime.now(),
+        sucursalId: sucursalId,
+      );
 
-      // Filtrar según estado si se especificó
-      List<dynamic> filteredData = data;
-      if (estadoTicket != null) {
-        // estadoTicket true = atendidos, false = pendientes
-        filteredData = data.where((sesion) {
-          final atendida = sesion['atendida'] ?? false;
-          return estadoTicket ? atendida == true : atendida == false;
-        }).toList();
-      }
-
-      _tickets = filteredData;
+      _tickets = data;
       _error = null;
-      print('TicketProvider: Fetched ${_tickets.length} tickets/sesiones');
+      print('TicketProvider: Fetched ${_tickets.length} tickets del día');
       return _tickets;
     } catch (e) {
       _error = e.toString();
-      print('TicketProvider: Error fetching tickets/agenda: $e');
+      print('TicketProvider: Error fetching tickets: $e');
       return _tickets;
     } finally {
       _isLoading = false;
@@ -132,7 +123,7 @@ class TicketProvider extends ChangeNotifier {
   // ------------------ NUEVA ARQUITECTURA ------------------
 
   /// Obtener agenda diaria (sesiones programadas para una fecha)
-  Future<List<dynamic>> fetchAgenda(DateTime fecha, {int? sucursalId}) async {
+  Future<List<dynamic>> fetchAgenda(DateTime fecha, {int? sucursalId, String? estadoSesion}) async {
     _lastFechaAgenda = fecha;
     _isLoadingAgenda = true;
     _error = null;
@@ -147,8 +138,8 @@ class TicketProvider extends ChangeNotifier {
         return _agenda;
       }
 
-      print('TicketProvider: Fetching agenda for fecha=$fecha, sucursalId=$sucursalId');
-      final data = await _api.obtenerAgenda(fecha, sucursalId: sucursalId);
+      print('TicketProvider: Fetching agenda for fecha=$fecha, sucursalId=$sucursalId, estado=$estadoSesion');
+      final data = await _api.obtenerAgenda(fecha, sucursalId: sucursalId, estadoSesion: estadoSesion);
       _agenda = data;
       _error = null;
       print('TicketProvider: Fetched ${_agenda.length} agenda items');

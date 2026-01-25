@@ -267,7 +267,10 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      for (var id in tratamientosSeleccionados) {
        final trat = tratamientos.firstWhere((t) => t['id'] == id, orElse: () => null);
        if (trat != null) {
-         total += double.tryParse(trat['precio']?.toString() ?? '0') ?? 0;
+         final precio = double.tryParse(trat['precio']?.toString() ?? '0') ?? 0;
+         final cantidadSesiones = cantidadSesionesPorTratamiento[id] ?? 1;
+         // Multiplicar precio por cantidad de sesiones
+         total += precio * cantidadSesiones;
        }
      }
      return total;
@@ -756,48 +759,12 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                              ],
                              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.06)),
                            ),
-                           padding: EdgeInsets.all(Responsive.isSmallScreen(context) ? 16 : 24),
-                           child: Column(
-                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                             children: [
-                               // Fecha
-                               Text('Fecha y hora', style: Theme.of(context).textTheme.labelLarge),
-                               const SizedBox(height: 8),
-                               GestureDetector(
-                                 onTap: () async {
-                                   final picked = await showDatePicker(
-                                     context: context,
-                                     initialDate: DateTime.now(),
-                                     firstDate: DateTime(2020),
-                                     lastDate: DateTime(2100),
-                                   );
-                                   if (picked != null) {
-                                     final time = await showTimePicker(
-                                       context: context,
-                                       initialTime: TimeOfDay.now(),
-                                     );
-                                     if (time != null) {
-                                       setState(() {
-                                         fecha = DateTime(picked.year, picked.month, picked.day, time.hour, time.minute);
-                                       });
-                                     }
-                                   }
-                                 },
-                                 child: Container(
-                                   padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                   decoration: BoxDecoration(
-                                     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
-                                     borderRadius: BorderRadius.circular(14),
-                                   ),
-                                   child: Text(
-                                     fecha == null ? 'Seleccionar fecha y hora' : DateFormat('dd/MM/yyyy HH:mm').format(fecha!),
-                                     style: const TextStyle(fontSize: 16),
-                                   ),
-                                 ),
-                               ),
-                               const SizedBox(height: 18),
-                               // Tratamientos agrupados por categoría (permite seleccionar de múltiples categorías)
-                               Row(
+                            padding: EdgeInsets.all(Responsive.isSmallScreen(context) ? 16 : 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Tratamientos agrupados por categoría (permite seleccionar de múltiples categorías)
+                                Row(
                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                  crossAxisAlignment: CrossAxisAlignment.start,
                                  children: [

@@ -15,32 +15,19 @@ class TicketsScreen extends StatefulWidget {
   State<TicketsScreen> createState() => _TicketsScreenState();
 }
 
-class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProviderStateMixin {
+class _TicketsScreenState extends State<TicketsScreen> {
   final ApiService api = ApiService();
   final TextEditingController _searchController = TextEditingController();
-  late TabController _tabController;
   String search = '';
   String? errorMsg;
-  bool showAtendidos = false; // false = pendientes, true = atendidos
   bool sortAscending = true; // true = antiguo→nuevo, false = nuevo→antiguo
-  bool showOnlyToday = true; // true = solo hoy, false = todos los tickets
+  bool showOnlyToday = true; // Siempre true - solo mostrar tickets de hoy
   SucursalProvider? _sucursalProvider;
   bool _isFirstLoad = true; // Flag para controlar la primera carga
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_onTabChanged);
-  }
-
-  void _onTabChanged() {
-    if (_tabController.indexIsChanging) {
-      setState(() {
-        showAtendidos = _tabController.index == 1;
-      });
-      _reloadTicketsForCurrentFilters();
-    }
   }
 
   @override
@@ -76,9 +63,9 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
 
     try {
       final ticketProvider = context.read<TicketProvider>();
+      // Cargar tickets del día actual
       await ticketProvider.fetchTickets(
         sucursalId: _sucursalProvider?.selectedSucursalId,
-        estadoTicket: showAtendidos,
       );
     } catch (e) {
       // Registrar pero no interrumpir UI
@@ -98,22 +85,7 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
       errorMsg = null; // Limpiar error anterior
     });
 
-    try {
-      final ticketProvider = context.read<TicketProvider>();
-      // Forzar recarga usando forceRefresh
-      await ticketProvider.fetchTickets(
-        sucursalId: _sucursalProvider?.selectedSucursalId,
-        estadoTicket: showAtendidos,
-        forceRefresh: true,
-      );
-    } catch (e) {
-      print('TicketsScreen: Error en refresh: $e');
-      if (mounted) {
-        setState(() {
-          errorMsg = 'Error al recargar: $e';
-        });
-      }
-    }
+    _reloadTicketsForCurrentFilters();
   }
 
   void _onSucursalChanged() {
@@ -138,8 +110,8 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
       final tomorrow = today.add(const Duration(days: 1));
 
       dateFilteredTickets = tickets.where((t) {
-        if (t['fecha'] == null) return false;
-        final ticketDate = DateTime.parse(t['fecha']);
+        if (t['created_at'] == null) return false;
+        final ticketDate = DateTime.parse(t['created_at']);
         return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) &&
             ticketDate.isBefore(tomorrow);
       }).toList();
@@ -163,8 +135,8 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
 
     // Ordenar
     filtered.sort((a, b) {
-      final dateA = a['fecha'] != null ? DateTime.parse(a['fecha']) : DateTime.now();
-      final dateB = b['fecha'] != null ? DateTime.parse(b['fecha']) : DateTime.now();
+      final dateA = a['created_at'] != null ? DateTime.parse(a['created_at']) : DateTime.now(); // ✅
+      final dateB = b['created_at'] != null ? DateTime.parse(b['created_at']) : DateTime.now(); // ✅
       return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
 
@@ -173,7 +145,6 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     _sucursalProvider?.removeListener(_onSucursalChanged);
     super.dispose();
@@ -251,34 +222,6 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                   ],
                 ),
                 const SizedBox(height: 16),
-                // Pestañas de estado (Pendiente / Atendido) - mismo estilo que reportes
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 50),
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicatorPadding: const EdgeInsets.all(4),
-                    labelColor: colorScheme.onPrimary,
-                    unselectedLabelColor: colorScheme.onSurfaceVariant,
-                    dividerColor: Colors.transparent,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 16),
-                    tabs: const [
-                      Tab(text: 'Pendiente'),
-                      Tab(text: 'Atendido'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
                 // Indicador de filtro por fecha y botón para ver histórico
                 Row(
                   children: [
@@ -304,7 +247,7 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                           MaterialPageRoute(
                             builder: (context) => const AllTicketsScreen(),
                           ),
-                        ).then((_) => context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos));
+                        ).then((_) => _reloadTicketsForCurrentFilters());
                       },
                       icon: const Icon(Icons.history),
                       label: const Text('Ver todos'),
@@ -378,13 +321,13 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  showAtendidos ? Icons.check_circle_outline : Icons.pending_actions_outlined,
+                                  Icons.event_busy,
                                   size: 64,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  showAtendidos ? 'No hay tickets atendidos' : 'No hay tickets pendientes',
+                                  'No hay tickets para hoy',
                                   style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                               ],
@@ -395,22 +338,31 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                             itemCount: filteredTickets.length,
                             itemBuilder: (context, i) {
                               final t = filteredTickets[i];
-                              final fechaDateTime = t['fecha'] != null ? DateTime.parse(t['fecha']) : null;
-                              final hora = fechaDateTime != null ? DateFormat('HH:mm').format(fechaDateTime) : '-';
+                              final fechaDateTime = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;                              final hora = fechaDateTime != null ? DateFormat('HH:mm').format(fechaDateTime) : '-';
                               final fecha = fechaDateTime != null ? DateFormat('dd/MM/yyyy').format(fechaDateTime) : '-';
-                              final cliente = t['cliente'] != null
-                                  ? ((t['cliente']['apellidoCliente'] ?? '').isNotEmpty
-                                      ? '${t['cliente']['nombreCliente'] ?? '-'} ${t['cliente']['apellidoCliente'] ?? ''}'
-                                      : t['cliente']['nombreCliente'] ?? '-')
-                                  : '-';
-                              final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-                              final tratamientoTexto = tratamientos.isEmpty
+                              final clienteObj = t['cliente'];
+                              String cliente = '-';
+                              if (clienteObj != null) {
+                                cliente = '${clienteObj['nombrecliente'] ?? ''} ${clienteObj['apellidocliente'] ?? ''}'.trim();
+                                if (cliente.isEmpty) cliente = '-';
+                              }
+
+                              final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+                              final List<String> nombresTratamientos = [];
+
+                              for (var s in sesiones) {
+                                if (s['tratamiento'] != null) {
+                                  nombresTratamientos.add(s['tratamiento']['nombretratamiento'] ?? '');
+                                }
+                              }
+
+                              final tratamientoTexto = nombresTratamientos.isEmpty
                                   ? 'Sin tratamientos'
-                                  : tratamientos.length == 1
-                                      ? tratamientos[0]['nombreTratamiento'] ?? '-'
-                                      : '${tratamientos.length} tratamientos';
-                              final saldoPendiente = t['saldoPendiente']?.toDouble() ?? 0.0;
-                              final tieneSaldo = saldoPendiente > 0;
+                                  : nombresTratamientos.length == 1
+                                  ? nombresTratamientos.first
+                                  : '${nombresTratamientos.length} tratamientos';
+
+                              final saldoPendiente = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;                              final tieneSaldo = saldoPendiente > 0;
                               final estadoTicket = t['estadoTicket'] == true;
 
                               return ClipRRect(
@@ -441,7 +393,7 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                                               builder: (context) => TicketDetailScreen(ticket: t),
                                             ),
                                           );
-                                          await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
+                                          _reloadTicketsForCurrentFilters();
                                         },
                                         child: Padding(
                                           padding: const EdgeInsets.all(16),
@@ -549,7 +501,7 @@ class _TicketsScreenState extends State<TicketsScreen> with SingleTickerProvider
                                                             behavior: SnackBarBehavior.floating,
                                                           ),
                                                         );
-                                                        await context.read<TicketProvider>().fetchTickets(sucursalId: _sucursalProvider?.selectedSucursalId, estadoTicket: showAtendidos);
+                                                        _reloadTicketsForCurrentFilters();
                                                       } else {
                                                         ScaffoldMessenger.of(context).showSnackBar(
                                                           SnackBar(
