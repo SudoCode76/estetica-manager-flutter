@@ -72,9 +72,9 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
       final Map<String, dynamic> nuevo = {
         'nombreCliente': _nombreController.text.trim(),
         'apellidoCliente': _apellidoController.text.trim(),
-        'telefono': int.tryParse(_telefonoController.text) ?? 0,
+        'telefono': _telefonoController.text.trim(),
         'estadoCliente': true,
-        'sucursal': widget.sucursalId, // SIEMPRE incluir la sucursal
+        'sucursal_id': widget.sucursalId, // SIEMPRE incluir la sucursal (clave DB)
       };
 
       print('CreateClientDialog: Creando cliente con sucursal=${widget.sucursalId}');

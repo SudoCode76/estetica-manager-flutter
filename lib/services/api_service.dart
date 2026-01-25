@@ -72,14 +72,18 @@ class ApiService {
           print('_ensureJwtExists: no jwt found, attempting Supabase.client.auth.refreshSession()');
           final resp = await Supabase.instance.client.auth.refreshSession();
           final newSession = resp.session;
-          if (newSession != null && (newSession.accessToken?.isNotEmpty ?? false)) {
-            final prefs = await SharedPreferences.getInstance();
-            final newAccess = newSession.accessToken ?? '';
-            final newRefresh = newSession.refreshToken ?? '';
-            await prefs.setString('jwt', newAccess);
-            if (newRefresh.isNotEmpty) await prefs.setString('refreshToken', newRefresh);
-            print('_ensureJwtExists: session refreshed and saved to prefs (jwt len=${newAccess.length})');
-            return;
+          if (newSession != null) {
+            final newAccess = newSession.accessToken;
+            final newRefresh = newSession.refreshToken;
+            if (newAccess.isNotEmpty) {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('jwt', newAccess);
+              if (newRefresh != null && newRefresh.isNotEmpty) {
+                await prefs.setString('refreshToken', newRefresh);
+              }
+              print('_ensureJwtExists: session refreshed and saved to prefs (jwt len=${newAccess.length})');
+              return;
+            }
           }
         } catch (e) {
           print('_ensureJwtExists: refreshSession failed: $e');
@@ -435,18 +439,17 @@ class ApiService {
   // ------------------ Categorias / Tratamientos ------------------
   Future<List<dynamic>> getCategorias() async {
     try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/categoriaTratamiento?select=*');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 10);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List<dynamic>;
-        return data.map((e) {
-          if (e is Map<String, dynamic>) return {'id': e['id'], 'nombreCategoria': e['nombreCategoria'] ?? e['nombre_categoria'] ?? e['name'], 'estadoCategoria': e['estadoCategoria'] ?? e['estado'] ?? true, 'created_at': e['created_at']};
-          return e;
-        }).toList();
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener categorias');
-      throw Exception('Error obteniendo categorias: ${resp.statusCode} ${resp.body}');
+      // Usar el SDK de supabase_flutter en lugar de REST manual
+      final data = await Supabase.instance.client.from('categoriaTratamiento').select('*');
+      return (data as List<dynamic>).map((e) {
+        if (e is Map<String, dynamic>) return {
+          'id': e['id'],
+          'nombreCategoria': e['nombreCategoria'] ?? e['nombre_categoria'] ?? e['name'],
+          'estadoCategoria': e['estadoCategoria'] ?? e['estado'] ?? true,
+          'created_at': e['created_at']
+        };
+        return e;
+      }).toList();
     } catch (e) {
       print('getCategorias error: $e');
       rethrow;
@@ -455,21 +458,20 @@ class ApiService {
 
   Future<List<dynamic>> getTratamientos({int? categoriaId}) async {
     try {
-      final supabaseUrl = categoriaId == null
-          ? '${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento?select=*'
-          : '${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento?select=*&categoria_id=eq.$categoriaId';
-      final url = Uri.parse(supabaseUrl);
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 12);
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List<dynamic>;
-        return data.map((e) {
-          if (e is Map<String, dynamic>) return {'id': e['id'], 'nombreTratamiento': e['nombreTratamiento'] ?? e['nombretratamiento'] ?? e['name'], 'precio': e['precio'], 'estadoTratamiento': e['estadoTratamiento'] ?? e['estadotratamiento'] ?? true, 'categoria_tratamiento': e['categoria_id'] ?? e['categoria_tratamiento'] ?? null, 'created_at': e['created_at']};
-          return e;
-        }).toList();
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener tratamientos');
-      throw Exception('Error al obtener tratamientos: ${resp.statusCode} ${resp.body}');
+      var qb = Supabase.instance.client.from('tratamiento').select('*');
+      if (categoriaId != null) qb = qb.eq('categoria_id', categoriaId);
+      final data = await qb;
+      return (data as List<dynamic>).map((e) {
+        if (e is Map<String, dynamic>) return {
+          'id': e['id'],
+          'nombreTratamiento': e['nombreTratamiento'] ?? e['nombretratamiento'] ?? e['name'],
+          'precio': e['precio'],
+          'estadoTratamiento': e['estadoTratamiento'] ?? e['estadotratamiento'] ?? true,
+          'categoria_tratamiento': e['categoria_id'] ?? e['categoria_tratamiento'] ?? null,
+          'created_at': e['created_at']
+        };
+        return e;
+      }).toList();
     } catch (e) {
       print('getTratamientos error: $e');
       rethrow;
@@ -479,17 +481,12 @@ class ApiService {
   Future<Map<String, dynamic>> crearCategoria(Map<String, dynamic> categoria) async {
     try {
       await _ensureJwtExists();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/categoriaTratamiento');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final resp = await _postWithTimeout(url, headers, jsonEncode(categoria), seconds: 10);
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al crear categoria');
-      throw Exception('Error al crear categoria: ${resp.statusCode} ${resp.body}');
+      final payload = <String, dynamic>{};
+      if (categoria.containsKey('nombreCategoria')) payload['nombreCategoria'] = categoria['nombreCategoria'];
+      if (categoria.containsKey('estadoCategoria')) payload['estadoCategoria'] = categoria['estadoCategoria'];
+
+      final res = await Supabase.instance.client.from('categoriaTratamiento').insert(payload).select().single();
+      return Map<String, dynamic>.from(res);
     } catch (e) {
       print('crearCategoria error: $e');
       rethrow;
@@ -499,9 +496,6 @@ class ApiService {
   Future<Map<String, dynamic>> crearTratamiento(Map<String, dynamic> tratamiento) async {
     try {
       await _ensureJwtExists();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
       final payload = <String, dynamic>{};
       if (tratamiento.containsKey('nombreTratamiento')) payload['nombretratamiento'] = tratamiento['nombreTratamiento'];
       if (tratamiento.containsKey('precio')) payload['precio'] = tratamiento['precio'];
@@ -511,38 +505,11 @@ class ApiService {
         if (cat is Map && cat.containsKey('id')) payload['categoria_id'] = cat['id'];
         else if (cat is int) payload['categoria_id'] = cat;
       }
-      final resp = await _postWithTimeout(url, headers, jsonEncode(payload), seconds: 10);
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al crear tratamiento');
-      throw Exception('Error al crear tratamiento: ${resp.statusCode} ${resp.body}');
+
+      final res = await Supabase.instance.client.from('tratamiento').insert(payload).select().single();
+      return Map<String, dynamic>.from(res);
     } catch (e) {
       print('crearTratamiento error: $e');
-      rethrow;
-    }
-  }
-
-  // Crear cliente (método público usado por UI)
-  Future<Map<String, dynamic>> crearCliente(Map<String, dynamic> cliente) async {
-    try {
-      await _ensureJwtExists();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/clientes');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final resp = await _postWithTimeout(url, headers, jsonEncode(cliente), seconds: 10);
-      print('ApiService.crearCliente -> status=${resp.statusCode} body=${resp.body}');
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al crear cliente');
-      throw Exception('Error al crear cliente: ${resp.statusCode} ${resp.body}');
-    } catch (e) {
-      print('crearCliente error: $e');
       rethrow;
     }
   }
@@ -550,23 +517,14 @@ class ApiService {
   Future<Map<String, dynamic>> updateCategoria(String documentId, Map<String, dynamic> categoria) async {
     try {
       await _ensureJwtExists();
-      final id = int.tryParse(documentId.toString())?.toString();
-      if (id == null) throw Exception('ID de categoría inválido: $documentId');
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/categoriaTratamiento?id=eq.$id');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
+      final idInt = int.tryParse(documentId.toString());
+      if (idInt == null) throw Exception('ID de categoría inválido: $documentId');
       final payload = <String, dynamic>{};
       if (categoria.containsKey('nombreCategoria')) payload['nombreCategoria'] = categoria['nombreCategoria'];
       if (categoria.containsKey('estadoCategoria')) payload['estadoCategoria'] = categoria['estadoCategoria'];
-      final resp = await _patchWithTimeout(url, headers, jsonEncode(payload), seconds: 10);
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        if (resp.body.trim().isEmpty) return {'id': id, ...categoria};
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al actualizar categoria');
-      throw Exception('Error al actualizar categoria: ${resp.statusCode} ${resp.body}');
+
+      final res = await Supabase.instance.client.from('categoriaTratamiento').update(payload).eq('id', idInt).select().single();
+      return Map<String, dynamic>.from(res);
     } catch (e) {
       print('updateCategoria error: $e');
       rethrow;
@@ -576,11 +534,8 @@ class ApiService {
   Future<Map<String, dynamic>> updateTratamiento(String documentId, Map<String, dynamic> tratamiento) async {
     try {
       await _ensureJwtExists();
-      final id = int.tryParse(documentId.toString())?.toString();
-      if (id == null) throw Exception('ID de tratamiento inválido: $documentId');
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento?id=eq.$id');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
+      final idInt = int.tryParse(documentId.toString());
+      if (idInt == null) throw Exception('ID de tratamiento inválido: $documentId');
       final payload = <String, dynamic>{};
       if (tratamiento.containsKey('nombreTratamiento')) payload['nombretratamiento'] = tratamiento['nombreTratamiento'];
       if (tratamiento.containsKey('precio')) payload['precio'] = tratamiento['precio'];
@@ -590,17 +545,59 @@ class ApiService {
         if (cat is Map && cat.containsKey('id')) payload['categoria_id'] = cat['id'];
         else if (cat is int) payload['categoria_id'] = cat;
       }
-      final resp = await _patchWithTimeout(url, headers, jsonEncode(payload), seconds: 10);
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        if (resp.body.trim().isEmpty) return {'id': id, ...tratamiento};
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al actualizar tratamiento');
-      throw Exception('Error al actualizar tratamiento: ${resp.statusCode} ${resp.body}');
+
+      final res = await Supabase.instance.client.from('tratamiento').update(payload).eq('id', idInt).select().single();
+      return Map<String, dynamic>.from(res);
     } catch (e) {
       print('updateTratamiento error: $e');
+      rethrow;
+    }
+  }
+
+  /// Crear cliente usando REST /rest/v1/clientes (Prefer: return=representation)
+  Future<Map<String, dynamic>> crearCliente(Map<String, dynamic> cliente) async {
+    try {
+      await _ensureJwtExists();
+
+      // Mapear keys de UI a las columnas de la tabla 'cliente'
+      final payload = <String, dynamic>{};
+      payload['nombrecliente'] = cliente['nombreCliente'] ?? cliente['nombrecliente'] ?? '';
+      payload['apellidocliente'] = cliente['apellidoCliente'] ?? cliente['apellidocliente'] ?? '';
+      // Guardar telefono como string (la tabla acepta varchar)
+      payload['telefono'] = cliente['telefono']?.toString() ?? '';
+      payload['estadocliente'] = cliente['estadoCliente'] ?? cliente['estadocliente'] ?? true;
+      payload['sucursal_id'] = cliente['sucursal_id'] ?? cliente['sucursal'] ?? cliente['sucursalId'];
+
+      final res = await Supabase.instance.client.from('cliente').insert(payload).select().single();
+      return Map<String, dynamic>.from(res);
+    } catch (e) {
+      print('crearCliente error: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteCategoria(dynamic documentId) async {
+    try {
+      await _ensureJwtExists();
+      final idInt = int.tryParse(documentId.toString());
+      if (idInt == null) throw Exception('ID de categoría inválido: $documentId');
+      await Supabase.instance.client.from('categoriaTratamiento').delete().eq('id', idInt);
+      return true;
+    } catch (e) {
+      print('deleteCategoria error: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> deleteTratamiento(dynamic documentId) async {
+    try {
+      await _ensureJwtExists();
+      final idInt = int.tryParse(documentId.toString());
+      if (idInt == null) throw Exception('ID de tratamiento inválido: $documentId');
+      await Supabase.instance.client.from('tratamiento').delete().eq('id', idInt);
+      return true;
+    } catch (e) {
+      print('deleteTratamiento error: $e');
       rethrow;
     }
   }
@@ -608,13 +605,8 @@ class ApiService {
   Future<bool> toggleTratamientoActivo(int id, bool activo) async {
     try {
       await _ensureJwtExists();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento?id=eq.$id');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final resp = await _patchWithTimeout(url, headers, jsonEncode({'estadotratamiento': activo}), seconds: 8);
-      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al desactivar tratamiento');
-      return false;
+      await Supabase.instance.client.from('tratamiento').update({'estadotratamiento': activo}).eq('id', id);
+      return true;
     } catch (e) {
       print('toggleTratamientoActivo error: $e');
       rethrow;
@@ -678,16 +670,28 @@ class ApiService {
 
   Future<List<dynamic>> getClientes({int? sucursalId, String? query}) async {
     try {
-      final params = <String>[];
-      if (sucursalId != null) params.add('sucursal=eq.$sucursalId');
-      if (query != null && query.isNotEmpty) params.add('nombreCliente=ilike.*${Uri.encodeComponent(query)}*');
-      final q = params.isNotEmpty ? '?select=*&${params.join('&')}' : '?select=*';
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/clientes$q');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 10);
-      if (resp.statusCode == 200) return jsonDecode(resp.body) as List<dynamic>;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener clientes');
-      throw Exception('Error al obtener clientes: ${resp.statusCode} ${resp.body}');
+      // Usar SDK de Supabase
+      var qb = Supabase.instance.client.from('cliente').select('*');
+      if (sucursalId != null) qb = qb.eq('sucursal_id', sucursalId);
+      if (query != null && query.isNotEmpty) {
+        // Buscar por nombre, apellido o teléfono usando OR + ilike
+        final pattern = '%$query%';
+        qb = qb.or('nombrecliente.ilike.$pattern,apellidocliente.ilike.$pattern,telefono.ilike.$pattern');
+      }
+
+      final data = await qb;
+      return (data as List<dynamic>).map((e) {
+        if (e is Map<String, dynamic>) return {
+          'id': e['id'],
+          'nombreCliente': e['nombrecliente'] ?? e['nombreCliente'] ?? '',
+          'apellidoCliente': e['apellidocliente'] ?? e['apellidoCliente'] ?? '',
+          'telefono': e['telefono'],
+          'estadoCliente': e['estadocliente'] ?? e['estadoCliente'] ?? true,
+          'sucursal_id': e['sucursal_id'] ?? e['sucursal'] ?? null,
+          'created_at': e['created_at'],
+        };
+        return e;
+      }).toList();
     } catch (e) {
       print('getClientes error: $e');
       rethrow;
@@ -697,13 +701,11 @@ class ApiService {
   Future<bool> deleteCliente(dynamic documentId) async {
     try {
       await _ensureJwtExists();
-      final id = documentId.toString();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/clientes?id=eq.$id');
-      final headers = await _getHeaders();
-      final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al eliminar cliente');
-      return false;
+      final idStr = documentId.toString();
+      final idInt = int.tryParse(idStr);
+      if (idInt == null) throw Exception('ID de cliente inválido: $documentId');
+      await Supabase.instance.client.from('cliente').delete().eq('id', idInt);
+      return true;
     } catch (e) {
       print('deleteCliente error: $e');
       rethrow;
@@ -713,190 +715,29 @@ class ApiService {
   Future<Map<String, dynamic>> updateCliente(String documentId, Map<String, dynamic> cliente) async {
     try {
       await _ensureJwtExists();
-      final id = documentId.toString();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/clientes?id=eq.$id');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final resp = await _patchWithTimeout(url, headers, jsonEncode(cliente), seconds: 10);
-      if (resp.statusCode == 200 || resp.statusCode == 204) {
-        if (resp.body.trim().isEmpty) return cliente;
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al actualizar cliente');
-      throw Exception('Error al actualizar cliente: ${resp.statusCode} ${resp.body}');
+      final idStr = documentId.toString();
+      final idInt = int.tryParse(idStr);
+      if (idInt == null) throw Exception('ID de cliente inválido: $documentId');
+
+      final payload = <String, dynamic>{};
+      if (cliente.containsKey('nombreCliente') || cliente.containsKey('nombrecliente')) payload['nombrecliente'] = cliente['nombreCliente'] ?? cliente['nombrecliente'];
+      if (cliente.containsKey('apellidoCliente') || cliente.containsKey('apellidocliente')) payload['apellidocliente'] = cliente['apellidoCliente'] ?? cliente['apellidocliente'];
+      if (cliente.containsKey('telefono')) payload['telefono'] = cliente['telefono']?.toString();
+      if (cliente.containsKey('estadoCliente') || cliente.containsKey('estadocliente')) payload['estadocliente'] = cliente['estadoCliente'] ?? cliente['estadocliente'];
+      if (cliente.containsKey('sucursal_id') || cliente.containsKey('sucursal')) payload['sucursal_id'] = cliente['sucursal_id'] ?? cliente['sucursal'];
+
+      if (payload.isEmpty) throw Exception('No hay campos para actualizar');
+
+      final res = await Supabase.instance.client.from('cliente').update(payload).eq('id', idInt).select().single();
+      return Map<String, dynamic>.from(res);
     } catch (e) {
       print('updateCliente error: $e');
       rethrow;
     }
   }
 
-  Future<bool> crearTicket(Map<String, dynamic> ticket) async {
-    try {
-      await _ensureJwtExists();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tickets');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final resp = await _postWithTimeout(url, headers, jsonEncode(ticket), seconds: 12);
-      if (resp.statusCode == 200 || resp.statusCode == 201) return true;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al crear ticket');
-      throw Exception('Error al crear ticket: ${resp.statusCode} ${resp.body}');
-    } catch (e) {
-      print('crearTicket error: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> crearPago(Map<String, dynamic> pago) async {
-    try {
-      await _ensureJwtExists();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/pagos');
-      final headers = await _getHeaders();
-      headers['Prefer'] = 'return=representation';
-      final resp = await _postWithTimeout(url, headers, jsonEncode(pago), seconds: 12);
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al crear pago');
-      throw Exception('Error al crear pago: ${resp.statusCode} ${resp.body}');
-    } catch (e) {
-      print('crearPago error: $e');
-      rethrow;
-    }
-  }
-
-  Future<List<dynamic>> getPagos({int? sucursalId}) async {
-    try {
-      final q = sucursalId != null ? '?select=*&sucursal=eq.$sucursalId' : '?select=*';
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/pagos$q');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 12);
-      if (resp.statusCode == 200) return jsonDecode(resp.body) as List<dynamic>;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener pagos');
-      throw Exception('Error al obtener pagos: ${resp.statusCode} ${resp.body}');
-    } catch (e) {
-      print('getPagos error: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>?> getTicketByDocumentId(String documentId) async {
-    try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tickets?documentId=eq.${Uri.encodeComponent(documentId)}&select=*');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 8);
-      if (resp.statusCode == 200) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        return null;
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener ticket');
-      throw Exception('Error al obtener ticket: ${resp.statusCode} ${resp.body}');
-    } catch (e) {
-      print('getTicketByDocumentId error: $e');
-      rethrow;
-    }
-  }
-
-  // Reportes (stubs mínimos, la UI espera listas/objetos)
-  Future<Map<String, dynamic>> getDailyReport({String? start, String? end, int? sucursalId}) async {
-    try {
-      // Ideal: crear una RPC en Supabase para reportes. Como stub, intentamos llamar a una vista REST y devolver un mapa.
-      final params = <String>[];
-      if (start != null) params.add('start=${Uri.encodeComponent(start)}');
-      if (end != null) params.add('end=${Uri.encodeComponent(end)}');
-      if (sucursalId != null) params.add('sucursal=eq.$sucursalId');
-      final q = params.isNotEmpty ? '?${params.join('&')}' : '';
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/reportes_diarios$q');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 12);
-      if (resp.statusCode == 200) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-        return {};
-      }
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener reporte diario');
-      return {};
-    } catch (e) {
-      print('getDailyReport error: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>?> getClientReport(int clientId) async {
-    try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/reportes_clientes?id=eq.$clientId&select=*');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 10);
-      if (resp.statusCode == 200) {
-        final parsed = jsonDecode(resp.body);
-        if (parsed is List && parsed.isNotEmpty) return Map<String, dynamic>.from(parsed.first);
-        if (parsed is Map) return Map<String, dynamic>.from(parsed);
-      }
-      return null;
-    } catch (e) {
-      print('getClientReport error: $e');
-      rethrow;
-    }
-  }
-
-  Future<Map<String, dynamic>> getPagosPaginated({String? start, String? end, int? sucursalId, int page = 1, int pageSize = 50}) async {
-    try {
-      final offset = (page - 1) * pageSize;
-      final params = <String>['select=*', 'limit=$pageSize', 'offset=$offset'];
-      if (sucursalId != null) params.add('sucursal=eq.$sucursalId');
-      if (start != null) params.add('start=${Uri.encodeComponent(start)}');
-      if (end != null) params.add('end=${Uri.encodeComponent(end)}');
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/pagos?${params.join('&')}');
-      final headers = await _getHeaders();
-      final resp = await _getWithTimeout(url, headers, seconds: 12);
-      if (resp.statusCode == 200) {
-        final items = jsonDecode(resp.body) as List<dynamic>;
-        // Como no tenemos meta real, devolver meta simple
-        return {'items': items, 'meta': {'pagination': {'page': page, 'pageCount': items.length >= pageSize ? page + 1 : page}}};
-      }
-      return {'items': [], 'meta': {}};
-    } catch (e) {
-      print('getPagosPaginated error: $e');
-      rethrow;
-    }
-  }
-
-  // Debug helpers
-  Future<Map<String, dynamic>> debugGetSucursalesDetailed() async {
-    final result = <String, dynamic>{'supabase_rest': null};
-    try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/sucursales?select=*');
-      final headers = await _getHeaders();
-      final response = await _getWithTimeout(url, headers, seconds: 10);
-      result['supabase_rest'] = {'status': response.statusCode, 'body': response.body, 'headers': headers};
-    } catch (e) {
-      result['supabase_rest'] = {'error': e.toString()};
-    }
-    return result;
-  }
-
-  Future<Map<String, dynamic>> debugAuthCheck() async {
-    try {
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/auth/v1/user');
-      final headers = await _getHeaders();
-      final response = await _getWithTimeout(url, headers, seconds: 8);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return {'ok': true, 'data': data};
-      } else {
-        return {'ok': false, 'status': response.statusCode, 'body': response.body};
-      }
-    } catch (e) {
-      return {'ok': false, 'error': e.toString()};
-    }
-  }
-
-  Future<List<dynamic>> getDebtReport({int? sucursalId}) async {
+  // ------------------ Reporte de Deuda ------------------
+  Future<List<dynamic>> getReporteDeuda({int? sucursalId}) async {
     try {
       final q = sucursalId != null ? '?select=*&sucursal=eq.$sucursalId' : '?select=*';
       final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/reportes_deuda$q');
@@ -911,6 +752,90 @@ class ApiService {
     }
   }
 
+  /// Reportes: obtiene reporte diario/mensual desde el endpoint REST 'reportes_ventas'
+  Future<Map<String, dynamic>> getDailyReport({String? start, String? end, int? sucursalId}) async {
+    try {
+      final params = <String>[];
+      if (start != null) params.add('start=eq.${Uri.encodeComponent(start)}');
+      if (end != null) params.add('end=eq.${Uri.encodeComponent(end)}');
+      if (sucursalId != null) params.add('sucursal=eq.$sucursalId');
+      final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/reportes_ventas$q');
+      final headers = await _getHeaders();
+      final resp = await _getWithTimeout(url, headers, seconds: 12);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data is List && data.isNotEmpty) return Map<String, dynamic>.from(data.first);
+        if (data is Map<String, dynamic>) return data;
+        return {};
+      }
+      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener reporte de ventas');
+      throw Exception('Error al obtener reporte de ventas: ${resp.statusCode} ${resp.body}');
+    } catch (e) {
+      print('getDailyReport error: $e');
+      rethrow;
+    }
+  }
+
+  /// Wrapper en inglés para compatibilidad: llama a getReporteDeuda
+  Future<List<dynamic>> getDebtReport({int? sucursalId}) async {
+    return await getReporteDeuda(sucursalId: sucursalId);
+  }
+
+  /// Obtener detalle de cliente (wrapper defensivo)
+  Future<Map<String, dynamic>> getClientReport(int clientId) async {
+    try {
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/reportes_cliente?id=eq.$clientId');
+      final headers = await _getHeaders();
+      final resp = await _getWithTimeout(url, headers, seconds: 10);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data is List && data.isNotEmpty) return Map<String, dynamic>.from(data.first);
+        if (data is Map<String, dynamic>) return data;
+        return {};
+      }
+      return {};
+    } catch (e) {
+      print('getClientReport error: $e');
+      rethrow;
+    }
+  }
+
+  /// Pagos paginados (wrapper defensivo). Retorna map: { items: List, meta: { pagination: { page, pageCount, total } } }
+  Future<Map<String, dynamic>> getPagosPaginated({String? start, String? end, int? sucursalId, int page = 1, int pageSize = 30}) async {
+    try {
+      final params = <String>[];
+      if (start != null) params.add('start=eq.${Uri.encodeComponent(start)}');
+      if (end != null) params.add('end=eq.${Uri.encodeComponent(end)}');
+      if (sucursalId != null) params.add('sucursal=eq.$sucursalId');
+      params.add('limit=$pageSize');
+      params.add('offset=${(page - 1) * pageSize}');
+      final q = params.isNotEmpty ? '?${params.join('&')}' : '';
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/pagos$q');
+      final headers = await _getHeaders();
+      final resp = await _getWithTimeout(url, headers, seconds: 12);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as List<dynamic>;
+        // sin metadata real, devolvemos una meta mínima
+        return {
+          'items': data,
+          'meta': {
+            'pagination': {
+              'page': page,
+              'pageCount': 1,
+              'total': data.length,
+            }
+          }
+        };
+      }
+      throw Exception('Error al obtener pagos: ${resp.statusCode} ${resp.body}');
+    } catch (e) {
+      print('getPagosPaginated error: $e');
+      rethrow;
+    }
+  }
+
+  // ------------------ Funciones RPC / Edge Functions ------------------
   Future<Map<String, dynamic>> callFunction(String functionName, Map<String, dynamic> body, {int seconds = 12, bool preferFunctionsToken = false}) async {
     final url = Uri.parse('${SupabaseConfig.supabaseUrl}/functions/v1/$functionName');
     try {
@@ -1160,38 +1085,6 @@ class ApiService {
     }
   }
 
-  Future<bool> deleteCategoria(dynamic documentId) async {
-    try {
-      await _ensureJwtExists();
-      final id = documentId.toString();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/categoriaTratamiento?id=eq.$id');
-      final headers = await _getHeaders();
-      final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al eliminar categoría');
-      return false;
-    } catch (e) {
-      print('deleteCategoria error: $e');
-      rethrow;
-    }
-  }
-
-  Future<bool> deleteTratamiento(dynamic documentId) async {
-    try {
-      await _ensureJwtExists();
-      final id = documentId.toString();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tratamiento?id=eq.$id');
-      final headers = await _getHeaders();
-      final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al eliminar tratamiento');
-      return false;
-    } catch (e) {
-      print('deleteTratamiento error: $e');
-      rethrow;
-    }
-  }
-
   /// Guarda el admin token en SharedPreferences para reintentos en Edge Functions.
   Future<void> saveAdminToken(String token) async {
     try {
@@ -1206,30 +1099,28 @@ class ApiService {
   }
 
 
-  /// Decide qué token usar como token_admin cuando llamamos a las Edge Functions.
-  /// Prioridad:
-  /// 1) SupabaseConfig.functionsAuthToken (si está configurado en código)
-  /// 2) adminToken guardado en SharedPreferences
-  /// 3) jwt de sesión actual de Supabase
-  Future<String> _chooseTokenAdmin() async {
-    try {
-      if (SupabaseConfig.functionsAuthToken.isNotEmpty) return SupabaseConfig.functionsAuthToken;
-      final prefs = await SharedPreferences.getInstance();
-      final storedAdmin = prefs.getString('adminToken') ?? '';
-      if (storedAdmin.isNotEmpty) return storedAdmin;
-      // fallback a jwt en prefs o sesión
-      try {
-        final session = Supabase.instance.client.auth.currentSession;
-        final jwt = session?.accessToken;
-        if (jwt != null && jwt.isNotEmpty) return jwt;
-      } catch (_) {}
-      final jwtPrefs = prefs.getString('jwt') ?? '';
-      return jwtPrefs;
-    } catch (e) {
-      print('_chooseTokenAdmin error: $e');
-      return '';
-    }
-  }
+  /// Si en el futuro necesitas elegir dinámicamente un token admin, puedes
+  /// usar `_getRuntimeFunctionsAuthToken()` (para el legacy functions token)
+  /// o `saveAdminToken()` + `_tryRefreshAdminToken()` para manejar un admin token en prefs.
+  // Future<String> _chooseTokenAdmin() async {
+  //   try {
+  //     if (SupabaseConfig.functionsAuthToken.isNotEmpty) return SupabaseConfig.functionsAuthToken;
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final storedAdmin = prefs.getString('adminToken') ?? '';
+  //     if (storedAdmin.isNotEmpty) return storedAdmin;
+  //     // fallback a jwt en prefs o sesión
+  //     try {
+  //       final session = Supabase.instance.client.auth.currentSession;
+  //       final jwt = session?.accessToken;
+  //       if (jwt != null && jwt.isNotEmpty) return jwt;
+  //     } catch (_) {}
+  //     final jwtPrefs = prefs.getString('jwt') ?? '';
+  //     return jwtPrefs;
+  //   } catch (e) {
+  //     print('_chooseTokenAdmin error: $e');
+  //     return '';
+  //   }
+  // }
 
   /// Intenta refrescar el admin token usando el refresh token guardado en SharedPreferences.
   /// Retorna true si se obtuvo y guardó un adminToken nuevo.
@@ -1294,4 +1185,315 @@ class ApiService {
       print('saveFunctionsAuthToken error: $e');
     }
   }
+
+  Future<Map<String, dynamic>> debugAuthCheck() async {
+    try {
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/auth/v1/user');
+      final headers = await _getHeaders();
+      final resp = await _getWithTimeout(url, headers, seconds: 8);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        return {'ok': true, 'data': data};
+      }
+      return {'ok': false, 'status': resp.statusCode, 'body': resp.body};
+    } catch (e) {
+      return {'ok': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> debugGetSucursalesDetailed() async {
+    final result = <String, dynamic>{'supabase_rest': null};
+    try {
+      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/sucursales?select=*');
+      final headers = await _getHeaders();
+      final response = await _getWithTimeout(url, headers, seconds: 10);
+      result['supabase_rest'] = {'status': response.statusCode, 'body': response.body, 'headers': headers};
+    } catch (e) {
+      result['supabase_rest'] = {'error': e.toString()};
+    }
+    return result;
+  }
+
+  // ------------------ NUEVA ARQUITECTURA DE TICKETS/SESIONES/PAGOS ------------------
+
+  /// 1. Obtener agenda diaria (vista de sesiones programadas)
+  Future<List<dynamic>> obtenerAgenda(DateTime fecha, {int? sucursalId}) async {
+    try {
+      // Si no hay sucursal seleccionada, retornar lista vacía
+      if (sucursalId == null) {
+        print('obtenerAgenda: sucursalId is null, returning empty list');
+        return [];
+      }
+
+      final start = DateTime(fecha.year, fecha.month, fecha.day).toIso8601String();
+      final end = DateTime(fecha.year, fecha.month, fecha.day, 23, 59, 59).toIso8601String();
+
+      // Construir query con filtros
+      var query = Supabase.instance.client
+          .from('vista_agenda_diaria')
+          .select()
+          .eq('sucursal_id', sucursalId)  // Filtro por sucursal
+          .gte('fecha_hora_inicio', start)
+          .lte('fecha_hora_inicio', end);
+
+      // Aplicar orden y ejecutar
+      final response = await query.order('fecha_hora_inicio', ascending: true);
+
+      print('obtenerAgenda: fetched ${(response as List).length} sesiones for sucursal $sucursalId');
+      return response as List<dynamic>;
+    } catch (e) {
+      print('obtenerAgenda error: $e');
+      rethrow;
+    }
+  }
+
+  /// 2. Crear venta completa (usa RPC para transacción atómica)
+  Future<void> registrarVenta({
+    required int clienteId,
+    required int sucursalId, // Ahora obligatorio
+    required double totalVenta,
+    required double pagoInicial,
+    required List<Map<String, dynamic>> itemsCarrito, // "Carrito"
+  }) async {
+    try {
+      // 1. Obtener ID del empleado actual
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) throw Exception('Usuario no autenticado');
+
+      // 2. Transformar el Carrito en Sesiones Individuales
+      // El backend espera una lista plana de sesiones, no agrupada por tratamientos
+      List<Map<String, dynamic>> sesionesParaEnviar = [];
+
+      for (var item in itemsCarrito) {
+        // Extraer datos del tratamiento
+        int idTratamiento = item['id'];
+        int cantidadSesiones = item['cantidad_sesiones'] ?? 1; // Ej: Paquete de 5
+        double precioTratamiento = (item['precio'] is num)
+            ? (item['precio'] as num).toDouble()
+            : 0.0;
+
+        // Generar las N sesiones
+        for (int i = 1; i <= cantidadSesiones; i++) {
+          sesionesParaEnviar.add({
+            'tratamiento_id': idTratamiento,
+            'numero_sesion': i,
+            'precio_sesion': precioTratamiento / cantidadSesiones, // Dividir precio
+            // Lógica de Negocio: La sesión 1 se marca para "HOY", las demás quedan abiertas (null)
+            'fecha_inicio': (i == 1) ? DateTime.now().toIso8601String() : null
+          });
+        }
+      }
+
+      print('registrarVenta: Creating ticket with ${sesionesParaEnviar.length} sesiones');
+
+      // 3. Llamada Atómica al Backend
+      final response = await Supabase.instance.client.rpc(
+        'crear_venta_completa',
+        params: {
+          'p_cliente_id': clienteId,
+          'p_empleado_id': userId,
+          'p_sucursal_id': sucursalId,
+          'p_monto_total': totalVenta,
+          'p_monto_pagado_inicial': pagoInicial,
+          'p_sesiones': sesionesParaEnviar // Supabase serializa esto automágicamente
+        }
+      );
+
+      // 4. Validar respuesta
+      if (response != null && response is Map) {
+        if (response['success'] == false) {
+          throw Exception('Error del backend: ${response['message'] ?? response['error']}');
+        }
+      }
+
+      print('registrarVenta: Venta creada exitosamente');
+    } catch (e) {
+      print('registrarVenta error: $e');
+      rethrow;
+    }
+  }
+
+  /// 3. Ver tickets pendientes de pago
+  Future<List<dynamic>> obtenerTicketsPendientes({int? sucursalId}) async {
+    try {
+      var query = Supabase.instance.client
+          .from('ticket')
+          .select('*, cliente:cliente_id(*)')
+          .or('estado_pago.eq.pendiente,estado_pago.eq.parcial');
+
+      // Aplicar filtro de sucursal si existe
+      if (sucursalId != null) {
+        query = query.eq('sucursal_id', sucursalId);
+      }
+
+      // Aplicar orden y ejecutar (sin reasignar a query)
+      final response = await query.order('created_at', ascending: true);
+      return response as List<dynamic>;
+    } catch (e) {
+      print('obtenerTicketsPendientes error: $e');
+      rethrow;
+    }
+  }
+
+  /// 4. Obtener detalle completo de un ticket (con sesiones y pagos)
+  Future<Map<String, dynamic>?> obtenerTicketDetalle(String ticketId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
+            *,
+            cliente:cliente_id(*),
+            empleado:empleado_id(*),
+            sesiones:sesion(*, tratamiento:tratamiento_id(*)),
+            pagos:pago(*)
+          ''')
+          .eq('id', ticketId)
+          .single();
+
+      return Map<String, dynamic>.from(response);
+    } catch (e) {
+      print('obtenerTicketDetalle error: $e');
+      rethrow;
+    }
+  }
+
+  /// 5. Registrar abono (pago parcial o total) - El trigger actualiza automáticamente el ticket
+  Future<Map<String, dynamic>> registrarAbono({
+    required String ticketId,
+    required double montoAbono,
+    String metodoPago = 'efectivo',
+  }) async {
+    try {
+      await _ensureJwtExists();
+
+      final response = await Supabase.instance.client.from('pago').insert({
+        'ticket_id': ticketId,
+        'monto': montoAbono,
+        'fecha_pago': DateTime.now().toIso8601String(),
+        'metodo_pago': metodoPago,
+      }).select().single();
+
+      return Map<String, dynamic>.from(response);
+    } catch (e) {
+      print('registrarAbono error: $e');
+      rethrow;
+    }
+  }
+
+  /// 6. Marcar sesión como atendida
+  Future<bool> marcarSesionAtendida(String sesionId) async {
+    try {
+      await _ensureJwtExists();
+
+      await Supabase.instance.client
+          .from('sesion')
+          .update({
+            'atendida': true,
+            'fecha_atencion': DateTime.now().toIso8601String(),
+          })
+          .eq('id', sesionId);
+
+      return true;
+    } catch (e) {
+      print('marcarSesionAtendida error: $e');
+      rethrow;
+    }
+  }
+
+  /// 7. Reprogramar sesión (cambiar fecha)
+  Future<bool> reprogramarSesion(String sesionId, DateTime nuevaFecha) async {
+    try {
+      await _ensureJwtExists();
+
+      await Supabase.instance.client
+          .from('sesion')
+          .update({'fecha_hora_inicio': nuevaFecha.toIso8601String()})
+          .eq('id', sesionId);
+
+      return true;
+    } catch (e) {
+      print('reprogramarSesion error: $e');
+      rethrow;
+    }
+  }
+
+  /// 8. Obtener historial de pagos de un ticket
+  Future<List<dynamic>> obtenerPagosTicket(String ticketId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('pago')
+          .select('*')
+          .eq('ticket_id', ticketId)
+          .order('fecha_pago', ascending: false);
+
+      return response as List<dynamic>;
+    } catch (e) {
+      print('obtenerPagosTicket error: $e');
+      rethrow;
+    }
+  }
+
+  /// 9. Obtener sesiones de un ticket
+  Future<List<dynamic>> obtenerSesionesTicket(String ticketId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('sesion')
+          .select('*, tratamiento:tratamiento_id(*)')
+          .eq('ticket_id', ticketId)
+          .order('numero_sesion', ascending: true);
+
+      return response as List<dynamic>;
+    } catch (e) {
+      print('obtenerSesionesTicket error: $e');
+      rethrow;
+    }
+  }
+
+  /// 10. Método de compatibilidad: crear ticket (wrapper sobre registrarVenta)
+  Future<bool> crearTicket(Map<String, dynamic> ticket) async {
+    try {
+      // Extraer datos del formato antiguo y mapear al nuevo
+      final clienteId = ticket['cliente'] is int ? ticket['cliente'] : null;
+      if (clienteId == null) throw Exception('Cliente no especificado');
+
+      final tratamientos = ticket['tratamientos'];
+      if (tratamientos == null || (tratamientos is! List) || tratamientos.isEmpty) {
+        throw Exception('Debe seleccionar al menos un tratamiento');
+      }
+
+      // Obtener información completa de tratamientos
+      List<Map<String, dynamic>> itemsCarrito = [];
+      for (var tratId in tratamientos) {
+        final trat = await Supabase.instance.client
+            .from('tratamiento')
+            .select('*')
+            .eq('id', tratId)
+            .single();
+        itemsCarrito.add(Map<String, dynamic>.from(trat));
+      }
+
+      final totalVenta = itemsCarrito.fold<double>(
+        0,
+        (sum, t) => sum + ((t['precio'] is num) ? (t['precio'] as num).toDouble() : 0.0),
+      );
+
+      final pagoInicial = ticket['cuota'] is num ? (ticket['cuota'] as num).toDouble() : 0.0;
+      final sucursalId = ticket['sucursal'] is int ? ticket['sucursal'] : null;
+
+      await registrarVenta(
+        clienteId: clienteId,
+        totalVenta: totalVenta,
+        pagoInicial: pagoInicial,
+        itemsCarrito: itemsCarrito,
+        sucursalId: sucursalId,
+      );
+
+      return true;
+    } catch (e) {
+      print('crearTicket (compat) error: $e');
+      return false;
+    }
+  }
+
+  // ------------------ FIN NUEVA ARQUITECTURA ------------------
 }

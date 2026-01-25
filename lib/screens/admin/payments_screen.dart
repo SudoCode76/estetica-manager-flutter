@@ -4,6 +4,8 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/payment_detail_screen.dart' as pd;
 import 'package:app_estetica/screens/admin/payments_history_screen.dart';
 
+
+
 class PaymentsScreen extends StatefulWidget {
   const PaymentsScreen({Key? key}) : super(key: key);
 
@@ -30,31 +32,41 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     setState(() => _loading = true);
     try {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
-      final clients = await _api.getClientes(sucursalId: sucursalId);
-      // Cada cliente puede tener tickets; filtramos por saldoPendiente > 0
-      // Para eficiencia, podríamos llamar a /tickets con filtro por sucursal y agrupar, pero aquí simplificamos
-      final tickets = await _api.getTickets(sucursalId: sucursalId);
+
+      // Usar la nueva arquitectura: obtener tickets pendientes/parciales directamente
+      final ticketsPendientes = await _api.obtenerTicketsPendientes(sucursalId: sucursalId);
 
       // Map clientId -> total debt
       final Map<int, double> debtMap = {};
-      for (final t in tickets) {
-        final cid = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
-        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
-        if (cid != null && saldo > 0) {
-          debtMap[cid] = (debtMap[cid] ?? 0) + saldo;
+      final Map<int, Map<String, dynamic>> clientMap = {};
+
+      for (final t in ticketsPendientes) {
+        // Extraer info del cliente (viene incluida en la consulta)
+        final cliente = t['cliente'];
+        if (cliente != null && cliente is Map) {
+          final clienteId = cliente['id'];
+          final saldo = (t['saldo_pendiente'] is num)
+              ? (t['saldo_pendiente'] as num).toDouble()
+              : 0.0;
+
+          if (clienteId != null && saldo > 0) {
+            debtMap[clienteId] = (debtMap[clienteId] ?? 0) + saldo;
+            clientMap[clienteId] = {
+              'id': clienteId,
+              'nombreCliente': cliente['nombrecliente'] ?? '',
+              'apellidoCliente': cliente['apellidocliente'] ?? '',
+              'telefono': cliente['telefono'],
+            };
+          }
         }
       }
 
       // Build list of clients with debt
       final List<dynamic> withDebt = [];
-      for (final c in clients) {
-        final id = c['id'];
-        final owed = debtMap[id] ?? 0;
-        if (owed > 0) {
-          final copy = Map<String, dynamic>.from(c);
-          copy['deudaTotal'] = owed;
-          withDebt.add(copy);
-        }
+      for (final entry in clientMap.entries) {
+        final clientData = entry.value;
+        clientData['deudaTotal'] = debtMap[entry.key] ?? 0;
+        withDebt.add(clientData);
       }
 
       // Order descending by deudaTotal

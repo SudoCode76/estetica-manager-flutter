@@ -109,23 +109,33 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
     setState(() => _loading = true);
     try {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
-      final allTickets = await _api.getTickets(sucursalId: sucursalId);
-      final clientId = client['id'];
-      final clientTickets = allTickets.where((t) {
-        final tclient = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
-        return tclient == clientId;
-      }).toList();
 
-      final allPagos = await _api.getPagos(sucursalId: sucursalId);
-      final pagosCliente = allPagos.where((p) {
-        final pc = p['cliente'] is Map ? p['cliente']['id'] : p['cliente'];
-        if (pc != null && pc == clientId) return true;
-        final pt = p['ticket'] is Map ? p['ticket']['id'] : p['ticket'];
-        if (pt != null) {
-          return clientTickets.any((t) => t['id'] == pt || (t['documentId'] ?? '').toString() == pt.toString());
+      // Usar la nueva arquitectura: obtener tickets pendientes del cliente
+      final allTickets = await _api.obtenerTicketsPendientes(sucursalId: sucursalId);
+      final clientId = client['id'];
+
+      // Filtrar tickets del cliente específico
+      final clientTickets = allTickets.where((t) {
+        final cliente = t['cliente'];
+        if (cliente is Map) {
+          return cliente['id'] == clientId;
         }
         return false;
       }).toList();
+
+      // Obtener pagos de cada ticket del cliente
+      List<dynamic> pagosCliente = [];
+      for (final ticket in clientTickets) {
+        try {
+          final ticketId = ticket['id']?.toString();
+          if (ticketId != null && ticketId.isNotEmpty) {
+            final pagosTicket = await _api.obtenerPagosTicket(ticketId);
+            pagosCliente.addAll(pagosTicket);
+          }
+        } catch (e) {
+          print('Error obteniendo pagos de ticket ${ticket['id']}: $e');
+        }
+      }
 
       setState(() => _loading = false);
 

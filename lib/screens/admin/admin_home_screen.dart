@@ -3,6 +3,7 @@ import 'package:app_estetica/screens/admin/clients_screen.dart';
 import 'package:app_estetica/screens/admin/reporte_ventas_screen.dart';
 import 'package:app_estetica/screens/admin/settings_screen.dart';
 import 'package:app_estetica/screens/admin/tickets_screen.dart';
+import 'package:app_estetica/screens/admin/sesiones_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
 import 'package:app_estetica/screens/admin/payments_screen.dart';
 import 'package:app_estetica/screens/admin/employees_screen.dart';
@@ -43,6 +44,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   // Pantallas para admin (todas) - usando Key para forzar recreación cuando cambia sucursal
   List<Widget> get _adminScreens => [
     TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
+    SesionesScreen(key: ValueKey('sesiones_${_sucursalProvider?.selectedSucursalId}')),
     ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
     TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
     PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
@@ -54,6 +56,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   // Pantallas para empleado (solo tickets y clientes) - usando Key para forzar recreación
   List<Widget> get _employeeScreens => [
     TicketsScreen(key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}')),
+    SesionesScreen(key: ValueKey('emp_sesiones_${_sucursalProvider?.selectedSucursalId}')),
     ClientsScreen(key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}')),
   ];
 
@@ -238,41 +241,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
       // Llamar a la función de debug para obtener detalles e informar al usuario
       try {
-        final debug = await _api.debugGetSucursalesDetailed();
-        print('AdminHomeScreen: debugGetSucursalesDetailed: $debug');
-
+        final s = await _api.getSucursales();
+        print('AdminHomeScreen: debug getSucursales returned ${s.length} items');
         if (mounted) {
           showDialog<void>(
             context: context,
-            builder: (context) {
-              final sup = debug['supabase_rest'];
-              final str = debug['strapi'];
-              String supMsg = sup == null ? 'No hay respuesta' : 'Status: ${sup['status']}\nBody: ${sup['body']}';
-              String strMsg = str == null ? 'No hay respuesta' : (str['status'] != null ? 'Status: ${str['status']}\nBody: ${str['body']}' : 'Error: ${str['error']}');
-
-              return AlertDialog(
-                title: const Text('Error cargando sucursales (diagnóstico)'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Supabase REST:'),
-                      Text(supMsg),
-                      const SizedBox(height: 12),
-                      const Text('Strapi (fallback):'),
-                      Text(strMsg),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
-                ],
-              );
-            },
+            builder: (context) => AlertDialog(
+              title: const Text('Error cargando sucursales (diagnóstico)'),
+              content: SingleChildScrollView(child: Text('Supabase REST fallback returned ${s.length} items.')),
+              actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
+            ),
           );
         }
       } catch (debugErr) {
-        print('AdminHomeScreen: Error al ejecutar debugGetSucursalesDetailed: $debugErr');
+        print('AdminHomeScreen: Error al ejecutar getSucursales debug: $debugErr');
       }
 
       // Intentar cargar desde caché local
@@ -649,14 +631,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       Navigator.pop(context);
                     },
                   ),
+                  // Agenda de Sesiones - disponible para todos
+                  _DrawerItem(
+                    icon: Icons.event_note_outlined,
+                    selectedIcon: Icons.event_note,
+                    label: 'Agenda de Sesiones',
+                    selected: _selectedIndex == 1,
+                    onTap: () {
+                      setState(() { _selectedIndex = 1; });
+                      Navigator.pop(context);
+                    },
+                  ),
                   // Clientes - disponible para todos
                   _DrawerItem(
                     icon: Icons.people_outline,
                     selectedIcon: Icons.people,
                     label: 'Clientes',
-                    selected: _selectedIndex == 1,
+                    selected: _selectedIndex == 2,
                     onTap: () {
-                      setState(() { _selectedIndex = 1; });
+                      setState(() { _selectedIndex = 2; });
                       Navigator.pop(context);
                     },
                   ),
@@ -666,16 +659,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       icon: Icons.spa,
                       selectedIcon: Icons.spa,
                       label: 'Tratamientos',
-                      selected: _selectedIndex == 2,
-                      onTap: () {
-                        setState(() { _selectedIndex = 2; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.payments,
-                      selectedIcon: Icons.payments_outlined,
-                      label: 'Pagos',
                       selected: _selectedIndex == 3,
                       onTap: () {
                         setState(() { _selectedIndex = 3; });
@@ -683,9 +666,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       },
                     ),
                     _DrawerItem(
-                      icon: Icons.insights_outlined,
-                      selectedIcon: Icons.bar_chart,
-                      label: 'Reportes',
+                      icon: Icons.payments,
+                      selectedIcon: Icons.payments_outlined,
+                      label: 'Pagos',
                       selected: _selectedIndex == 4,
                       onTap: () {
                         setState(() { _selectedIndex = 4; });
@@ -693,9 +676,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       },
                     ),
                     _DrawerItem(
-                      icon: Icons.people_outline_rounded,
-                      selectedIcon: Icons.people_rounded,
-                      label: 'Empleados',
+                      icon: Icons.insights_outlined,
+                      selectedIcon: Icons.bar_chart,
+                      label: 'Reportes',
                       selected: _selectedIndex == 5,
                       onTap: () {
                         setState(() { _selectedIndex = 5; });
@@ -703,12 +686,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       },
                     ),
                     _DrawerItem(
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings,
-                      label: 'Configuración',
+                      icon: Icons.people_outline_rounded,
+                      selectedIcon: Icons.people_rounded,
+                      label: 'Empleados',
                       selected: _selectedIndex == 6,
                       onTap: () {
                         setState(() { _selectedIndex = 6; });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings,
+                      label: 'Configuración',
+                      selected: _selectedIndex == 7,
+                      onTap: () {
+                        setState(() { _selectedIndex = 7; });
                         Navigator.pop(context);
                       },
                     ),

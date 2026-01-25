@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'package:app_estetica/config/responsive.dart';
 
+
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
   const NewTicketScreen({Key? key, this.currentUserId}) : super(key: key);
@@ -24,6 +25,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    final ApiService api = ApiService();
    DateTime? fecha;
    List<int> tratamientosSeleccionados = []; // Ahora soporta múltiples tratamientos
+   Map<int, int> cantidadSesionesPorTratamiento = {}; // NUEVO: almacena cantidad de sesiones por tratamiento
    int? clienteId;
    String? clienteNombre;
    int? usuarioId;
@@ -312,6 +314,120 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      }
    }
 
+   Future<int?> _mostrarDialogoCantidadSesiones(BuildContext context, String nombreTratamiento, {int? cantidadActual}) async {
+     int sesiones = cantidadActual ?? 1;
+
+     return showDialog<int>(
+       context: context,
+       builder: (BuildContext context) {
+         return StatefulBuilder(
+           builder: (context, setDialogState) {
+             return AlertDialog(
+               title: Text(
+                 'Cantidad de Sesiones',
+                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+               ),
+               content: Column(
+                 mainAxisSize: MainAxisSize.min,
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                   Text(
+                     nombreTratamiento,
+                     style: TextStyle(
+                       fontSize: 14,
+                       color: Theme.of(context).colorScheme.onSurfaceVariant,
+                     ),
+                   ),
+                   const SizedBox(height: 24),
+                   Text(
+                     '¿Cuántas sesiones incluye?',
+                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                   ),
+                   const SizedBox(height: 16),
+                   Row(
+                     mainAxisAlignment: MainAxisAlignment.center,
+                     children: [
+                       IconButton(
+                         icon: const Icon(Icons.remove_circle_outline),
+                         iconSize: 32,
+                         onPressed: sesiones > 1
+                             ? () {
+                                 setDialogState(() {
+                                   sesiones--;
+                                 });
+                               }
+                             : null,
+                       ),
+                       const SizedBox(width: 16),
+                       Container(
+                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                         decoration: BoxDecoration(
+                           color: Theme.of(context).colorScheme.primaryContainer,
+                           borderRadius: BorderRadius.circular(12),
+                         ),
+                         child: Text(
+                           '$sesiones',
+                           style: TextStyle(
+                             fontSize: 32,
+                             fontWeight: FontWeight.bold,
+                             color: Theme.of(context).colorScheme.onPrimaryContainer,
+                           ),
+                         ),
+                       ),
+                       const SizedBox(width: 16),
+                       IconButton(
+                         icon: const Icon(Icons.add_circle_outline),
+                         iconSize: 32,
+                         onPressed: sesiones < 20
+                             ? () {
+                                 setDialogState(() {
+                                   sesiones++;
+                                 });
+                               }
+                             : null,
+                       ),
+                     ],
+                   ),
+                   const SizedBox(height: 16),
+                   // Atajos rápidos
+                   Wrap(
+                     spacing: 8,
+                     runSpacing: 8,
+                     alignment: WrapAlignment.center,
+                     children: [1, 3, 5, 10].map((cantidad) {
+                       final isSelected = sesiones == cantidad;
+                       return ChoiceChip(
+                         label: Text('$cantidad'),
+                         selected: isSelected,
+                         onSelected: (selected) {
+                           if (selected) {
+                             setDialogState(() {
+                               sesiones = cantidad;
+                             });
+                           }
+                         },
+                       );
+                     }).toList(),
+                   ),
+                 ],
+               ),
+               actions: [
+                 TextButton(
+                   onPressed: () => Navigator.of(context).pop(null),
+                   child: const Text('Cancelar'),
+                 ),
+                 FilledButton(
+                   onPressed: () => Navigator.of(context).pop(sesiones),
+                   child: const Text('Confirmar'),
+                 ),
+               ],
+             );
+           },
+         );
+       },
+     );
+   }
+
    Future<void> crearTicket() async {
      // Evitar envíos múltiples
      if (_isSubmitting) return;
@@ -319,13 +435,11 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      // Limpiar error de validación previo
      setState(() { validationError = null; });
 
-     // Validar campos requeridos
+     // 1. Validaciones básicas
      List<String> camposFaltantes = [];
 
-     if (fecha == null) camposFaltantes.add('Fecha y hora');
      if (tratamientosSeleccionados.isEmpty) camposFaltantes.add('Tratamientos');
      if (clienteId == null) camposFaltantes.add('Cliente');
-     if (usuarioId == null && widget.currentUserId == null) camposFaltantes.add('Usuario');
      if (pago == null) camposFaltantes.add('Pago realizado');
 
      if (camposFaltantes.isNotEmpty) {
@@ -335,55 +449,105 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        return;
      }
 
-     if (_sucursalProvider?.selectedSucursalId == null) {
-       setState(() { validationError = 'Selecciona una sucursal en el menú lateral'; });
+     // 2. Obtener datos del entorno (Sucursal)
+     final sucursalId = _sucursalProvider?.selectedSucursalId;
+
+     if (sucursalId == null) {
+       setState(() {
+         validationError = 'Error: No hay sucursal seleccionada. Selecciona una en el menú lateral.';
+       });
        return;
      }
-     calcularEstadoPago();
-
-     final usuarioFinalId = usuarioId ?? int.tryParse(widget.currentUserId ?? '0');
-
-     final ticket = {
-       'fecha': fecha!.toIso8601String(),
-       'cuota': cuota,
-       'saldoPendiente': saldoPendiente,
-       'estadoTicket': estadoTicket,
-       'tratamientos': tratamientosSeleccionados, // Array de IDs de tratamientos
-       'cliente': clienteId,
-       'users_permissions_user': usuarioFinalId,
-       'estadoPago': estadoPago,
-       'sucursal': _sucursalProvider!.selectedSucursalId,
-     };
 
      setState(() { _isSubmitting = true; });
+
      try {
-       final ok = await api.crearTicket(ticket);
-       if (ok) {
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(
-               content: Text('Ticket creado exitosamente'),
-               backgroundColor: Colors.green,
-             ),
-           );
+       // 3. Preparar carrito de compras
+       List<Map<String, dynamic>> itemsCarrito = [];
 
-           // Refrescar la lista global de tickets a través del provider
-           try {
-             await context.read<TicketProvider>().fetchCurrent();
-           } catch (e) {
-             // Si falla la recarga automática, no bloqueamos el flujo; el usuario volverá y podrá refrescar manualmente
-             print('NewTicketScreen: Error al refrescar TicketProvider: $e');
-           }
+       for (var tratId in tratamientosSeleccionados) {
+         final trat = tratamientos.firstWhere(
+           (t) => t['id'] == tratId,
+           orElse: () => <String, dynamic>{},
+         );
 
-           Navigator.pop(context, true);
+         if (trat.isNotEmpty) {
+           final cantidadSesiones = cantidadSesionesPorTratamiento[tratId] ?? 1;
+           itemsCarrito.add({
+             'id': trat['id'],
+             'nombreTratamiento': trat['nombreTratamiento'] ?? '',
+             'precio': (trat['precio'] is num) ? (trat['precio'] as num).toDouble() : 0.0,
+             'cantidad_sesiones': cantidadSesiones, // ← Ahora usa la cantidad seleccionada por el usuario
+           });
          }
-       } else {
-         setState(() { validationError = 'Error al crear ticket. Intenta de nuevo.'; });
+       }
+
+       // 4. Calcular Total
+       final totalVenta = itemsCarrito.fold<double>(
+         0,
+         (sum, t) => sum + (t['precio'] as double),
+       );
+
+       print('NewTicketScreen: Creating venta - cliente=$clienteId, sucursal=$sucursalId, total=$totalVenta, pago=$pago');
+       print('NewTicketScreen: Items carrito: ${itemsCarrito.map((i) => "${i['nombreTratamiento']} x${i['cantidad_sesiones']} sesiones").join(", ")}');
+
+       // 5. LLAMAR AL SERVICIO (Transacción atómica)
+       await api.registrarVenta(
+         clienteId: clienteId!,
+         sucursalId: sucursalId, // Ahora obligatorio
+         totalVenta: totalVenta,
+         pagoInicial: pago ?? 0.0,
+         itemsCarrito: itemsCarrito,
+       );
+
+       // 6. Éxito!
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+             content: Text('¡Venta registrada con éxito!'),
+             backgroundColor: Colors.green,
+             duration: Duration(seconds: 2),
+           ),
+         );
+
+         // Refrescar la lista global de tickets/agenda
+         try {
+           final sucId = _sucursalProvider?.selectedSucursalId;
+           if (sucId != null) {
+             await context.read<TicketProvider>().fetchAgenda(DateTime.now(), sucursalId: sucId);
+           }
+         } catch (e) {
+           print('NewTicketScreen: Error al refrescar agenda: $e');
+         }
+
+         // Volver a la pantalla anterior
+         Navigator.pop(context, true);
        }
      } catch (e) {
-       // Mostrar error inline y permitir reintento
+       // Mostrar error real (útil para depurar RPC)
        final msg = e.toString();
-       setState(() { validationError = 'Error: $msg'; });
+       print('NewTicketScreen: Error creando venta: $msg');
+
+       setState(() {
+         validationError = 'Error al crear venta: ${msg.replaceAll('Exception: ', '')}';
+       });
+
+       if (mounted) {
+         // También mostrar en dialog para errores críticos
+         showDialog(
+           context: context,
+           builder: (_) => AlertDialog(
+             title: const Text('Error al crear venta'),
+             content: Text(msg.replaceAll('Exception: ', '')),
+             actions: [
+               TextButton(
+                 onPressed: () => Navigator.pop(context),
+                 child: const Text('Cerrar'),
+               ),
+             ],
+           ),
+         );
+       }
      } finally {
        if (mounted) setState(() { _isSubmitting = false; });
      }
@@ -643,26 +807,95 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                              final id = t['id'] as int;
                                              final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
                                              final isSelected = tratamientosSeleccionados.contains(id);
-                                             return CheckboxListTile(
+                                             final cantidadSesiones = cantidadSesionesPorTratamiento[id] ?? 1;
+
+                                             return ListTile(
                                                key: ValueKey('tratamiento_filtered_$id'),
                                                dense: Responsive.isSmallScreen(context),
                                                contentPadding: EdgeInsets.symmetric(horizontal: Responsive.isSmallScreen(context) ? 8 : 16, vertical: 0),
-                                               title: Text(t['nombreTratamiento'] ?? 'Sin nombre', style: TextStyle(color: isSelected ? colorScheme.primary : null, fontWeight: isSelected ? FontWeight.bold : null, fontSize: Responsive.isSmallScreen(context) ? 13 : null), overflow: TextOverflow.ellipsis, maxLines: 2),
-                                               subtitle: Text('Bs ${precio.toStringAsFixed(2)}', style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 11 : null)),
-                                               value: isSelected,
-                                               onChanged: (bool? value) {
-                                                 setState(() {
+                                               leading: Checkbox(
+                                                 value: isSelected,
+                                                 onChanged: (bool? value) async {
                                                    if (value == true) {
-                                                     tratamientosSeleccionados.add(id);
+                                                     // Mostrar diálogo para seleccionar cantidad de sesiones
+                                                     final sesiones = await _mostrarDialogoCantidadSesiones(context, t['nombreTratamiento'] ?? 'Tratamiento');
+                                                     if (sesiones != null) {
+                                                       setState(() {
+                                                         tratamientosSeleccionados.add(id);
+                                                         cantidadSesionesPorTratamiento[id] = sesiones;
+                                                         final total = calcularPrecioTotal();
+                                                         pago = total;
+                                                         calcularEstadoPago();
+                                                       });
+                                                     }
                                                    } else {
-                                                     tratamientosSeleccionados.remove(id);
+                                                     setState(() {
+                                                       tratamientosSeleccionados.remove(id);
+                                                       cantidadSesionesPorTratamiento.remove(id);
+                                                       final total = calcularPrecioTotal();
+                                                       pago = total;
+                                                       calcularEstadoPago();
+                                                     });
                                                    }
-                                                   final total = calcularPrecioTotal();
-                                                   pago = total;
-                                                   calcularEstadoPago();
-                                                 });
-                                               },
-                                               controlAffinity: ListTileControlAffinity.leading,
+                                                 },
+                                               ),
+                                               title: Text(
+                                                 t['nombreTratamiento'] ?? 'Sin nombre',
+                                                 style: TextStyle(
+                                                   color: isSelected ? colorScheme.primary : null,
+                                                   fontWeight: isSelected ? FontWeight.bold : null,
+                                                   fontSize: Responsive.isSmallScreen(context) ? 13 : null,
+                                                 ),
+                                                 overflow: TextOverflow.ellipsis,
+                                                 maxLines: 2,
+                                               ),
+                                               subtitle: Row(
+                                                 children: [
+                                                   Text(
+                                                     'Bs ${precio.toStringAsFixed(2)}',
+                                                     style: TextStyle(fontSize: Responsive.isSmallScreen(context) ? 11 : null),
+                                                   ),
+                                                   if (isSelected) ...[
+                                                     const SizedBox(width: 8),
+                                                     Container(
+                                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                       decoration: BoxDecoration(
+                                                         color: colorScheme.primaryContainer,
+                                                         borderRadius: BorderRadius.circular(4),
+                                                       ),
+                                                       child: Text(
+                                                         '$cantidadSesiones sesión${cantidadSesiones > 1 ? "es" : ""}',
+                                                         style: TextStyle(
+                                                           fontSize: 10,
+                                                           color: colorScheme.onPrimaryContainer,
+                                                           fontWeight: FontWeight.bold,
+                                                         ),
+                                                       ),
+                                                     ),
+                                                   ],
+                                                 ],
+                                               ),
+                                               trailing: isSelected
+                                                   ? IconButton(
+                                                       icon: const Icon(Icons.settings, size: 20),
+                                                       tooltip: 'Cambiar cantidad de sesiones',
+                                                       onPressed: () async {
+                                                         final sesiones = await _mostrarDialogoCantidadSesiones(
+                                                           context,
+                                                           t['nombreTratamiento'] ?? 'Tratamiento',
+                                                           cantidadActual: cantidadSesiones,
+                                                         );
+                                                         if (sesiones != null) {
+                                                           setState(() {
+                                                             cantidadSesionesPorTratamiento[id] = sesiones;
+                                                             final total = calcularPrecioTotal();
+                                                             pago = total;
+                                                             calcularEstadoPago();
+                                                           });
+                                                         }
+                                                       },
+                                                     )
+                                                   : null,
                                              );
                                            },
                                          );
@@ -725,146 +958,6 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                    ),
                                  ],
                                ),
-                               const SizedBox(width: 8),
-                               // Usuario
-                               Text('Usuario', style: Theme.of(context).textTheme.labelLarge),
-                               const SizedBox(height: 8),
-                               // Mostrar loading mientras se determina el tipo de usuario
-                               if (isLoadingUserType)
-                                 Container(
-                                   padding: const EdgeInsets.all(16),
-                                   decoration: BoxDecoration(
-                                     color: colorScheme.surfaceContainerHighest,
-                                     borderRadius: BorderRadius.circular(12),
-                                     border: Border.all(
-                                       color: colorScheme.outline.withValues(alpha: 0.5),
-                                     ),
-                                   ),
-                                   child: Row(
-                                     children: [
-                                       SizedBox(
-                                         width: 20,
-                                         height: 20,
-                                         child: CircularProgressIndicator(
-                                           strokeWidth: 2,
-                                           color: colorScheme.primary,
-                                         ),
-                                       ),
-                                       const SizedBox(width: 12),
-                                       Text(
-                                         'Verificando permisos...',
-                                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                           color: colorScheme.onSurfaceVariant,
-                                         ),
-                                       ),
-                                     ],
-                                   ),
-                                 )
-                               // Si es empleado, mostrar solo texto (no puede cambiar)
-                               else if (_isEmployee)
-                                 Container(
-                                   padding: const EdgeInsets.all(16),
-                                   decoration: BoxDecoration(
-                                     color: colorScheme.surfaceContainerHighest,
-                                     borderRadius: BorderRadius.circular(12),
-                                     border: Border.all(
-                                       color: colorScheme.outline.withValues(alpha: 0.5),
-                                     ),
-                                   ),
-                                   child: Row(
-                                     children: [
-                                       Icon(Icons.person, color: colorScheme.primary),
-                                       const SizedBox(width: 12),
-                                       Expanded(
-                                         child: Text(
-                                           usuarioNombre ?? 'Usuario actual',
-                                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                             color: colorScheme.onSurface,
-                                           ),
-                                         ),
-                                       ),
-                                       Icon(Icons.lock, size: 16, color: colorScheme.onSurfaceVariant),
-                                     ],
-                                   ),
-                                 )
-                               // Si es admin, mostrar dropdown para seleccionar
-                               else
-                                 Builder(
-                                   builder: (context) {
-                                     // Si está cargando usuarios, mostrar un indicador
-                                     if (isLoadingUsuarios) {
-                                       return Container(
-                                         padding: const EdgeInsets.all(16),
-                                         decoration: BoxDecoration(
-                                           color: colorScheme.surfaceContainerHighest,
-                                           borderRadius: BorderRadius.circular(12),
-                                           border: Border.all(
-                                             color: colorScheme.outline.withValues(alpha: 0.5),
-                                           ),
-                                         ),
-                                         child: Row(
-                                           children: [
-                                             SizedBox(
-                                               width: 20,
-                                               height: 20,
-                                               child: CircularProgressIndicator(
-                                                 strokeWidth: 2,
-                                                 color: colorScheme.primary,
-                                               ),
-                                             ),
-                                             const SizedBox(width: 12),
-                                             Text(
-                                               'Cargando usuarios...',
-                                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                                 color: colorScheme.onSurfaceVariant,
-                                               ),
-                                             ),
-                                           ],
-                                         ),
-                                       );
-                                     }
-
-                                     // Eliminar usuarios duplicados por ID
-                                     final uniqueUsuarios = <int, Map<String, dynamic>>{};
-                                     for (var u in usuarios) {
-                                       if (u['id'] != null) {
-                                         uniqueUsuarios[u['id'] as int] = u;
-                                       }
-                                     }
-                                     final usuariosList = uniqueUsuarios.values.toList();
-
-                                     // SOLUCIÓN SIMPLE: SIEMPRE usar null como value para evitar el error
-                                     // Esto fuerza al admin a seleccionar manualmente
-                                     print('NewTicket: Creando dropdown con ${usuariosList.length} usuarios, usuarioId actual=$usuarioId');
-
-                                     return DropdownButtonFormField<int>(
-                                       initialValue: null, // SIEMPRE null para evitar errores
-                                       decoration: InputDecoration(
-                                         filled: true,
-                                         fillColor: colorScheme.surfaceContainerHighest,
-                                         border: OutlineInputBorder(
-                                           borderRadius: BorderRadius.circular(12),
-                                           borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
-                                         ),
-                                       ),
-                                       items: usuariosList.isEmpty
-                                           ? [
-                                               DropdownMenuItem<int>(
-                                                 value: null,
-                                                 child: Text('No hay usuarios disponibles'),
-                                               )
-                                             ]
-                                           : usuariosList.map<DropdownMenuItem<int>>((u) {
-                                               return DropdownMenuItem(
-                                                 value: u['id'],
-                                                 child: Text(u['username'] ?? u['email'] ?? ''),
-                                               );
-                                             }).toList(),
-                                       onChanged: usuariosList.isEmpty ? null : (v) => setState(() => usuarioId = v),
-                                       hint: const Text('Seleccionar usuario'),
-                                     );
-                                   }
-                                 ),
                                const SizedBox(height: 18),
                                // Mostrar precio total de tratamientos
                                if (tratamientosSeleccionados.isNotEmpty)

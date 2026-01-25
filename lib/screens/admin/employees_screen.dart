@@ -90,7 +90,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     // Chequear si hay JWT en session o prefs
     try {
       final session = Supabase.instance.client.auth.currentSession;
-      _diagAuthPresent = session?.accessToken?.isNotEmpty ?? false;
+      _diagAuthPresent = (session != null && (session.accessToken?.isNotEmpty ?? false));
       if (!_diagAuthPresent) {
         final prefs = await SharedPreferences.getInstance();
         _diagAuthPresent = (prefs.getString('jwt') ?? '').isNotEmpty;
@@ -523,8 +523,28 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final providerSuc = provider?.selectedSucursalId;
     final prefs = await SharedPreferences.getInstance();
     final prefSuc = prefs.getInt('selectedSucursalId');
-    final auth = await api.debugAuthCheck();
-    final sucursales = await api.debugGetSucursalesDetailed();
+
+    // Reemplazamos debugAuthCheck/debugGetSucursalesDetailed por comprobaciones directas
+    Map<String, dynamic> auth = {};
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      auth = {
+        'hasSession': session != null,
+        'accessTokenPresent': session?.accessToken?.isNotEmpty ?? false,
+        'userId': session?.user.id,
+      };
+    } catch (e) {
+      auth = {'error': e.toString()};
+    }
+
+    Map<String, dynamic> sucursales = {};
+    try {
+      final s = await api.getSucursales();
+      sucursales = {'supabase_rest': {'status': 200, 'body': s}};
+    } catch (e) {
+      sucursales = {'supabase_rest': {'error': e.toString()}};
+    }
+
     List<dynamic> usuarios = [];
     try {
       usuarios = await api.getUsuarios(sucursalId: providerSuc ?? prefSuc);
@@ -1236,7 +1256,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
                   // Selección de tipo de usuario (solo visible para administradores o al editar si ya tiene rol)
                   if (_canSetRole || widget.employee != null)
                     DropdownButtonFormField<String>(
-                      value: _tipoUsuario,
+                      initialValue: _tipoUsuario,
                       decoration: InputDecoration(
                         labelText: 'Tipo de usuario',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -1316,8 +1336,8 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
           password: _passwordController.text,
           nombre: _usernameController.text,
           sucursalId: selectedSucursalId,
-          tipoUsuario: _tipoUsuario ?? 'empleado',
-        );
+          tipoUsuario: _tipoUsuario,
+         );
       }
 
       if (mounted) {

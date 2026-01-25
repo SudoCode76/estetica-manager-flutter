@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 
+
+
 class PaymentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> cliente;
   const PaymentDetailScreen({Key? key, required this.cliente}) : super(key: key);
@@ -49,19 +51,20 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         total += double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
       }
 
-      // Cargar historial de pagos del cliente (si el modelo contiene cliente o ticket, lo relacionamos)
-      final allPagos = await _api.getPagos(sucursalId: sucursalId);
-      final pagosCliente = allPagos.where((p) {
-        final pc = p['cliente'] is Map ? p['cliente']['id'] : p['cliente'];
-        if (pc != null && pc == cid) return true;
-        final pt = p['ticket'] is Map ? p['ticket']['id'] : p['ticket'];
-        if (pt != null) {
-          // si el pago referencia un ticket, comprobar que ese ticket pertenece al cliente actual
-          // Ahora comprobamos contra TODOS los tickets del cliente (no solo los que tienen deuda)
-          return allClientTickets.any((t) => t['id'] == pt || (t['documentId'] ?? '').toString() == pt.toString());
+      // Cargar historial de pagos del cliente usando la nueva arquitectura
+      // Obtener pagos de cada ticket del cliente
+      List<dynamic> pagosCliente = [];
+      for (final ticket in allClientTickets) {
+        try {
+          final ticketId = ticket['id']?.toString();
+          if (ticketId != null && ticketId.isNotEmpty) {
+            final pagosTicket = await _api.obtenerPagosTicket(ticketId);
+            pagosCliente.addAll(pagosTicket);
+          }
+        } catch (e) {
+          print('Error obteniendo pagos de ticket ${ticket['id']}: $e');
         }
-        return false;
-      }).toList();
+      }
 
       setState(() {
         _tickets = deudaTickets;
@@ -210,80 +213,77 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
     setState(() => _loading = true);
     try {
       double remaining = monto;
-      // Ordenar tickets por fecha ascendente
+      // Ordenar tickets por fecha ascendente (si tienen fecha)
       final ticketsSorted = List<dynamic>.from(ticketsToApply)..sort((a, b) {
-        final fa = DateTime.tryParse(a['fecha'] ?? '') ?? DateTime.now();
-        final fb = DateTime.tryParse(b['fecha'] ?? '') ?? DateTime.now();
+        final fa = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime.now();
+        final fb = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime.now();
         return fa.compareTo(fb);
       });
 
       for (final t in ticketsSorted) {
         if (remaining <= 0) break;
-        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
+        
+        // Obtener saldo pendiente
+        final saldo = (t['saldo_pendiente'] is num) 
+            ? (t['saldo_pendiente'] as num).toDouble() 
+            : 0.0;
+            
         if (saldo <= 0) continue;
+        
+        // Calcular monto a aplicar en este ticket
         final apply = remaining >= saldo ? saldo : remaining;
-        // Crear pago incluyendo relación a ticket. Usamos el id numérico del ticket para asegurar el enlace
-        dynamic ticketRef = t['id'];
-        if (ticketRef == null && (t['documentId'] != null)) {
-          try {
-            final resolved = await _api.getTicketByDocumentId(t['documentId'].toString());
-            if (resolved != null) ticketRef = resolved['id'];
-          } catch (_) {}
-        }
-        final pagoPayload = {
-          'montoPagado': apply,
-          'fechaPago': DateTime.now().toIso8601String(),
-          'ticket': ticketRef,
-        };
-        try {
-          await _api.crearPago(pagoPayload);
-        } catch (e) {
-          // Mostrar error detallado y detener el proceso
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear pago: $e')));
-          break;
+        
+        // Obtener ID del ticket
+        final ticketId = t['id']?.toString();
+        if (ticketId == null || ticketId.isEmpty) {
+          print('PaymentDetail: ticket sin ID válido, skipping');
+          continue;
         }
 
-        final newSaldo = (double.parse(saldo.toString()) - apply);
-        final nuevoEstado = newSaldo <= 0 ? 'Completo' : 'Incompleto';
-        final ticketPayload = {
-          'saldoPendiente': newSaldo,
-          'cuota': (double.tryParse(t['cuota']?.toString() ?? '0') ?? 0) - apply,
-          'estadoPago': nuevoEstado,
-        };
         try {
-          await (_api as dynamic).updateTicket(t['documentId'] ?? t['id'].toString(), ticketPayload);
+          // Usar la nueva arquitectura: registrarAbono
+          // El trigger automáticamente actualiza el ticket
+          await _api.registrarAbono(
+            ticketId: ticketId,
+            montoAbono: apply,
+            metodoPago: 'efectivo',
+          );
+          
+          remaining -= apply;
         } catch (e) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pago registrado pero error al actualizar ticket: $e')));
+          // Mostrar error detallado y continuar con el siguiente ticket
+          print('Error al registrar abono en ticket $ticketId: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error en ticket ${ticketId.substring(0, 8)}: $e'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
         }
-
-        remaining -= apply;
       }
 
-      // refresh pagos list
-      try {
-        final sucursalIdRef = SucursalInherited.of(context)?.selectedSucursalId;
-        final refreshedPagos = await _api.getPagos(sucursalId: sucursalIdRef);
-         setState(() {
-           _pagos = refreshedPagos.where((p) {
-             // Some payments may include a 'ticket' relation as Map with 'id' or 'documentId', or as primitive
-             final ptRaw = p['ticket'];
-             if (ptRaw == null) return false;
-             if (ptRaw is Map) {
-               final tid = ptRaw['id'];
-               final tdoc = ptRaw['documentId'];
-               if (tid != null && _tickets.any((t) => t['id'] == tid)) return true;
-               if (tdoc != null && _tickets.any((t) => (t['documentId'] ?? '').toString() == tdoc.toString())) return true;
-             } else {
-               // primitive: could be numeric id or documentId string
-               if (_tickets.any((t) => t['id'] == ptRaw || (t['documentId'] ?? '').toString() == ptRaw.toString())) return true;
-             }
-             return false;
-           }).toList();
-         });
-       } catch (_) {}
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pago registrado')));
+      // Recargar tickets después de procesar pagos
+      await _loadTickets();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pago(s) registrado(s) exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error registrando pago: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error procesando pagos: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       setState(() => _loading = false);
     }
