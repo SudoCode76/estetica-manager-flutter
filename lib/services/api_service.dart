@@ -1261,30 +1261,44 @@ class ApiService {
       if (userId == null) throw Exception('Usuario no autenticado');
 
       // 2. Transformar el Carrito en Sesiones Individuales
-      // El backend espera una lista plana de sesiones, no agrupada por tratamientos
+      // Ahora usamos el cronograma_sesiones que trae las fechas elegidas por el usuario
       List<Map<String, dynamic>> sesionesParaEnviar = [];
 
       for (var item in itemsCarrito) {
-        // Extraer datos del tratamiento
         int idTratamiento = item['id'];
-        int cantidadSesiones = item['cantidad_sesiones'] ?? 1; // Ej: Paquete de 5
         double precioTratamiento = (item['precio'] is num)
             ? (item['precio'] as num).toDouble()
             : 0.0;
 
-        // Generar las N sesiones
-        for (int i = 1; i <= cantidadSesiones; i++) {
+        // Obtenemos la lista de fechas que eligió el usuario en la UI
+        List<dynamic> cronogramaRaw = item['cronograma_sesiones'] ?? [];
+
+        if (cronogramaRaw.isEmpty) {
+          throw Exception('El tratamiento ${item['nombreTratamiento'] ?? item['id']} no tiene fechas programadas');
+        }
+
+        // Convertir a DateTime si es necesario
+        List<DateTime> fechas = cronogramaRaw.map((f) {
+          if (f is DateTime) return f;
+          if (f is String) return DateTime.parse(f);
+          throw Exception('Formato de fecha inválido');
+        }).toList();
+
+        int cantidadSesiones = fechas.length;
+
+        // Iteramos por CADA FECHA elegida
+        for (int i = 0; i < fechas.length; i++) {
           sesionesParaEnviar.add({
             'tratamiento_id': idTratamiento,
-            'numero_sesion': i,
-            'precio_sesion': precioTratamiento / cantidadSesiones, // Dividir precio
-            // Lógica de Negocio: La sesión 1 se marca para "HOY", las demás quedan abiertas (null)
-            'fecha_inicio': (i == 1) ? DateTime.now().toIso8601String() : null
+            'numero_sesion': i + 1, // 1, 2, 3...
+            'precio_sesion': precioTratamiento / cantidadSesiones,
+            'fecha_inicio': fechas[i].toIso8601String() // ← La fecha exacta de esa sesión
           });
         }
       }
 
       print('registrarVenta: Creating ticket with ${sesionesParaEnviar.length} sesiones');
+      print('registrarVenta: Sesiones: ${sesionesParaEnviar.map((s) => "Sesión ${s['numero_sesion']}: ${s['fecha_inicio']}").join(", ")}');
 
       // 3. Llamada Atómica al Backend
       final response = await Supabase.instance.client.rpc(

@@ -24,8 +24,9 @@ class NewTicketScreen extends StatefulWidget {
 class _NewTicketScreenState extends State<NewTicketScreen> {
    final ApiService api = ApiService();
    DateTime? fecha;
-   List<int> tratamientosSeleccionados = []; // Ahora soporta múltiples tratamientos
-   Map<int, int> cantidadSesionesPorTratamiento = {}; // NUEVO: almacena cantidad de sesiones por tratamiento
+   List<int> tratamientosSeleccionados = [];
+   Map<int, int> cantidadSesionesPorTratamiento = {}; // cantidad de sesiones por tratamiento
+   Map<int, List<DateTime>> cronogramaSesionesPorTratamiento = {}; // NUEVO: fechas de cada sesión
    int? clienteId;
    String? clienteNombre;
    int? usuarioId;
@@ -314,102 +315,186 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      }
    }
 
-   Future<int?> _mostrarDialogoCantidadSesiones(BuildContext context, String nombreTratamiento, {int? cantidadActual}) async {
-     int sesiones = cantidadActual ?? 1;
-
-     return showDialog<int>(
+   /// Selector de fecha y hora para cada sesión
+   Future<DateTime?> _pickDateTime(BuildContext context, {String? labelSesion}) async {
+     final date = await showDatePicker(
        context: context,
+       initialDate: DateTime.now(),
+       firstDate: DateTime.now(),
+       lastDate: DateTime(2030),
+       helpText: labelSesion != null ? 'Fecha para $labelSesion' : 'Seleccionar fecha',
+     );
+     if (date == null) return null;
+
+     final time = await showTimePicker(
+       context: context,
+       initialTime: TimeOfDay.now(),
+       helpText: labelSesion != null ? 'Hora para $labelSesion' : 'Seleccionar hora',
+     );
+     if (time == null) return null;
+
+     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+   }
+
+   Future<Map<String, dynamic>?> _mostrarDialogoCantidadSesiones(
+     BuildContext context,
+     String nombreTratamiento,
+     {int? cantidadActual, List<DateTime>? fechasActuales}
+   ) async {
+     int sesiones = cantidadActual ?? 1;
+     List<DateTime> fechasElegidas = List.from(fechasActuales ?? []);
+
+     return showDialog<Map<String, dynamic>>(
+       context: context,
+       barrierDismissible: false,
        builder: (BuildContext context) {
          return StatefulBuilder(
            builder: (context, setDialogState) {
              return AlertDialog(
                title: Text(
-                 'Cantidad de Sesiones',
+                 'Programar Sesiones',
                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                ),
-               content: Column(
-                 mainAxisSize: MainAxisSize.min,
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                 children: [
-                   Text(
-                     nombreTratamiento,
-                     style: TextStyle(
-                       fontSize: 14,
-                       color: Theme.of(context).colorScheme.onSurfaceVariant,
-                     ),
-                   ),
-                   const SizedBox(height: 24),
-                   Text(
-                     '¿Cuántas sesiones incluye?',
-                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                   ),
-                   const SizedBox(height: 16),
-                   Row(
-                     mainAxisAlignment: MainAxisAlignment.center,
-                     children: [
-                       IconButton(
-                         icon: const Icon(Icons.remove_circle_outline),
-                         iconSize: 32,
-                         onPressed: sesiones > 1
-                             ? () {
-                                 setDialogState(() {
-                                   sesiones--;
-                                 });
-                               }
-                             : null,
+               content: SingleChildScrollView(
+                 child: Column(
+                   mainAxisSize: MainAxisSize.min,
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Text(
+                       nombreTratamiento,
+                       style: TextStyle(
+                         fontSize: 14,
+                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                        ),
-                       const SizedBox(width: 16),
-                       Container(
-                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                         decoration: BoxDecoration(
-                           color: Theme.of(context).colorScheme.primaryContainer,
-                           borderRadius: BorderRadius.circular(12),
+                     ),
+                     const SizedBox(height: 16),
+                     Text(
+                       '¿Cuántas sesiones?',
+                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                     ),
+                     const SizedBox(height: 12),
+                     Row(
+                       mainAxisAlignment: MainAxisAlignment.center,
+                       children: [
+                         IconButton(
+                           icon: const Icon(Icons.remove_circle_outline),
+                           iconSize: 28,
+                           onPressed: sesiones > 1
+                               ? () {
+                                   setDialogState(() {
+                                     sesiones--;
+                                     if (fechasElegidas.length > sesiones) {
+                                       fechasElegidas.removeRange(sesiones, fechasElegidas.length);
+                                     }
+                                   });
+                                 }
+                               : null,
                          ),
-                         child: Text(
-                           '$sesiones',
-                           style: TextStyle(
-                             fontSize: 32,
-                             fontWeight: FontWeight.bold,
-                             color: Theme.of(context).colorScheme.onPrimaryContainer,
+                         Container(
+                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                           decoration: BoxDecoration(
+                             color: Theme.of(context).colorScheme.primaryContainer,
+                             borderRadius: BorderRadius.circular(10),
+                           ),
+                           child: Text(
+                             '$sesiones',
+                             style: TextStyle(
+                               fontSize: 28,
+                               fontWeight: FontWeight.bold,
+                               color: Theme.of(context).colorScheme.onPrimaryContainer,
+                             ),
                            ),
                          ),
-                       ),
-                       const SizedBox(width: 16),
-                       IconButton(
-                         icon: const Icon(Icons.add_circle_outline),
-                         iconSize: 32,
-                         onPressed: sesiones < 20
-                             ? () {
-                                 setDialogState(() {
-                                   sesiones++;
-                                 });
-                               }
-                             : null,
-                       ),
-                     ],
-                   ),
-                   const SizedBox(height: 16),
-                   // Atajos rápidos
-                   Wrap(
-                     spacing: 8,
-                     runSpacing: 8,
-                     alignment: WrapAlignment.center,
-                     children: [1, 3, 5, 10].map((cantidad) {
-                       final isSelected = sesiones == cantidad;
-                       return ChoiceChip(
-                         label: Text('$cantidad'),
-                         selected: isSelected,
-                         onSelected: (selected) {
-                           if (selected) {
-                             setDialogState(() {
-                               sesiones = cantidad;
-                             });
-                           }
-                         },
+                         IconButton(
+                           icon: const Icon(Icons.add_circle_outline),
+                           iconSize: 28,
+                           onPressed: sesiones < 20
+                               ? () {
+                                   setDialogState(() {
+                                     sesiones++;
+                                   });
+                                 }
+                               : null,
+                         ),
+                       ],
+                     ),
+                     const SizedBox(height: 12),
+                     Wrap(
+                       spacing: 8,
+                       runSpacing: 8,
+                       alignment: WrapAlignment.center,
+                       children: [1, 3, 5, 10].map((cantidad) {
+                         return ChoiceChip(
+                           label: Text('$cantidad'),
+                           selected: sesiones == cantidad,
+                           onSelected: (selected) {
+                             if (selected) {
+                               setDialogState(() {
+                                 sesiones = cantidad;
+                                 if (fechasElegidas.length > sesiones) {
+                                   fechasElegidas.removeRange(sesiones, fechasElegidas.length);
+                                 }
+                               });
+                             }
+                           },
+                         );
+                       }).toList(),
+                     ),
+                     const SizedBox(height: 20),
+                     Divider(),
+                     const SizedBox(height: 12),
+                     Text(
+                       'Fechas de las sesiones:',
+                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                     ),
+                     const SizedBox(height: 8),
+                     // Lista de fechas programadas
+                     ...List.generate(sesiones, (index) {
+                       final sesionNum = index + 1;
+                       final tieneFecha = fechasElegidas.length > index;
+                       final fecha = tieneFecha ? fechasElegidas[index] : null;
+
+                       return Padding(
+                         padding: const EdgeInsets.only(bottom: 8),
+                         child: OutlinedButton.icon(
+                           onPressed: () async {
+                             final fechaNueva = await _pickDateTime(
+                               context,
+                               labelSesion: 'Sesión $sesionNum',
+                             );
+                             if (fechaNueva != null) {
+                               setDialogState(() {
+                                 if (tieneFecha) {
+                                   fechasElegidas[index] = fechaNueva;
+                                 } else {
+                                   while (fechasElegidas.length < index) {
+                                     fechasElegidas.add(DateTime.now());
+                                   }
+                                   fechasElegidas.add(fechaNueva);
+                                 }
+                               });
+                             }
+                           },
+                           icon: Icon(
+                             fecha != null ? Icons.event_available : Icons.event,
+                             size: 18,
+                           ),
+                           label: Text(
+                             fecha != null
+                                 ? 'Sesión $sesionNum: ${DateFormat('dd/MM/yy HH:mm').format(fecha)}'
+                                 : 'Sesión $sesionNum: Seleccionar fecha',
+                             style: TextStyle(fontSize: 12),
+                           ),
+                           style: OutlinedButton.styleFrom(
+                             backgroundColor: fecha != null
+                                 ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                                 : null,
+                           ),
+                         ),
                        );
-                     }).toList(),
-                   ),
-                 ],
+                     }),
+                   ],
+                 ),
                ),
                actions: [
                  TextButton(
@@ -417,7 +502,14 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                    child: const Text('Cancelar'),
                  ),
                  FilledButton(
-                   onPressed: () => Navigator.of(context).pop(sesiones),
+                   onPressed: fechasElegidas.length == sesiones
+                       ? () {
+                           Navigator.of(context).pop({
+                             'cantidad_sesiones': sesiones,
+                             'cronograma_sesiones': fechasElegidas,
+                           });
+                         }
+                       : null,
                    child: const Text('Confirmar'),
                  ),
                ],
@@ -461,35 +553,44 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
      setState(() { _isSubmitting = true; });
 
-     try {
-       // 3. Preparar carrito de compras
-       List<Map<String, dynamic>> itemsCarrito = [];
+      try {
+        // 3. Preparar carrito de compras con cronograma de sesiones
+        List<Map<String, dynamic>> itemsCarrito = [];
 
-       for (var tratId in tratamientosSeleccionados) {
-         final trat = tratamientos.firstWhere(
-           (t) => t['id'] == tratId,
-           orElse: () => <String, dynamic>{},
-         );
+        for (var tratId in tratamientosSeleccionados) {
+          final trat = tratamientos.firstWhere(
+            (t) => t['id'] == tratId,
+            orElse: () => <String, dynamic>{},
+          );
 
-         if (trat.isNotEmpty) {
-           final cantidadSesiones = cantidadSesionesPorTratamiento[tratId] ?? 1;
-           itemsCarrito.add({
-             'id': trat['id'],
-             'nombreTratamiento': trat['nombreTratamiento'] ?? '',
-             'precio': (trat['precio'] is num) ? (trat['precio'] as num).toDouble() : 0.0,
-             'cantidad_sesiones': cantidadSesiones, // ← Ahora usa la cantidad seleccionada por el usuario
-           });
-         }
-       }
+          if (trat.isNotEmpty) {
+            final cantidadSesiones = cantidadSesionesPorTratamiento[tratId] ?? 1;
+            final cronogramaSesiones = cronogramaSesionesPorTratamiento[tratId] ?? [];
 
-       // 4. Calcular Total
-       final totalVenta = itemsCarrito.fold<double>(
-         0,
-         (sum, t) => sum + (t['precio'] as double),
-       );
+            // Validar que haya cronograma
+            if (cronogramaSesiones.isEmpty) {
+              throw Exception('El tratamiento ${trat['nombreTratamiento']} no tiene fechas programadas');
+            }
 
-       print('NewTicketScreen: Creating venta - cliente=$clienteId, sucursal=$sucursalId, total=$totalVenta, pago=$pago');
-       print('NewTicketScreen: Items carrito: ${itemsCarrito.map((i) => "${i['nombreTratamiento']} x${i['cantidad_sesiones']} sesiones").join(", ")}');
+            itemsCarrito.add({
+              'id': trat['id'],
+              'nombreTratamiento': trat['nombreTratamiento'] ?? '',
+              'precio': (trat['precio'] is num) ? (trat['precio'] as num).toDouble() : 0.0,
+              'cantidad_sesiones': cantidadSesiones,
+              'cronograma_sesiones': cronogramaSesiones, // ← NUEVO: Lista de fechas
+            });
+          }
+        }
+
+        // 4. Calcular Total
+        final totalVenta = itemsCarrito.fold<double>(
+          0,
+          (sum, t) => sum + (t['precio'] as double),
+        );
+
+        print('NewTicketScreen: Creating venta - cliente=$clienteId, sucursal=$sucursalId, total=$totalVenta, pago=$pago');
+        print('NewTicketScreen: Items carrito: ${itemsCarrito.map((i) => "${i['nombreTratamiento']} x${i['cantidad_sesiones']} sesiones").join(", ")}');
+        print('NewTicketScreen: Cronogramas: ${itemsCarrito.map((i) => "${i['nombreTratamiento']}: ${(i['cronograma_sesiones'] as List).map((f) => DateFormat('dd/MM HH:mm').format(f)).join(', ')}").join(" | ")}');
 
        // 5. LLAMAR AL SERVICIO (Transacción atómica)
        await api.registrarVenta(
@@ -808,6 +909,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                              final precio = double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
                                              final isSelected = tratamientosSeleccionados.contains(id);
                                              final cantidadSesiones = cantidadSesionesPorTratamiento[id] ?? 1;
+                                             final fechasSesiones = cronogramaSesionesPorTratamiento[id] ?? [];
 
                                              return ListTile(
                                                key: ValueKey('tratamiento_filtered_$id'),
@@ -817,12 +919,16 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                                  value: isSelected,
                                                  onChanged: (bool? value) async {
                                                    if (value == true) {
-                                                     // Mostrar diálogo para seleccionar cantidad de sesiones
-                                                     final sesiones = await _mostrarDialogoCantidadSesiones(context, t['nombreTratamiento'] ?? 'Tratamiento');
-                                                     if (sesiones != null) {
+                                                     // Mostrar diálogo para seleccionar cantidad y fechas de sesiones
+                                                     final resultado = await _mostrarDialogoCantidadSesiones(
+                                                       context,
+                                                       t['nombreTratamiento'] ?? 'Tratamiento',
+                                                     );
+                                                     if (resultado != null) {
                                                        setState(() {
                                                          tratamientosSeleccionados.add(id);
-                                                         cantidadSesionesPorTratamiento[id] = sesiones;
+                                                         cantidadSesionesPorTratamiento[id] = resultado['cantidad_sesiones'];
+                                                         cronogramaSesionesPorTratamiento[id] = resultado['cronograma_sesiones'];
                                                          final total = calcularPrecioTotal();
                                                          pago = total;
                                                          calcularEstadoPago();
@@ -832,6 +938,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                                      setState(() {
                                                        tratamientosSeleccionados.remove(id);
                                                        cantidadSesionesPorTratamiento.remove(id);
+                                                       cronogramaSesionesPorTratamiento.remove(id);
                                                        final total = calcularPrecioTotal();
                                                        pago = total;
                                                        calcularEstadoPago();
@@ -878,16 +985,18 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                                trailing: isSelected
                                                    ? IconButton(
                                                        icon: const Icon(Icons.settings, size: 20),
-                                                       tooltip: 'Cambiar cantidad de sesiones',
+                                                       tooltip: 'Modificar sesiones',
                                                        onPressed: () async {
-                                                         final sesiones = await _mostrarDialogoCantidadSesiones(
+                                                         final resultado = await _mostrarDialogoCantidadSesiones(
                                                            context,
                                                            t['nombreTratamiento'] ?? 'Tratamiento',
                                                            cantidadActual: cantidadSesiones,
+                                                           fechasActuales: fechasSesiones,
                                                          );
-                                                         if (sesiones != null) {
+                                                         if (resultado != null) {
                                                            setState(() {
-                                                             cantidadSesionesPorTratamiento[id] = sesiones;
+                                                             cantidadSesionesPorTratamiento[id] = resultado['cantidad_sesiones'];
+                                                             cronogramaSesionesPorTratamiento[id] = resultado['cronograma_sesiones'];
                                                              final total = calcularPrecioTotal();
                                                              pago = total;
                                                              calcularEstadoPago();
