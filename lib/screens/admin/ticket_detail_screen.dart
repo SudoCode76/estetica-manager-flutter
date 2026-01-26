@@ -290,6 +290,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final cliente = widget.ticket['cliente'];
     final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
 
+    // Crear una copia ordenada de las sesiones: de más antiguo a más reciente.
+    // Si la sesión no tiene fecha, la colocamos al final.
+    final sesionesOrdenadas = List<dynamic>.from(sesiones);
+    sesionesOrdenadas.sort((a, b) {
+      try {
+        final fa = a?['fecha_hora_inicio'];
+        final fb = b?['fecha_hora_inicio'];
+        if (fa == null && fb == null) return 0;
+        if (fa == null) return 1; // a sin fecha => va al final
+        if (fb == null) return -1; // b sin fecha => a antes
+        final da = DateTime.parse(fa.toString());
+        final db = DateTime.parse(fb.toString());
+        return da.compareTo(db); // ascendente
+      } catch (e) {
+        return 0;
+      }
+    });
+
     final montoTotal = (widget.ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
     final montoPagado = (widget.ticket['monto_pagado'] as num?)?.toDouble() ?? 0.0;
     final saldoPendiente = (widget.ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
@@ -350,8 +368,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
               const SizedBox(height: 16),
 
-              // --- SECCIÓN: AGENDA DE SESIONES (CORREGIDA) ---
-              // --- SECCIÓN: AGENDA DE SESIONES (CORREGIDA) ---
               _SectionCard(
                 title: 'Agenda de Sesiones',
                 icon: Icons.calendar_month,
@@ -362,7 +378,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       value: 'Sin sesiones registradas',
                     )
                   else
-                    ...sesiones.asMap().entries.map((entry) {
+                    ...sesionesOrdenadas.asMap().entries.map((entry) {
                       final index = entry.key;
                       final s = entry.value;
 
@@ -392,18 +408,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       }
 
                       return Container(
-                        margin: EdgeInsets.only(bottom: index < sesiones.length - 1 ? 12 : 0),
+                        margin: EdgeInsets.only(bottom: index < sesionesOrdenadas.length - 1 ? 12 : 0),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           // Fondo verde suave si está realizada, gris si no
                           color: isRealizada
-                              ? Colors.green.withOpacity(0.05)
-                              : colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              ? Colors.green.withValues(alpha: 0.05)
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isRealizada
-                                ? Colors.green.withOpacity(0.3)
-                                : colorScheme.outline.withOpacity(0.2),
+                                ? Colors.green.withValues(alpha: 0.3)
+                                : colorScheme.outline.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
