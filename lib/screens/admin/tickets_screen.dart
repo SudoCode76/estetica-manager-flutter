@@ -219,48 +219,15 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         padding: const EdgeInsets.all(16),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Indicador de filtro por fecha y botón para ver histórico
-                Row(
-                  children: [
-                    Chip(
-                      avatar: Icon(
-                        Icons.today,
-                        size: 18,
-                        color: colorScheme.primary,
-                      ),
-                      label: Text(
-                        'Solo hoy',
-                        style: textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      backgroundColor: colorScheme.primaryContainer,
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AllTicketsScreen(),
-                          ),
-                        ).then((_) => _reloadTicketsForCurrentFilters());
-                      },
-                      icon: const Icon(Icons.history),
-                      label: const Text('Ver todos'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
+        ),
 
-          // Lista de tickets
-          Expanded(
+        // Lista de tickets
+        Expanded(
             child: isLoading
                 ? Center(
                     child: Column(
@@ -479,47 +446,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                   ],
                                                 ),
                                               ),
-                                              // Botón check mejorado
-                                              if (!estadoTicket)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(left: 12.0),
-                                                  child: _AttendButton(
-                                                    onPressedAsync: () async {
-                                                      final documentId = t['documentId'];
-                                                      final success = await api.actualizarEstadoTicket(documentId, true);
-                                                      if (success) {
-                                                        ScaffoldMessenger.of(context).showSnackBar(
-                                                          SnackBar(
-                                                            content: Row(
-                                                              children: [
-                                                                const Icon(Icons.check_circle, color: Colors.white),
-                                                                const SizedBox(width: 8),
-                                                                const Text('Ticket marcado como atendido'),
-                                                              ],
-                                                            ),
-                                                            backgroundColor: colorScheme.primary,
-                                                            behavior: SnackBarBehavior.floating,
-                                                          ),
-                                                        );
-                                                        _reloadTicketsForCurrentFilters();
-                                                      } else {
-                                                        ScaffoldMessenger.of(context).showSnackBar(
-                                                          SnackBar(
-                                                            content: Row(
-                                                              children: [
-                                                                const Icon(Icons.error, color: Colors.white),
-                                                                const SizedBox(width: 8),
-                                                                const Text('Error al actualizar el ticket'),
-                                                              ],
-                                                            ),
-                                                            backgroundColor: colorScheme.error,
-                                                            behavior: SnackBarBehavior.floating,
-                                                          ),
-                                                        );
-                                                      }
-                                                    },
-                                                  ),
-                                                ),
                                             ],
                                           ),
                                         ),
@@ -537,92 +463,4 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 }
 
-class _AttendButton extends StatefulWidget {
-  // Ahora recibe una función asíncrona que realizará la acción (API call + refresh)
-  final Future<void> Function()? onPressedAsync;
-
-  const _AttendButton({required this.onPressedAsync});
-
-  @override
-  State<_AttendButton> createState() => __AttendButtonState();
-}
-
-class __AttendButtonState extends State<_AttendButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _animation = Tween<double>(begin: 1.0, end: 0.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ScaleTransition(
-      scale: _animation,
-      child: GestureDetector(
-        onTapDown: (_) {
-          _controller.forward();
-        },
-        onTapUp: (_) {
-          _controller.reverse();
-        },
-        onTapCancel: () {
-          _controller.reverse();
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colorScheme.primary,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: IconButton(
-            // Mostrar loader cuando está procesando
-            icon: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                : const Icon(Icons.check, color: Colors.white, size: 28),
-            onPressed: (_isLoading || widget.onPressedAsync == null)
-                ? null
-                : () async {
-                    setState(() { _isLoading = true; });
-                    try {
-                      await widget.onPressedAsync!();
-                    } catch (e) {
-                      // El callback debería manejar errores y mostrar snackbars; aquí solo aseguramos que se quite el loader
-                      print('AttendButton: error en onPressedAsync: $e');
-                    } finally {
-                      if (mounted) setState(() { _isLoading = false; });
-                      _controller.forward().then((_) => _controller.reverse());
-                    }
-                  },
-            splashRadius: 28,
-            padding: EdgeInsets.zero,
-          ),
-        ),
-      ),
-    );
-  }
-}
+// Widget _AttendButton eliminado - ya no es necesario

@@ -412,56 +412,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Estado del ticket
-              Card(
-                elevation: 0,
-                color: estadoTicket
-                    ? colorScheme.primaryContainer
-                    : colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Icon(
-                        estadoTicket ? Icons.check_circle : Icons.pending_actions,
-                        color: estadoTicket
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onErrorContainer,
-                        size: 48,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              estadoTicket ? 'Atendido' : 'Pendiente',
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: estadoTicket
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.onErrorContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              estadoTicket
-                                  ? 'Este ticket ya fue atendido'
-                                  : 'Este ticket está pendiente de atención',
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: estadoTicket
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.onErrorContainer,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
 
               // Cliente
               _SectionCard(
@@ -579,11 +529,112 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     ),
                   ],
                 ],
-            ),
-            const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 16),
 
-            // Fecha y hora
-            _SectionCard(
+              // Sesiones programadas
+              _SectionCard(
+                title: 'Sesiones',
+                icon: Icons.event_note,
+                children: [
+                  if (sesiones.isEmpty)
+                    const _DetailRow(
+                      label: 'Estado',
+                      value: 'Sin sesiones programadas',
+                    )
+                  else ...[
+                    // Mostrar resumen de sesiones por tratamiento
+                    ...tratamientos.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final trat = entry.value;
+                      final tratId = trat['id'];
+
+                      // Filtrar sesiones de este tratamiento
+                      final sesionesTratamiento = sesiones.where((s) {
+                        final tratamiento = s['tratamiento'];
+                        return tratamiento != null && tratamiento['id'] == tratId;
+                      }).toList();
+
+                      final totalSesiones = sesionesTratamiento.length;
+                      final sesionesRealizadas = sesionesTratamiento.where((s) =>
+                        s['estado_sesion_enum'] == 'realizada'
+                      ).length;
+                      final sesionesPendientes = totalSesiones - sesionesRealizadas;
+
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 16 : 0),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outline.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      trat['nombretratamiento'] ?? 'Sin nombre',
+                                      style: textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.secondaryContainer,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '$totalSesiones ${totalSesiones == 1 ? 'sesión' : 'sesiones'}',
+                                      style: textTheme.labelSmall?.copyWith(
+                                        color: colorScheme.onSecondaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.check_circle, size: 16, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Realizadas: $sesionesRealizadas',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Icon(Icons.pending, size: 16, color: Colors.orange),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Pendientes: $sesionesPendientes',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Fecha y hora
+              _SectionCard(
                 title: 'Fecha y Hora',
                 icon: Icons.calendar_today,
                 children: [
@@ -657,28 +708,25 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Botones de acción
-              if (!estadoTicket)
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: isUpdating ? null : _marcarComoAtendido,
-                    icon: isUpdating
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Icon(Icons.check),
-                    label: Text(isUpdating ? 'Actualizando...' : 'Marcar como Atendido'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                    ),
+              // Botón de acción - Enviar por WhatsApp
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _chooseAndSendToWhatsApp,
+                  icon: Image.asset(
+                    'assets/whatsapp.png',
+                    width: 24,
+                    height: 24,
+                    color: Colors.white,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.send, color: Colors.white),
+                  ),
+                  label: const Text('Enviar por WhatsApp'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366), // Verde de WhatsApp
+                    padding: const EdgeInsets.all(16),
                   ),
                 ),
+              ),
             ],
           ),
         ),

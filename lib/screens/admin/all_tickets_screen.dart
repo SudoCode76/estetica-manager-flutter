@@ -20,9 +20,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   bool isLoading = true;
   String search = '';
   String? errorMsg;
-  bool showAtendidos = false; // false = pendientes, true = atendidos
-  bool sortAscending = true; // true = antiguo→nuevo, false = nuevo→antiguo
+  bool sortAscending = false; // false = nuevo→antiguo (más reciente primero)
   SucursalProvider? _sucursalProvider;
+  DateTimeRange? _selectedDateRange; // Para filtrar por rango de fechas
 
   @override
   void initState() {
@@ -60,41 +60,65 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       errorMsg = null;
     });
     try {
-      final data = await api.getTickets(
-        sucursalId: _sucursalProvider!.selectedSucursalId,
-        estadoTicket: showAtendidos,
-      );
+      // Obtener TODOS los tickets de la sucursal (sin filtro de fecha)
+      final sucursalId = _sucursalProvider!.selectedSucursalId!;
+
+      // Usar query directa a Supabase para obtener todos los tickets
+      final data = await api.getAllTickets(sucursalId: sucursalId);
       tickets = data;
 
-      // Aplicar filtro de búsqueda actual (sin filtro de fecha)
-      if (search.isEmpty) {
-        filteredTickets = tickets;
-      } else {
-        filteredTickets = tickets.where((t) {
-          final cliente = t['cliente']?['nombreCliente'] ?? '';
-          final apellido = t['cliente']?['apellidoCliente'] ?? '';
-          final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-          final tratamientosMatch = tratamientos.any((tr) =>
-            (tr['nombreTratamiento'] ?? '').toLowerCase().contains(search.toLowerCase())
-          );
-          return cliente.toLowerCase().contains(search.toLowerCase()) ||
-              apellido.toLowerCase().contains(search.toLowerCase()) ||
-              tratamientosMatch;
-        }).toList();
-      }
-      sortTickets();
+      // Aplicar filtros
+      applyFilters();
     } catch (e) {
-      errorMsg = 'No se pudo conectar al servidor.';
+      print('Error fetching tickets: $e');
+      errorMsg = 'No se pudo conectar al servidor: $e';
     }
     setState(() {
       isLoading = false;
     });
   }
 
+  void applyFilters() {
+    filteredTickets = tickets.where((t) {
+      // Filtro por búsqueda de texto
+      if (search.isNotEmpty) {
+        final cliente = t['cliente'];
+        final nombreCliente = (cliente?['nombrecliente'] ?? '').toLowerCase();
+        final apellidoCliente = (cliente?['apellidocliente'] ?? '').toLowerCase();
+        final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+
+        final tratamientosMatch = sesiones.any((sesion) {
+          final tratamiento = sesion['tratamiento'];
+          return tratamiento != null &&
+                 (tratamiento['nombretratamiento'] ?? '').toLowerCase().contains(search.toLowerCase());
+        });
+
+        final matchesSearch = nombreCliente.contains(search.toLowerCase()) ||
+            apellidoCliente.contains(search.toLowerCase()) ||
+            tratamientosMatch;
+
+        if (!matchesSearch) return false;
+      }
+
+      // Filtro por rango de fechas
+      if (_selectedDateRange != null) {
+        final createdAt = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;
+        if (createdAt == null) return false;
+
+        return createdAt.isAfter(_selectedDateRange!.start.subtract(const Duration(days: 1))) &&
+               createdAt.isBefore(_selectedDateRange!.end.add(const Duration(days: 1)));
+      }
+
+      return true;
+    }).toList();
+
+    sortTickets();
+  }
+
   void sortTickets() {
     filteredTickets.sort((a, b) {
-      final dateA = a['fecha'] != null ? DateTime.parse(a['fecha']) : DateTime.now();
-      final dateB = b['fecha'] != null ? DateTime.parse(b['fecha']) : DateTime.now();
+      final dateA = a['created_at'] != null ? DateTime.parse(a['created_at']) : DateTime.now();
+      final dateB = b['created_at'] != null ? DateTime.parse(b['created_at']) : DateTime.now();
       return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
   }
@@ -102,18 +126,31 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   void filterTickets(String value) {
     setState(() {
       search = value;
-      filteredTickets = tickets.where((t) {
-        final cliente = t['cliente']?['nombreCliente'] ?? '';
-        final apellido = t['cliente']?['apellidoCliente'] ?? '';
-        final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-        final tratamientosMatch = tratamientos.any((tr) =>
-          (tr['nombreTratamiento'] ?? '').toLowerCase().contains(value.toLowerCase())
-        );
-        return cliente.toLowerCase().contains(value.toLowerCase()) ||
-            apellido.toLowerCase().contains(value.toLowerCase()) ||
-            tratamientosMatch;
-      }).toList();
-      sortTickets();
+      applyFilters();
+    });
+  }
+
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: _selectedDateRange,
+      locale: const Locale('es'),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDateRange = picked;
+        applyFilters();
+      });
+    }
+  }
+
+  void _clearDateFilter() {
+    setState(() {
+      _selectedDateRange = null;
+      applyFilters();
     });
   }
 
@@ -186,59 +223,52 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                           padding: const EdgeInsets.all(16),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Filtro de estado (Pendientes / Atendidos)
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment<bool>(
-                        value: false,
-                        label: Text('Pendientes'),
-                        icon: Icon(Icons.pending_actions),
-                      ),
-                      ButtonSegment<bool>(
-                        value: true,
-                        label: Text('Atendidos'),
-                        icon: Icon(Icons.check_circle),
-                      ),
-                    ],
-                    selected: {showAtendidos},
-                    onSelectionChanged: (Set<bool> newSelection) async {
-                      setState(() {
-                        showAtendidos = newSelection.first;
-                      });
-                      await fetchTickets();
-                    },
-                    style: const ButtonStyle(
-                      visualDensity: VisualDensity.comfortable,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Indicador de que se muestran todos los tickets
-                  Align(
-                    alignment: Alignment.centerLeft,
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Filtro de fecha
+                if (_selectedDateRange != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
                     child: Chip(
                       avatar: Icon(
-                        Icons.history,
+                        Icons.date_range,
                         size: 18,
-                        color: colorScheme.secondary,
+                        color: colorScheme.primary,
                       ),
                       label: Text(
-                        'Mostrando todos los tickets',
+                        '${DateFormat('dd/MM/yy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yy').format(_selectedDateRange!.end)}',
                         style: textTheme.labelMedium?.copyWith(
-                          color: colorScheme.secondary,
+                          color: colorScheme.primary,
                         ),
                       ),
-                      backgroundColor: colorScheme.secondaryContainer,
+                      onDeleted: _clearDateFilter,
+                      backgroundColor: colorScheme.primaryContainer,
                     ),
                   ),
-                ],
-              ),
+                Row(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _selectDateRange,
+                      icon: const Icon(Icons.calendar_month),
+                      label: Text(_selectedDateRange == null ? 'Filtrar por fecha' : 'Cambiar fecha'),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${filteredTickets.length} ${filteredTickets.length == 1 ? 'ticket' : 'tickets'}',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
+          ),
 
-            // Lista de tickets
-            Expanded(
+          // Lista de tickets
+          Expanded(
               child: isLoading
                   ? Center(
                       child: CircularProgressIndicator(
@@ -265,13 +295,15 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    showAtendidos ? Icons.check_circle_outline : Icons.pending_actions_outlined,
+                                    Icons.search_off,
                                     size: 64,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    showAtendidos ? 'No hay tickets atendidos' : 'No hay tickets pendientes',
+                                    search.isNotEmpty || _selectedDateRange != null
+                                        ? 'No se encontraron tickets'
+                                        : 'No hay tickets registrados',
                                     style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ],
@@ -282,23 +314,36 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                               itemCount: filteredTickets.length,
                               itemBuilder: (context, i) {
                                 final t = filteredTickets[i];
-                                final fechaDateTime = t['fecha'] != null ? DateTime.parse(t['fecha']) : null;
-                                final hora = fechaDateTime != null ? DateFormat('HH:mm').format(fechaDateTime) : '-';
-                                final fecha = fechaDateTime != null ? DateFormat('dd/MM/yyyy').format(fechaDateTime) : '-';
-                                final cliente = t['cliente'] != null
-                                    ? ((t['cliente']['apellidoCliente'] ?? '').isNotEmpty
-                                        ? '${t['cliente']['nombreCliente'] ?? '-'} ${t['cliente']['apellidoCliente'] ?? ''}'
-                                        : t['cliente']['nombreCliente'] ?? '-')
+                                final createdAt = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;
+                                final hora = createdAt != null ? DateFormat('HH:mm').format(createdAt) : '-';
+                                final fecha = createdAt != null ? DateFormat('dd/MM/yyyy').format(createdAt) : '-';
+
+                                final clienteData = t['cliente'];
+                                final nombreCliente = clienteData?['nombrecliente'] ?? '';
+                                final apellidoCliente = clienteData?['apellidocliente'] ?? '';
+                                final cliente = nombreCliente.isNotEmpty
+                                    ? (apellidoCliente.isNotEmpty ? '$nombreCliente $apellidoCliente' : nombreCliente)
                                     : '-';
-                                final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-                                final tratamientoTexto = tratamientos.isEmpty
+
+                                final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+
+                                // Extraer tratamientos únicos
+                                final Set<String> tratamientosNombres = {};
+                                for (var sesion in sesiones) {
+                                  final tratamiento = sesion['tratamiento'];
+                                  if (tratamiento != null) {
+                                    tratamientosNombres.add(tratamiento['nombretratamiento'] ?? '');
+                                  }
+                                }
+
+                                final tratamientoTexto = tratamientosNombres.isEmpty
                                     ? 'Sin tratamientos'
-                                    : tratamientos.length == 1
-                                        ? tratamientos[0]['nombreTratamiento'] ?? '-'
-                                        : '${tratamientos.length} tratamientos';
-                                final saldoPendiente = t['saldoPendiente']?.toDouble() ?? 0.0;
+                                    : tratamientosNombres.length == 1
+                                        ? tratamientosNombres.first
+                                        : '${tratamientosNombres.length} tratamientos';
+
+                                final saldoPendiente = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
                                 final tieneSaldo = saldoPendiente > 0;
-                                final estadoTicket = t['estadoTicket'] == true;
 
                                 return ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
@@ -414,47 +459,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                                                     ],
                                                   ),
                                                 ),
-                                                // Botón check mejorado
-                                                if (!estadoTicket)
-                                                  Padding(
-                                                    padding: const EdgeInsets.only(left: 12.0),
-                                                    child: _AttendButton(
-                                                      onPressed: () async {
-                                                        final documentId = t['documentId'];
-                                                        final success = await api.actualizarEstadoTicket(documentId, true);
-                                                        if (success) {
-                                                          ScaffoldMessenger.of(context).showSnackBar(
-                                                            SnackBar(
-                                                              content: Row(
-                                                                children: [
-                                                                  const Icon(Icons.check_circle, color: Colors.white),
-                                                                  const SizedBox(width: 8),
-                                                                  const Text('Ticket marcado como atendido'),
-                                                                ],
-                                                              ),
-                                                              backgroundColor: colorScheme.primary,
-                                                              behavior: SnackBarBehavior.floating,
-                                                            ),
-                                                          );
-                                                          await fetchTickets();
-                                                        } else {
-                                                          ScaffoldMessenger.of(context).showSnackBar(
-                                                            SnackBar(
-                                                              content: Row(
-                                                                children: [
-                                                                  const Icon(Icons.error, color: Colors.white),
-                                                                  const SizedBox(width: 8),
-                                                                  const Text('Error al actualizar el ticket'),
-                                                                ],
-                                                              ),
-                                                              backgroundColor: colorScheme.error,
-                                                              behavior: SnackBarBehavior.floating,
-                                                            ),
-                                                          );
-                                                        }
-                                                      },
-                                                    ),
-                                                  ),
                                               ],
                                             ),
                                           ),
@@ -467,81 +471,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                             ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AttendButton extends StatefulWidget {
-  final VoidCallback onPressed;
-
-  const _AttendButton({required this.onPressed});
-
-  @override
-  State<_AttendButton> createState() => __AttendButtonState();
-}
-
-class __AttendButtonState extends State<_AttendButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _animation = Tween<double>(begin: 1.0, end: 0.0).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ScaleTransition(
-      scale: _animation,
-      child: GestureDetector(
-        onTapDown: (_) {
-          _controller.forward();
-        },
-        onTapUp: (_) {
-          _controller.reverse();
-        },
-        onTapCancel: () {
-          _controller.reverse();
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colorScheme.primary,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.check, color: Colors.white, size: 28),
-            onPressed: () {
-              widget.onPressed();
-              _controller.forward().then((_) => _controller.reverse());
-            },
-            splashRadius: 28,
-            padding: EdgeInsets.zero,
-          ),
         ),
       ),
     );

@@ -1287,6 +1287,35 @@ class ApiService {
     }
   }
 
+  /// 1C. Obtener TODOS los tickets de una sucursal (sin filtro de fecha)
+  Future<List<dynamic>> getAllTickets({
+    required int sucursalId,
+  }) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
+            *, 
+            cliente:cliente_id(nombrecliente, apellidocliente, telefono),
+            sesiones:sesion(
+              id,
+              numero_sesion,
+              fecha_hora_inicio,
+              estado_sesion_enum,
+              tratamiento:tratamiento_id(id, nombretratamiento, precio)
+            )
+          ''')
+          .eq('sucursal_id', sucursalId)
+          .order('created_at', ascending: false);
+
+      print('getAllTickets: fetched ${(response as List).length} tickets for sucursal $sucursalId');
+      return response as List<dynamic>;
+    } catch (e) {
+      print('getAllTickets error: $e');
+      rethrow;
+    }
+  }
+
   /// 2. Crear venta completa (usa RPC para transacción atómica)
   Future<void> registrarVenta({
     required int clienteId,
