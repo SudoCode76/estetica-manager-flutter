@@ -351,9 +351,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               const SizedBox(height: 16),
 
               // --- SECCIÓN: AGENDA DE SESIONES (CORREGIDA) ---
+              // --- SECCIÓN: AGENDA DE SESIONES (CORREGIDA) ---
               _SectionCard(
                 title: 'Agenda de Sesiones',
-                icon: Icons.calendar_month, // Icono más apropiado
+                icon: Icons.calendar_month,
                 children: [
                   if (sesiones.isEmpty)
                     const _DetailRow(
@@ -365,37 +366,44 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       final index = entry.key;
                       final s = entry.value;
 
-                      // 1. Extraer datos con seguridad (Soportando estructura anidada)
+                      // 1. Extraer Tratamiento
                       final tratamiento = s['tratamiento'];
                       final nombreTratamiento = tratamiento != null
                           ? (tratamiento['nombretratamiento'] ?? 'Tratamiento')
                           : 'Tratamiento';
 
                       final numSesion = s['numero_sesion'] ?? 0;
-                      // El estado puede venir como 'estado_sesion' o 'estado_sesion_enum'
-                      final estadoRaw = s['estado_sesion'] ?? s['estado_sesion_enum'] ?? 'agendada';
-                      final estado = estadoRaw.toString().toUpperCase();
 
-                      // 2. Formatear Fecha y Hora Individual
+                      final estadoRaw = s['estado_sesion'] ?? s['estado_sesion'] ?? 'agendada';
+                      final estadoStr = estadoRaw.toString().toLowerCase(); // Normalizamos a minúscula
+
+                      // Verificamos si está realizada (aceptamos 'realizada', 'completada', etc.)
+                      final isRealizada = estadoStr == 'realizada' || estadoStr == 'completada';
+
+                      // 3. Extraer Fecha y Hora
                       final fechaRaw = s['fecha_hora_inicio'];
-                      final fechaFormateada = fechaRaw != null
-                          ? DateFormat('dd/MM/yyyy • HH:mm', 'es').format(DateTime.parse(fechaRaw))
-                          : 'Fecha sin definir';
+                      String fechaFormateada = 'Sin agendar';
 
-                      final isRealizada = estado == 'REALIZADA';
+                      if (fechaRaw != null) {
+                        // Parseamos la fecha ISO de Supabase
+                        final dt = DateTime.parse(fechaRaw.toString());
+                        // Formato amigable: "25/01/2026 • 14:30"
+                        fechaFormateada = DateFormat('dd/MM/yyyy • HH:mm', 'es').format(dt);
+                      }
 
                       return Container(
                         margin: EdgeInsets.only(bottom: index < sesiones.length - 1 ? 12 : 0),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
+                          // Fondo verde suave si está realizada, gris si no
                           color: isRealizada
-                              ? Colors.green.withValues(alpha: 0.05)
-                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              ? Colors.green.withOpacity(0.05)
+                              : colorScheme.surfaceContainerHighest.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isRealizada
-                                ? Colors.green.withValues(alpha: 0.3)
-                                : colorScheme.outline.withValues(alpha: 0.2),
+                                ? Colors.green.withOpacity(0.3)
+                                : colorScheme.outline.withOpacity(0.2),
                           ),
                         ),
                         child: Row(
@@ -417,9 +425,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                 Text(
                                   '#$numSesion',
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurfaceVariant
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurfaceVariant
                                   ),
                                 ),
                               ],
@@ -443,26 +451,26 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                       Text(
                                         fechaFormateada,
                                         style: textTheme.bodyMedium?.copyWith(
-                                          color: colorScheme.onSurface,
-                                          fontWeight: FontWeight.w500
+                                            color: colorScheme.onSurface,
+                                            fontWeight: FontWeight.w500
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   // Badge de Estado
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: isRealizada ? Colors.green : Colors.orange,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      isRealizada ? 'COMPLETADA' : 'PENDIENTE',
+                                      isRealizada ? 'REALIZADA' : 'PENDIENTE',
                                       style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold
                                       ),
                                     ),
                                   ),

@@ -1272,7 +1272,11 @@ class ApiService {
             *, 
             cliente:cliente_id(nombrecliente, apellidocliente),
             sesiones:sesion(
-              tratamiento:tratamiento_id(nombretratamiento)
+              id,
+              numero_sesion,
+              fecha_hora_inicio,
+              estado_sesion,
+              tratamiento:tratamiento_id(id, nombretratamiento, precio)
             )
           ''')
           .eq('sucursal_id', sucursalId)
@@ -1301,7 +1305,7 @@ class ApiService {
               id,
               numero_sesion,
               fecha_hora_inicio,
-              estado_sesion_enum,
+              estado_sesion,
               tratamiento:tratamiento_id(id, nombretratamiento, precio)
             )
           ''')
