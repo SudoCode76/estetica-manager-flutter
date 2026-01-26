@@ -71,8 +71,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     });
 
     try {
-      final documentId = widget.ticket['documentId'];
-      final success = await api.actualizarEstadoTicket(documentId, true);
+      // Usar 'id' de Supabase en lugar de 'documentId' de Strapi
+      final ticketId = widget.ticket['id'];
+
+      if (ticketId == null) {
+        throw Exception('ID de ticket no encontrado');
+      }
+
+      final success = await api.actualizarEstadoTicket(ticketId.toString(), true);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -201,24 +207,46 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   // Construye el texto del ticket (sin lanzar)
   String _buildWhatsAppMessage() {
     final cliente = widget.ticket['cliente'];
-    final fecha = widget.ticket['fecha'] != null ? DateTime.tryParse(widget.ticket['fecha']) : null;
-    final nombreCliente = cliente?['nombreCliente'] ?? '';
-    final apellidoCliente = cliente?['apellidoCliente'] ?? '';
-    final tratamientos = widget.ticket['tratamientos'] as List<dynamic>? ?? [];
+    final createdAt = widget.ticket['created_at'] != null ? DateTime.tryParse(widget.ticket['created_at']) : null;
+    final nombreCliente = cliente?['nombrecliente'] ?? '';
+    final apellidoCliente = cliente?['apellidocliente'] ?? '';
+    final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
+
+    // Extraer tratamientos únicos de las sesiones
+    final Map<int, Map<String, dynamic>> tratamientosMap = {};
+    for (var sesion in sesiones) {
+      final tratamiento = sesion['tratamiento'];
+      if (tratamiento != null) {
+        final tratId = tratamiento['id'];
+        if (tratId != null && !tratamientosMap.containsKey(tratId)) {
+          tratamientosMap[tratId] = tratamiento;
+        }
+      }
+    }
+    final tratamientos = tratamientosMap.values.toList();
 
     final buffer = StringBuffer();
-    buffer.writeln('Hola ${nombreCliente.toString()} ${apellidoCliente.toString()},');
+    buffer.writeln('Hola $nombreCliente $apellidoCliente,');
     buffer.writeln('Aquí están los detalles de su turno:');
-    if (fecha != null) buffer.writeln('- Fecha: ${DateFormat('EEEE, d MMMM yyyy', 'es').format(fecha)}');
-    if (widget.ticket['fecha'] != null) buffer.writeln('- Hora: ${DateFormat('HH:mm').format(fecha!)}');
-    buffer.writeln('- Ticket: ${widget.ticket['documentId'] ?? widget.ticket['id']}');
+
+    if (createdAt != null) {
+      buffer.writeln('- Fecha de venta: ${DateFormat('EEEE, d MMMM yyyy', 'es').format(createdAt)}');
+      buffer.writeln('- Hora: ${DateFormat('HH:mm').format(createdAt)}');
+    }
+
+    buffer.writeln('- Ticket: ${widget.ticket['id']}');
+
     if (tratamientos.isNotEmpty) {
       buffer.writeln('- Tratamientos:');
       for (final t in tratamientos) {
-        buffer.writeln('  • ${t['nombreTratamiento'] ?? 'Sin nombre'} - Bs ${t['precio'] ?? '0'}');
+        final nombre = t['nombretratamiento'] ?? 'Sin nombre';
+        final precio = t['precio'] ?? '0';
+        buffer.writeln('  • $nombre - Bs $precio');
       }
     }
-    buffer.writeln('- Total: Bs ${tratamientos.fold<double>(0, (p, e) => p + (double.tryParse(e['precio']?.toString() ?? '0') ?? 0)).toStringAsFixed(2)}');
+
+    final montoTotal = widget.ticket['monto_total'] ?? 0;
+    buffer.writeln('- Total: Bs ${montoTotal.toStringAsFixed(2)}');
     buffer.writeln('Por favor confirme su asistencia o contáctenos si necesita reprogramar.');
 
     return buffer.toString();
@@ -323,24 +351,32 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       );
     }
 
-    // Extraer información del ticket
-    final fecha = widget.ticket['fecha'] != null
-        ? DateTime.parse(widget.ticket['fecha'])
+    // Extraer información del ticket (estructura Supabase)
+    final createdAt = widget.ticket['created_at'] != null
+        ? DateTime.parse(widget.ticket['created_at'])
         : null;
     final cliente = widget.ticket['cliente'];
-    final tratamientos = widget.ticket['tratamientos'] as List<dynamic>? ?? [];
-    final sucursal = widget.ticket['sucursal'];
-    final usuario = widget.ticket['users_permissions_user'];
-    final cuota = widget.ticket['cuota']?.toString() ?? '-';
-    final saldo = widget.ticket['saldoPendiente']?.toString() ?? '0';
-    final estadoPago = widget.ticket['estadoPago'] ?? '-';
+    final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
+
+    // Extraer tratamientos únicos de las sesiones
+    final Map<int, Map<String, dynamic>> tratamientosMap = {};
+    for (var sesion in sesiones) {
+      final tratamiento = sesion['tratamiento'];
+      if (tratamiento != null) {
+        final tratId = tratamiento['id'];
+        if (tratId != null && !tratamientosMap.containsKey(tratId)) {
+          tratamientosMap[tratId] = tratamiento;
+        }
+      }
+    }
+    final tratamientos = tratamientosMap.values.toList();
+
+    final montoTotal = (widget.ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
+    final montoPagado = (widget.ticket['monto_pagado'] as num?)?.toDouble() ?? 0.0;
+    final saldoPendiente = (widget.ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+    final estadoPago = widget.ticket['estado_pago'] ?? '-';
     final estadoTicket = widget.ticket['estadoTicket'] == true;
 
-    // Calcular precio total de tratamientos
-    double precioTotal = 0;
-    for (var t in tratamientos) {
-      precioTotal += double.tryParse(t['precio']?.toString() ?? '0') ?? 0;
-    }
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -435,7 +471,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   _DetailRow(
                     label: 'Nombre',
                     value: cliente != null
-                        ? '${cliente['nombreCliente'] ?? ''} ${cliente['apellidoCliente'] ?? ''}'
+                        ? '${cliente['nombrecliente'] ?? ''} ${cliente['apellidocliente'] ?? ''}'
                         : '-',
                   ),
                   if (cliente?['telefono'] != null)
@@ -484,7 +520,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          t['nombreTratamiento'] ?? 'Sin nombre',
+                                          t['nombretratamiento'] ?? 'Sin nombre',
                                           style: textTheme.titleSmall?.copyWith(
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -539,70 +575,28 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     const SizedBox(height: 8),
                     _DetailRow(
                       label: 'Total de tratamientos',
-                      value: 'Bs ${precioTotal.toStringAsFixed(2)}',
+                      value: 'Bs ${montoTotal.toStringAsFixed(2)}',
                     ),
                   ],
                 ],
-              ),
-              const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
 
-              // Usuario que creó el ticket
-              if (usuario != null)
-                _SectionCard(
-                  title: 'Usuario',
-                  icon: Icons.person_outline,
-                  children: [
-                    _DetailRow(
-                      label: 'Nombre',
-                      value: usuario['username'] ?? '-',
-                    ),
-                    if (usuario['email'] != null)
-                      _DetailRow(
-                        label: 'Email',
-                        value: usuario['email'],
-                      ),
-                    if (usuario['tipoUsuario'] != null)
-                      _DetailRow(
-                        label: 'Tipo',
-                        value: usuario['tipoUsuario'],
-                      ),
-                  ],
-                ),
-              if (usuario != null) const SizedBox(height: 16),
-
-              // Fecha y hora
-              _SectionCard(
+            // Fecha y hora
+            _SectionCard(
                 title: 'Fecha y Hora',
                 icon: Icons.calendar_today,
                 children: [
                   _DetailRow(
                     label: 'Fecha',
-                    value: fecha != null
-                        ? DateFormat('EEEE, d MMMM yyyy', 'es').format(fecha)
+                    value: createdAt != null
+                        ? DateFormat('EEEE, d MMMM yyyy', 'es').format(createdAt)
                         : '-',
                   ),
                   _DetailRow(
                     label: 'Hora',
-                    value: fecha != null ? DateFormat('HH:mm').format(fecha) : '-',
+                    value: createdAt != null ? DateFormat('HH:mm').format(createdAt) : '-',
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Sucursal
-              _SectionCard(
-                title: 'Sucursal',
-                icon: Icons.location_on,
-                children: [
-                  _DetailRow(
-                    label: 'Nombre',
-                    value: sucursal?['nombreSucursal'] ?? '-',
-                  ),
-                  if (sucursal?['direccion'] != null)
-                    _DetailRow(
-                      label: 'Dirección',
-                      value: sucursal['direccion'],
-                    ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -613,19 +607,23 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 icon: Icons.payments,
                 children: [
                   _DetailRow(
-                    label: 'Cuota pagada',
-                    value: 'Bs $cuota',
+                    label: 'Total',
+                    value: 'Bs ${montoTotal.toStringAsFixed(2)}',
+                  ),
+                  _DetailRow(
+                    label: 'Pagado',
+                    value: 'Bs ${montoPagado.toStringAsFixed(2)}',
                   ),
                   _DetailRow(
                     label: 'Saldo pendiente',
-                    value: 'Bs $saldo',
-                    valueColor: saldo != '0' ? colorScheme.error : null,
+                    value: 'Bs ${saldoPendiente.toStringAsFixed(2)}',
+                    valueColor: saldoPendiente > 0 ? colorScheme.error : null,
                   ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: estadoPago == 'Completo'
+                      color: estadoPago == 'pagado'
                           ? colorScheme.primaryContainer
                           : colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
@@ -634,24 +632,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          estadoPago == 'Completo'
+                          estadoPago == 'pagado'
                               ? Icons.check_circle_outline
                               : Icons.warning_amber_outlined,
                           size: 20,
-                          color: estadoPago == 'Completo'
+                          color: estadoPago == 'pagado'
                               ? colorScheme.onPrimaryContainer
                               : colorScheme.onErrorContainer,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Estado: $estadoPago',
-                          style: textTheme.titleSmall?.copyWith(
-                            color: estadoPago == 'Completo'
-                                ? colorScheme.onPrimaryContainer
-                                : colorScheme.onErrorContainer,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Estado: $estadoPago',
+                        style: textTheme.titleSmall?.copyWith(
+                          color: estadoPago == 'pagado'
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
                       ],
                     ),
                   ),
