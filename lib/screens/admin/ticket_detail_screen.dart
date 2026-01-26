@@ -45,76 +45,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  String? _getCategoriaNombreFromTratamiento(dynamic tratamiento) {
-    final possibleKeys = [
-      'categoria_tratamiento',
-      'categoria-tratamiento',
-      'categoriaTratamiento',
-      'categoria',
-      'categoria_tratamientos',
-      'categoriaTratamientos'
-    ];
-
-    for (final key in possibleKeys) {
-      final catValue = tratamiento[key];
-      if (catValue != null && catValue is Map) {
-        final nombre = catValue['nombreCategoria'] ?? catValue['nombre'];
-        if (nombre != null) return nombre as String;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _marcarComoAtendido() async {
-    setState(() {
-      isUpdating = true;
-    });
-
-    try {
-      // Usar 'id' de Supabase en lugar de 'documentId' de Strapi
-      final ticketId = widget.ticket['id'];
-
-      if (ticketId == null) {
-        throw Exception('ID de ticket no encontrado');
-      }
-
-      final success = await api.actualizarEstadoTicket(ticketId.toString(), true);
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ticket marcado como atendido'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Regresar a la pantalla anterior con resultado
-        Navigator.pop(context, true);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al actualizar el ticket'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isUpdating = false;
-        });
-      }
-    }
-  }
-
   Future<void> _eliminarTicket() async {
     // Mostrar diálogo de confirmación
     final confirmacion = await showDialog<bool>(
@@ -207,47 +137,52 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   // Construye el texto del ticket (sin lanzar)
   String _buildWhatsAppMessage() {
     final cliente = widget.ticket['cliente'];
-    final createdAt = widget.ticket['created_at'] != null ? DateTime.tryParse(widget.ticket['created_at']) : null;
-    final nombreCliente = cliente?['nombrecliente'] ?? '';
-    final apellidoCliente = cliente?['apellidocliente'] ?? '';
+    final nombreCliente = cliente?['nombrecliente'] ?? 'Cliente';
     final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
 
-    // Extraer tratamientos únicos de las sesiones
-    final Map<int, Map<String, dynamic>> tratamientosMap = {};
-    for (var sesion in sesiones) {
-      final tratamiento = sesion['tratamiento'];
-      if (tratamiento != null) {
-        final tratId = tratamiento['id'];
-        if (tratId != null && !tratamientosMap.containsKey(tratId)) {
-          tratamientosMap[tratId] = tratamiento;
-        }
-      }
-    }
-    final tratamientos = tratamientosMap.values.toList();
+    // Total del ticket
+    final total = (widget.ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
+    final saldo = (widget.ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
 
     final buffer = StringBuffer();
-    buffer.writeln('Hola $nombreCliente $apellidoCliente,');
-    buffer.writeln('Aquí están los detalles de su turno:');
+    buffer.writeln('Hola *$nombreCliente*,'); // Negrita en WhatsApp
+    buffer.writeln('Le enviamos el detalle de sus citas programadas:');
+    buffer.writeln('');
 
-    if (createdAt != null) {
-      buffer.writeln('- Fecha de venta: ${DateFormat('EEEE, d MMMM yyyy', 'es').format(createdAt)}');
-      buffer.writeln('- Hora: ${DateFormat('HH:mm').format(createdAt)}');
-    }
+    if (sesiones.isNotEmpty) {
+      // Ordenar por fecha para que se vea bonito
+      final sesionesCopia = List<dynamic>.from(sesiones);
+      sesionesCopia.sort((a, b) {
+        final dateA = a['fecha_hora_inicio'] ?? '9999-12-31';
+        final dateB = b['fecha_hora_inicio'] ?? '9999-12-31';
+        return dateA.toString().compareTo(dateB.toString());
+      });
 
-    buffer.writeln('- Ticket: ${widget.ticket['id']}');
+      for (var s in sesionesCopia) {
+        final trat = s['tratamiento']?['nombretratamiento'] ?? 'Tratamiento';
+        final num = s['numero_sesion'];
 
-    if (tratamientos.isNotEmpty) {
-      buffer.writeln('- Tratamientos:');
-      for (final t in tratamientos) {
-        final nombre = t['nombretratamiento'] ?? 'Sin nombre';
-        final precio = t['precio'] ?? '0';
-        buffer.writeln('  • $nombre - Bs $precio');
+        String fechaStr = 'Fecha por definir';
+        if (s['fecha_hora_inicio'] != null) {
+          final dt = DateTime.parse(s['fecha_hora_inicio']);
+          fechaStr = DateFormat('dd/MM - HH:mm', 'es').format(dt);
+        }
+
+        buffer.writeln('🗓 *$fechaStr*');
+        buffer.writeln('   $trat (Sesión $num)');
+        buffer.writeln('');
       }
+    } else {
+      buffer.writeln('(Sin sesiones agendadas)');
     }
 
-    final montoTotal = widget.ticket['monto_total'] ?? 0;
-    buffer.writeln('- Total: Bs ${montoTotal.toStringAsFixed(2)}');
-    buffer.writeln('Por favor confirme su asistencia o contáctenos si necesita reprogramar.');
+    buffer.writeln('💰 *Total:* Bs ${total.toStringAsFixed(2)}');
+    if (saldo > 0) {
+      buffer.writeln('⚠️ *Saldo Pendiente:* Bs ${saldo.toStringAsFixed(2)}');
+    }
+
+    buffer.writeln('');
+    buffer.writeln('¡Le esperamos! 💆‍♀️✨');
 
     return buffer.toString();
   }
@@ -352,31 +287,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
 
     // Extraer información del ticket (estructura Supabase)
-    final createdAt = widget.ticket['created_at'] != null
-        ? DateTime.parse(widget.ticket['created_at'])
-        : null;
     final cliente = widget.ticket['cliente'];
     final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
-
-    // Extraer tratamientos únicos de las sesiones
-    final Map<int, Map<String, dynamic>> tratamientosMap = {};
-    for (var sesion in sesiones) {
-      final tratamiento = sesion['tratamiento'];
-      if (tratamiento != null) {
-        final tratId = tratamiento['id'];
-        if (tratId != null && !tratamientosMap.containsKey(tratId)) {
-          tratamientosMap[tratId] = tratamiento;
-        }
-      }
-    }
-    final tratamientos = tratamientosMap.values.toList();
 
     final montoTotal = (widget.ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
     final montoPagado = (widget.ticket['monto_pagado'] as num?)?.toDouble() ?? 0.0;
     final saldoPendiente = (widget.ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
     final estadoPago = widget.ticket['estado_pago'] ?? '-';
-    final estadoTicket = widget.ticket['estadoTicket'] == true;
-
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -433,224 +350,133 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Tratamientos (ahora puede haber múltiples)
+              // --- SECCIÓN: AGENDA DE SESIONES (CORREGIDA) ---
               _SectionCard(
-                title: 'Tratamientos',
-                icon: Icons.spa,
-                children: [
-                  if (tratamientos.isEmpty)
-                    const _DetailRow(
-                      label: 'Servicios',
-                      value: 'Sin tratamientos',
-                    )
-                  else
-                    ...tratamientos.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final t = entry.value;
-                      final categoriaNombre = _getCategoriaNombreFromTratamiento(t);
-
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 12 : 0),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: colorScheme.outline.withValues(alpha: 0.1),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          t['nombretratamiento'] ?? 'Sin nombre',
-                                          style: textTheme.titleSmall?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        if (categoriaNombre != null) ...[
-                                          const SizedBox(height: 2),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.category,
-                                                size: 12,
-                                                color: colorScheme.primary.withValues(alpha: 0.7),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                categoriaNombre,
-                                                style: textTheme.bodySmall?.copyWith(
-                                                  color: colorScheme.primary.withValues(alpha: 0.7),
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'Bs ${t['precio'] ?? '0'}',
-                                      style: textTheme.labelMedium?.copyWith(
-                                        color: colorScheme.onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  if (tratamientos.length > 1) ...[
-                    const SizedBox(height: 12),
-                    Divider(color: colorScheme.outline.withValues(alpha: 0.2)),
-                    const SizedBox(height: 8),
-                    _DetailRow(
-                      label: 'Total de tratamientos',
-                      value: 'Bs ${montoTotal.toStringAsFixed(2)}',
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Sesiones programadas
-              _SectionCard(
-                title: 'Sesiones',
-                icon: Icons.event_note,
+                title: 'Agenda de Sesiones',
+                icon: Icons.calendar_month, // Icono más apropiado
                 children: [
                   if (sesiones.isEmpty)
                     const _DetailRow(
                       label: 'Estado',
-                      value: 'Sin sesiones programadas',
+                      value: 'Sin sesiones registradas',
                     )
-                  else ...[
-                    // Mostrar resumen de sesiones por tratamiento
-                    ...tratamientos.asMap().entries.map((entry) {
+                  else
+                    ...sesiones.asMap().entries.map((entry) {
                       final index = entry.key;
-                      final trat = entry.value;
-                      final tratId = trat['id'];
+                      final s = entry.value;
 
-                      // Filtrar sesiones de este tratamiento
-                      final sesionesTratamiento = sesiones.where((s) {
-                        final tratamiento = s['tratamiento'];
-                        return tratamiento != null && tratamiento['id'] == tratId;
-                      }).toList();
+                      // 1. Extraer datos con seguridad (Soportando estructura anidada)
+                      final tratamiento = s['tratamiento'];
+                      final nombreTratamiento = tratamiento != null
+                          ? (tratamiento['nombretratamiento'] ?? 'Tratamiento')
+                          : 'Tratamiento';
 
-                      final totalSesiones = sesionesTratamiento.length;
-                      final sesionesRealizadas = sesionesTratamiento.where((s) =>
-                        s['estado_sesion_enum'] == 'realizada'
-                      ).length;
-                      final sesionesPendientes = totalSesiones - sesionesRealizadas;
+                      final numSesion = s['numero_sesion'] ?? 0;
+                      // El estado puede venir como 'estado_sesion' o 'estado_sesion_enum'
+                      final estadoRaw = s['estado_sesion'] ?? s['estado_sesion_enum'] ?? 'agendada';
+                      final estado = estadoRaw.toString().toUpperCase();
 
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: index < tratamientos.length - 1 ? 16 : 0),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: colorScheme.outline.withValues(alpha: 0.1),
+                      // 2. Formatear Fecha y Hora Individual
+                      final fechaRaw = s['fecha_hora_inicio'];
+                      final fechaFormateada = fechaRaw != null
+                          ? DateFormat('dd/MM/yyyy • HH:mm', 'es').format(DateTime.parse(fechaRaw))
+                          : 'Fecha sin definir';
+
+                      final isRealizada = estado == 'REALIZADA';
+
+                      return Container(
+                        margin: EdgeInsets.only(bottom: index < sesiones.length - 1 ? 12 : 0),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isRealizada
+                              ? Colors.green.withValues(alpha: 0.05)
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isRealizada
+                                ? Colors.green.withValues(alpha: 0.3)
+                                : colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Columna Izquierda: Icono y Número
+                            Column(
+                              children: [
+                                CircleAvatar(
+                                  radius: 16,
+                                  backgroundColor: isRealizada ? Colors.green : colorScheme.primary,
+                                  child: Icon(
+                                    isRealizada ? Icons.check : Icons.access_time,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '#$numSesion',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurfaceVariant
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                            const SizedBox(width: 12),
+
+                            // Columna Central: Detalles
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      trat['nombretratamiento'] ?? 'Sin nombre',
-                                      style: textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                  Text(
+                                    nombreTratamiento,
+                                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                                   ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.event, size: 14, color: colorScheme.primary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        fechaFormateada,
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          color: colorScheme.onSurface,
+                                          fontWeight: FontWeight.w500
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  // Badge de Estado
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.secondaryContainer,
-                                      borderRadius: BorderRadius.circular(6),
+                                      color: isRealizada ? Colors.green : Colors.orange,
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      '$totalSesiones ${totalSesiones == 1 ? 'sesión' : 'sesiones'}',
-                                      style: textTheme.labelSmall?.copyWith(
-                                        color: colorScheme.onSecondaryContainer,
-                                        fontWeight: FontWeight.bold,
+                                      isRealizada ? 'COMPLETADA' : 'PENDIENTE',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(Icons.check_circle, size: 16, color: Colors.green),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Realizadas: $sesionesRealizadas',
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Icon(Icons.pending, size: 16, color: Colors.orange),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Pendientes: $sesionesPendientes',
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
-                  ],
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Fecha y hora
-              _SectionCard(
-                title: 'Fecha y Hora',
-                icon: Icons.calendar_today,
-                children: [
-                  _DetailRow(
-                    label: 'Fecha',
-                    value: createdAt != null
-                        ? DateFormat('EEEE, d MMMM yyyy', 'es').format(createdAt)
-                        : '-',
-                  ),
-                  _DetailRow(
-                    label: 'Hora',
-                    value: createdAt != null ? DateFormat('HH:mm').format(createdAt) : '-',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
 
               // Información de pago
               _SectionCard(
