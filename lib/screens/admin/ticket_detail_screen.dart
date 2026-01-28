@@ -321,15 +321,36 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     // Si es PDF, generarlo y enviarlo
     try {
-      final pdfBytes = await ShareService.buildTicketPdf(widget.ticket);
-      final nameBase = (widget.ticket['documentId'] ?? widget.ticket['id'] ?? DateTime.now().millisecondsSinceEpoch.toString()).toString();
-      final file = await ShareService.writeTempFile(pdfBytes, '${ShareService.sanitizeFileName(nameBase)}_ticket.pdf');
+      final ticketForPdf = _detailedTicket ?? widget.ticket;
+      final pdfBytes = await ShareService.buildTicketPdf(ticketForPdf);
+      final nameBase = (ticketForPdf['documentId'] ?? ticketForPdf['id'] ?? DateTime.now().millisecondsSinceEpoch.toString()).toString();
+      // Intentar escribir archivo temporal. En web esto dispara la descarga y lanza UnsupportedError.
+      dynamic file; // usar dynamic porque dart:io File no está disponible en web
+      try {
+        file = await ShareService.writeTempFile(pdfBytes, '${ShareService.sanitizeFileName(nameBase)}_ticket.pdf');
+      } on UnsupportedError catch (_) {
+        // En web, writeTempFile ejecutó la descarga directa; informar al usuario y salir.
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Se abrió la descarga del PDF en el navegador')));
+        return;
+      }
+
+      // Intentar enviar directo a WhatsApp nativo; si falla, abrir share sheet
       final sent = await ShareService.shareFileToWhatsAppNative(file, caption: message, package: appChoice, phone: digits);
       if (!sent) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo enviar directamente a la app seleccionada, se abrió el share sheet.')));
+        // Fallback: abrir share sheet con el archivo y el texto
+        try {
+          await ShareService.shareFile(file, text: message);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Se abrió el selector para compartir el PDF')));
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo compartir el PDF: $e')));
+        }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error preparando archivo: $e')));
+      // Mostrar detalle del error y sugerir usar el texto en su lugar
+      print('Error generando o compartiendo PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error preparando archivo: $e')));
+      }
     }
   }
 
@@ -750,6 +771,10 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+
+
+
+
 
 
 

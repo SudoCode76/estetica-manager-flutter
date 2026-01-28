@@ -10,6 +10,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle, MethodChannel;
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// Conditional web helper (implemented in web_file_utils.dart)
+import 'web_file_utils_io.dart' if (dart.library.html) 'web_file_utils.dart' as web_utils;
 
 class ShareService {
   static const MethodChannel _channel = MethodChannel('app_estetica/share');
@@ -18,11 +21,59 @@ class ShareService {
   static Future<Uint8List> buildTicketPdf(Map<String, dynamic> ticket) async {
     final pdf = pw.Document();
 
-    final tratamientos = ticket['tratamientos'] as List<dynamic>? ?? [];
+    // Soportar dos estructuras: la antigua con 'tratamientos' o la nueva con 'sesiones'.
+    final tratamientosRaw = ticket['tratamientos'] as List<dynamic>?;
+    final sesionesRaw = ticket['sesiones'] as List<dynamic>?;
     final cliente = ticket['cliente'] ?? {};
     final id = ticket['documentId'] ?? ticket['id'] ?? '';
 
-    final total = tratamientos.fold<double>(0, (p, e) => p + (double.tryParse(e['precio']?.toString() ?? '0') ?? 0));
+    // Construir una lista de tratamientos a partir de sesiones cuando no exista el arreglo 'tratamientos'
+    List<Map<String, dynamic>> tratamientos = [];
+    if (tratamientosRaw != null && tratamientosRaw.isNotEmpty) {
+      tratamientos = tratamientosRaw.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+    } else if (sesionesRaw != null && sesionesRaw.isNotEmpty) {
+      // Agrupar sesiones por tratamiento
+      final Map<dynamic, Map<String, dynamic>> map = {};
+      for (final s in sesionesRaw) {
+        try {
+          final trat = s['tratamiento'] ?? s['tratamiento_id'] ?? {};
+          final tratId = trat is Map ? (trat['id'] ?? trat['ID']) : (s['tratamiento_id'] ?? trat);
+          final nombre = (trat is Map) ? (trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['name'] ?? 'Tratamiento') : 'Tratamiento';
+          // precio por sesión puede venir en la sesion como 'precio_sesion' o en tratamiento como 'precio'
+          double precioSesion = 0.0;
+          if (s is Map && s.containsKey('precio_sesion') && s['precio_sesion'] != null) {
+            precioSesion = double.tryParse(s['precio_sesion'].toString()) ?? 0.0;
+          } else if (trat is Map && trat['precio'] != null) {
+            precioSesion = double.tryParse(trat['precio'].toString()) ?? 0.0;
+          }
+
+          if (map.containsKey(tratId)) {
+            map[tratId]!['cantidad'] = (map[tratId]!['cantidad'] as int) + 1;
+            map[tratId]!['subtotal'] = (map[tratId]!['subtotal'] as double) + precioSesion;
+          } else {
+            map[tratId] = {
+              'id': tratId,
+              'nombreTratamiento': nombre,
+              'precio': precioSesion,
+              'cantidad': 1,
+              'subtotal': precioSesion,
+            };
+          }
+        } catch (_) {}
+      }
+      tratamientos = map.values.map((m) => Map<String, dynamic>.from(m)).toList();
+    } else {
+      tratamientos = [];
+    }
+
+    final total = tratamientos.fold<double>(0, (p, e) {
+      // Si existe subtotal, usarlo; si no, usar precio * cantidad
+      final subtotal = (e['subtotal'] is num) ? (e['subtotal'] as num).toDouble() : null;
+      if (subtotal != null) return p + subtotal;
+      final precio = (e['precio'] is num) ? (e['precio'] as num).toDouble() : (double.tryParse(e['precio']?.toString() ?? '0') ?? 0.0);
+      final cantidad = (e['cantidad'] is num) ? (e['cantidad'] as num).toInt() : 1;
+      return p + precio * cantidad;
+    });
 
     // Intentar cargar logo desde assets (assets/logo.png)
     Uint8List? logoBytes;
@@ -95,8 +146,8 @@ class ShareService {
                     padding: pw.EdgeInsets.all(8),
                     decoration: pw.BoxDecoration(color: PdfColors.grey200, borderRadius: pw.BorderRadius.circular(8)),
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text(cliente['nombreCliente'] ?? '', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                      if (cliente['telefono'] != null) pw.Text('Tel: ${cliente['telefono']}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                      pw.Text((cliente['nombreCliente'] ?? cliente['nombrecliente'] ?? cliente['name'] ?? '').toString(), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      if ((cliente['telefono'] ?? cliente['phone']) != null) pw.Text('Tel: ${cliente['telefono'] ?? cliente['phone']}', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
                     ]),
                   ),
 
@@ -104,19 +155,19 @@ class ShareService {
                   // Lista de tratamientos
                   pw.Column(children: [
                     ...tratamientos.map((t) {
-                      final name = t['nombreTratamiento'] ?? '-';
-                      final price = t['precio']?.toString() ?? '0';
+                      final name = t['nombreTratamiento'] ?? t['nombre'] ?? '-';
+                      final cantidad = (t['cantidad'] ?? 1).toString();
+                      final subtotal = (t['subtotal'] is num) ? (t['subtotal'] as num).toDouble() : ((t['precio'] is num ? (t['precio'] as num).toDouble() : double.tryParse(t['precio']?.toString() ?? '0') ?? 0.0) * (t['cantidad'] ?? 1));
                       return pw.Padding(
                         padding: pw.EdgeInsets.symmetric(vertical: 6),
                         child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                          pw.Expanded(child: pw.Text(name, style: pw.TextStyle(fontSize: 11))),
-                          pw.Text('Bs $price', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                          pw.Expanded(child: pw.Text('$name x$cantidad', style: pw.TextStyle(fontSize: 11))),
+                          pw.Text('Bs ${subtotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
                         ]),
                       );
                     }).toList()
                   ]),
 
-                  pw.Divider(),
                   pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                     pw.Text('Total', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
                     pw.Text('Bs ${total.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
@@ -170,10 +221,31 @@ class ShareService {
 
   // Escribe bytes en un archivo temporal y devuelve el File
   static Future<File> writeTempFile(Uint8List bytes, String filename) async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$filename');
-    await file.writeAsBytes(bytes, flush: true);
-    return file;
+    // On web, use the download helper and return a dummy File is not possible.
+    if (kIsWeb) {
+      // Trigger browser download and then throw to indicate no File available
+      await web_utils.downloadFileWeb(bytes, filename);
+      throw UnsupportedError('File objects are not available on web; download triggered');
+    }
+
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsBytes(bytes, flush: true);
+      return file;
+    } catch (e) {
+      // Algunos entornos (tests, web runner o plataformas no soportadas) lanzan MissingPluginException
+      // En esos casos, caemos al directorio temporal del sistema usando dart:io
+      try {
+        final tmp = Directory.systemTemp;
+        final file = File('${tmp.path}/$filename');
+        await file.writeAsBytes(bytes, flush: true);
+        return file;
+      } catch (e2) {
+        // Si aún falla, re-lanzar la excepción original para que el caller lo maneje
+        rethrow;
+      }
+    }
   }
 
   // Compartir archivo usando la API moderna de share_plus (SharePlus.instance.share)
@@ -193,6 +265,31 @@ class ShareService {
           // ignore: deprecated_member_use
           await Share.share(text ?? '');
         } catch (_) {}
+      }
+    }
+  }
+
+  // Compartir a partir de bytes (sin necesidad de crear File)
+  static Future<void> shareBytes(Uint8List bytes, String filename, {String? text}) async {
+    if (kIsWeb) {
+      // En web, simplemente desencadenar la descarga
+      await web_utils.downloadFileWeb(bytes, filename);
+      return;
+    }
+
+    try {
+      // Crear XFile desde memoria (cross_file) y usar share_plus
+      final xfile = XFile.fromData(bytes, name: filename, mimeType: 'application/pdf');
+      final params = ShareParams(files: [xfile], text: text ?? '');
+      await SharePlus.instance.share(params);
+    } catch (e) {
+      try {
+        // Fallback: usar la API estática
+        final xfile = XFile.fromData(bytes, name: filename, mimeType: 'application/pdf');
+        // ignore: deprecated_member_use
+        await Share.shareXFiles([xfile], text: text ?? '');
+      } catch (_) {
+        await Share.share(text ?? '');
       }
     }
   }
