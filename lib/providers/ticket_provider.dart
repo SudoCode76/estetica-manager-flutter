@@ -23,6 +23,8 @@ class TicketProvider extends ChangeNotifier {
   int? _lastSucursalId;
   bool? _lastEstadoTicket;
   DateTime? _lastFechaAgenda;
+  DateTime? _lastRangeStart;
+  DateTime? _lastRangeEnd;
 
   /// Fuerza el reset del estado de loading para recuperarse de errores
   void resetLoadingState() {
@@ -254,5 +256,41 @@ class TicketProvider extends ChangeNotifier {
       print('TicketProvider: Error reprogramando sesión: $e');
       return false;
     }
+  }
+
+  /// Obtener tickets por rango de fechas (historial)
+  Future<List<dynamic>> fetchTicketsByRange({
+    required DateTime start,
+    required DateTime end,
+    required int sucursalId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _lastSucursalId = sucursalId;
+      _lastEstadoTicket = null; // no aplica
+      _lastRangeStart = start;
+      _lastRangeEnd = end;
+
+      final data = await _api.getTicketsByRange(start: start, end: end, sucursalId: sucursalId);
+      _tickets = data;
+      _error = null;
+      return _tickets;
+    } catch (e) {
+      _error = e.toString();
+      print('TicketProvider: Error fetching tickets by range: $e');
+      return _tickets;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Re-ejecuta el último fetch de historial si existe
+  Future<List<dynamic>> refreshLastRange() async {
+    if (_lastRangeStart == null || _lastRangeEnd == null || _lastSucursalId == null) return _tickets;
+    return fetchTicketsByRange(start: _lastRangeStart!, end: _lastRangeEnd!, sucursalId: _lastSucursalId!);
   }
 }

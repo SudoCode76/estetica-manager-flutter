@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
-import 'package:app_estetica/screens/admin/all_tickets_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +23,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
   bool showOnlyToday = true; // Siempre true - solo mostrar tickets de hoy
   SucursalProvider? _sucursalProvider;
   bool _isFirstLoad = true; // Flag para controlar la primera carga
+
+  // Nuevas variables para historial
+  DateTime? _rangeStart;
+  DateTime? _rangeEnd;
+  bool _showHistoryMode = false;
 
   @override
   void initState() {
@@ -104,7 +108,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
   List<dynamic> _computeFilteredTickets(List<dynamic> tickets) {
     // Filtrar por fecha de hoy si showOnlyToday es true
     List<dynamic> dateFilteredTickets = tickets;
-    if (showOnlyToday) {
+    // Si estamos mostrando historial por rango, NO aplicamos el filtro de hoy
+    if (showOnlyToday && !_showHistoryMode) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final tomorrow = today.add(const Duration(days: 1));
@@ -141,6 +146,58 @@ class _TicketsScreenState extends State<TicketsScreen> {
     });
 
     return filtered;
+  }
+
+  void _onShowTodayPressed() async {
+    setState(() {
+      _showHistoryMode = false;
+      _rangeStart = null;
+      _rangeEnd = null;
+    });
+    _reloadTicketsForCurrentFilters();
+  }
+
+  Future<void> _selectDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: _rangeStart != null && _rangeEnd != null ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!) : null,
+    );
+
+    if (picked == null) return;
+
+    // Asegurarnos que start <= end
+    DateTime start = picked.start;
+    DateTime end = picked.end;
+    if (start.isAfter(end)) {
+      final tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    setState(() {
+      _rangeStart = start;
+      _rangeEnd = end;
+      _showHistoryMode = true;
+      errorMsg = null;
+    });
+
+    try {
+      if (_sucursalProvider?.selectedSucursalId == null) {
+        setState(() => errorMsg = 'Seleccione una sucursal primero');
+        return;
+      }
+
+      await context.read<TicketProvider>().fetchTicketsByRange(
+        start: _rangeStart!,
+        end: _rangeEnd!,
+        sucursalId: _sucursalProvider!.selectedSucursalId!,
+      );
+    } catch (e) {
+      setState(() => errorMsg = 'Error al cargar historial: $e');
+    }
   }
 
   @override
@@ -221,6 +278,28 @@ class _TicketsScreenState extends State<TicketsScreen> {
                     ),
                 ],
               ),
+
+              const SizedBox(height: 12),
+
+              // Controles de Historial
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _selectDateRange,
+                      child: Text(_rangeStart == null || _rangeEnd == null
+                          ? 'Seleccionar rango'
+                          : '${DateFormat('dd/MM/yyyy').format(_rangeStart!)} - ${DateFormat('dd/MM/yyyy').format(_rangeEnd!)}'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _onShowTodayPressed,
+                    child: const Text('Hoy'),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 16),
             ],
           ),
@@ -294,7 +373,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'No hay tickets para hoy',
+                                  _showHistoryMode ? 'No hay tickets en ese rango' : 'No hay tickets para hoy',
                                   style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                               ],
@@ -330,7 +409,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                   : '${nombresTratamientos.length} tratamientos';
 
                               final saldoPendiente = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;                              final tieneSaldo = saldoPendiente > 0;
-                              final estadoTicket = t['estadoTicket'] == true;
+                              // final estadoTicket = t['estadoTicket'] == true; // variable no usada, eliminada
 
                               return ClipRRect(
                                 borderRadius: BorderRadius.circular(12),

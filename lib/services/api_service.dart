@@ -1320,6 +1320,46 @@ class ApiService {
     }
   }
 
+  /// NUEVO: Obtener tickets por rango de fechas (historial)
+  Future<List<dynamic>> getTicketsByRange({
+    required DateTime start,
+    required DateTime end,
+    required int sucursalId,
+  }) async {
+    try {
+      // Ajustar inicio al 00:00:00 y fin al 23:59:59 en la zona local, luego convertir a UTC
+      final startLocal = DateTime(start.year, start.month, start.day, 0, 0, 0);
+      final endLocal = DateTime(end.year, end.month, end.day, 23, 59, 59);
+
+      final startIso = startLocal.toUtc().toIso8601String();
+      final endIso = endLocal.toUtc().toIso8601String();
+
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
+            *, 
+            cliente:cliente_id(nombrecliente, apellidocliente, telefono),
+            sesiones:sesion(
+              id,
+              numero_sesion,
+              fecha_hora_inicio,
+              estado_sesion,
+              tratamiento:tratamiento_id(id, nombretratamiento, precio)
+            )
+          ''')
+          .eq('sucursal_id', sucursalId)
+          .gte('created_at', startIso)
+          .lte('created_at', endIso)
+          .order('created_at', ascending: false);
+
+      print('getTicketsByRange: fetched ${(response as List).length} tickets for sucursal $sucursalId between $startIso and $endIso');
+      return response as List<dynamic>;
+    } catch (e) {
+      print('getTicketsByRange error: $e');
+      rethrow;
+    }
+  }
+
   /// 2. Crear venta completa (usa RPC para transacción atómica)
   Future<void> registrarVenta({
     required int clienteId,
