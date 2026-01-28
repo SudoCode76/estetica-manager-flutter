@@ -585,48 +585,61 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
           }
         }
 
-        // 4. Calcular Total
+        // 4. Calcular Total: precio por sesión * cantidad de sesiones por tratamiento
         final totalVenta = itemsCarrito.fold<double>(
           0,
-          (sum, t) => sum + (t['precio'] as double),
+          (sum, t) {
+            final precio = (t['precio'] is num) ? (t['precio'] as num).toDouble() : 0.0;
+            final cantidadSes = (t['cantidad_sesiones'] is num) ? (t['cantidad_sesiones'] as num).toInt() : 1;
+            return sum + (precio * cantidadSes);
+          },
         );
 
         print('NewTicketScreen: Creating venta - cliente=$clienteId, sucursal=$sucursalId, total=$totalVenta, pago=$pago');
         print('NewTicketScreen: Items carrito: ${itemsCarrito.map((i) => "${i['nombreTratamiento']} x${i['cantidad_sesiones']} sesiones").join(", ")}');
         print('NewTicketScreen: Cronogramas: ${itemsCarrito.map((i) => "${i['nombreTratamiento']}: ${(i['cronograma_sesiones'] as List).map((f) => DateFormat('dd/MM HH:mm').format(f)).join(', ')}").join(" | ")}');
 
-       // 5. LLAMAR AL SERVICIO (Transacción atómica)
-       await api.registrarVenta(
-         clienteId: clienteId!,
-         sucursalId: sucursalId, // Ahora obligatorio
-         totalVenta: totalVenta,
-         pagoInicial: pago ?? 0.0,
-         itemsCarrito: itemsCarrito,
-       );
+       // Validación adicional: pago no puede superar el totalVenta
+       if (pago != null && pago! > totalVenta) {
+         setState(() {
+           validationError = 'El pago no puede ser mayor al total de la venta (Bs ${totalVenta.toStringAsFixed(2)})';
+           _isSubmitting = false;
+         });
+         return;
+       }
 
-       // 6. Éxito!
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(
-             content: Text('¡Venta registrada con éxito!'),
-             backgroundColor: Colors.green,
-             duration: Duration(seconds: 2),
-           ),
+       // 5. LLAMAR AL SERVICIO (Transacción atómica)
+         await api.registrarVenta(
+           clienteId: clienteId!,
+           sucursalId: sucursalId, // Ahora obligatorio
+           totalVenta: totalVenta,
+           pagoInicial: pago ?? 0.0,
+           itemsCarrito: itemsCarrito,
          );
 
-         // Refrescar la lista global de tickets/agenda
-         try {
-           final sucId = _sucursalProvider?.selectedSucursalId;
-           if (sucId != null) {
-             await context.read<TicketProvider>().fetchAgenda(DateTime.now(), sucursalId: sucId);
-           }
-         } catch (e) {
-           print('NewTicketScreen: Error al refrescar agenda: $e');
-         }
+         // 6. Éxito!
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(
+               content: Text('¡Venta registrada con éxito!'),
+               backgroundColor: Colors.green,
+               duration: Duration(seconds: 2),
+             ),
+           );
 
-         // Volver a la pantalla anterior
-         Navigator.pop(context, true);
-       }
+           // Refrescar la lista global de tickets/agenda
+           try {
+             final sucId = _sucursalProvider?.selectedSucursalId;
+             if (sucId != null) {
+               await context.read<TicketProvider>().fetchAgenda(DateTime.now(), sucursalId: sucId);
+             }
+           } catch (e) {
+             print('NewTicketScreen: Error al refrescar agenda: $e');
+           }
+
+           // Volver a la pantalla anterior
+           Navigator.pop(context, true);
+         }
      } catch (e) {
        // Mostrar error real (útil para depurar RPC)
        final msg = e.toString();
@@ -1092,12 +1105,19 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                TextFormField(
                                  initialValue: pago?.toString() ?? '',
                                  keyboardType: TextInputType.number,
-                                 decoration: const InputDecoration(
+                                 decoration: InputDecoration(
                                    hintText: 'Monto pagado',
+                                   errorText: (pago != null && pago! > calcularPrecioTotal()) ? 'El pago no puede ser mayor al total' : null,
                                  ),
                                  onChanged: (v) {
                                    setState(() {
                                      pago = double.tryParse(v) ?? 0;
+                                     // Validación inmediata: si pago excede el total, mostrar mensaje
+                                     if (pago != null && pago! > calcularPrecioTotal()) {
+                                       validationError = 'El pago no puede ser mayor al total';
+                                     } else {
+                                       validationError = null;
+                                     }
                                      calcularEstadoPago();
                                    });
                                  },

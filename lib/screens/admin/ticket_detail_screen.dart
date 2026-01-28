@@ -21,11 +21,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   bool isUpdating = false;
   bool localeReady = false;
   bool _isEmployee = false;
+  Map<String, dynamic>? _detailedTicket;
+  bool _loadingDetail = false;
+  String? _detailError;
 
   @override
   void initState() {
     super.initState();
     _loadUserType();
+    _loadDetailedTicketIfNeeded();
     initializeDateFormatting('es').then((_) {
       setState(() {
         localeReady = true;
@@ -42,6 +46,48 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       });
     } catch (e) {
       print('Error cargando tipo de usuario: $e');
+    }
+  }
+
+  Future<void> _loadDetailedTicketIfNeeded() async {
+    // Si el widget.ticket ya tiene el teléfono y sesiones completas, no es necesario recargar.
+    try {
+      final cliente = widget.ticket['cliente'] as Map<String, dynamic>?;
+      final sesiones = widget.ticket['sesiones'] as List<dynamic>?;
+      final hasPhone = cliente != null && (cliente['telefono'] != null && cliente['telefono'].toString().trim().isNotEmpty);
+      final hasSesiones = sesiones != null && sesiones.isNotEmpty;
+
+      // Si falta telefono o sesiones, cargar detalle completo desde la API
+      if (!hasPhone || !hasSesiones) {
+        setState(() {
+          _loadingDetail = true;
+          _detailError = null;
+        });
+
+        final id = widget.ticket['id']?.toString() ?? widget.ticket['documentId']?.toString();
+        if (id != null) {
+          try {
+            final resp = await api.obtenerTicketDetalle(id.toString());
+            if (resp != null) {
+              setState(() {
+                _detailedTicket = resp;
+              });
+            }
+          } catch (e) {
+            // No fatal: guardamos el error para mostrar si es necesario
+            setState(() {
+              _detailError = e.toString();
+            });
+            print('Error cargando detalle completo del ticket: $e');
+          }
+        }
+
+        setState(() {
+          _loadingDetail = false;
+        });
+      }
+    } catch (e) {
+      print('Error en _loadDetailedTicketIfNeeded: $e');
     }
   }
 
@@ -136,13 +182,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   // Construye el texto del ticket (sin lanzar)
   String _buildWhatsAppMessage() {
-    final cliente = widget.ticket['cliente'];
+    final ticket = _detailedTicket ?? widget.ticket;
+    final cliente = ticket['cliente'];
     final nombreCliente = cliente?['nombrecliente'] ?? 'Cliente';
-    final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
+    final sesiones = ticket['sesiones'] as List<dynamic>? ?? [];
 
     // Total del ticket
-    final total = (widget.ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
-    final saldo = (widget.ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+    final total = (ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
+    final saldo = (ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
 
     final buffer = StringBuffer();
     buffer.writeln('Hola *$nombreCliente*,'); // Negrita en WhatsApp
@@ -214,12 +261,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     if (format == null) return;
 
-    final cliente = widget.ticket['cliente'];
-    final telefonoRaw = cliente?['telefono']?.toString();
+    // Preferir el detalle completo si está disponible
+    final ticket = _detailedTicket ?? widget.ticket;
+    final cliente = ticket['cliente'];
+    final telefonoRaw = (cliente != null) ? (cliente['telefono']?.toString() ?? cliente['phone']?.toString()) : null;
     String digits = telefonoRaw != null ? telefonoRaw.replaceAll(RegExp(r'[^0-9]'), '') : '';
     if (digits.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El cliente no tiene teléfono')));
-      return;
+      // Forzar carga del detalle si no lo hemos cargado aún
+      await _loadDetailedTicketIfNeeded();
+
+      final ticket2 = _detailedTicket ?? widget.ticket;
+      final cliente2 = ticket2['cliente'];
+      final telefonoRaw2 = (cliente2 != null) ? (cliente2['telefono']?.toString() ?? cliente2['phone']?.toString()) : null;
+      digits = telefonoRaw2 != null ? telefonoRaw2.replaceAll(RegExp(r'[^0-9]'), '') : '';
+
+      if (digits.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El cliente no tiene teléfono')));
+        return;
+      }
     }
     if (digits.length <= 8) digits = '591$digits';
 
@@ -234,12 +293,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: Image.asset('assets/whatsapp.png', width: 28, height: 28, errorBuilder: (_, __, ___) => Icon(Icons.chat)),
+                leading: const Icon(Icons.chat, color: Color(0xFF25D366)),
                 title: const Text('WhatsApp'),
                 onTap: () => Navigator.of(context).pop('com.whatsapp'),
               ),
               ListTile(
-                leading: Image.asset('assets/whatsapp_business.png', width: 28, height: 28, errorBuilder: (_, __, ___) => Icon(Icons.business)),
+                leading: const Icon(Icons.business, color: Color(0xFF25D366)),
                 title: const Text('WhatsApp Business'),
                 onTap: () => Navigator.of(context).pop('com.whatsapp.w4b'),
               ),
@@ -286,9 +345,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       );
     }
 
+    // Preferir el ticket detallado si está cargado
+    final ticketData = _detailedTicket ?? widget.ticket;
     // Extraer información del ticket (estructura Supabase)
-    final cliente = widget.ticket['cliente'];
-    final sesiones = widget.ticket['sesiones'] as List<dynamic>? ?? [];
+    final cliente = ticketData['cliente'];
+    final sesiones = ticketData['sesiones'] as List<dynamic>? ?? [];
 
     // Crear una copia ordenada de las sesiones: de más antiguo a más reciente.
     // Si la sesión no tiene fecha, la colocamos al final.
@@ -308,10 +369,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       }
     });
 
-    final montoTotal = (widget.ticket['monto_total'] as num?)?.toDouble() ?? 0.0;
-    final montoPagado = (widget.ticket['monto_pagado'] as num?)?.toDouble() ?? 0.0;
-    final saldoPendiente = (widget.ticket['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
-    final estadoPago = widget.ticket['estado_pago'] ?? '-';
+    final montoTotal = (ticketData['monto_total'] as num?)?.toDouble() ?? 0.0;
+    final montoPagado = (ticketData['monto_pagado'] as num?)?.toDouble() ?? 0.0;
+    final saldoPendiente = (ticketData['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+    final estadoPago = ticketData['estado_pago'] ?? '-';
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -331,12 +392,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           IconButton(
             onPressed: _chooseAndSendToWhatsApp,
             tooltip: 'Enviar ticket por WhatsApp',
-            icon: Image.asset(
-              'assets/whatsapp.png',
-              width: 24,
-              height: 24,
-              errorBuilder: (_, __, ___) => const Icon(Icons.send),
-            ),
+            icon: const Icon(Icons.send),
           ),
         ],
       ),
@@ -347,6 +403,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Mostrar error de detalle si existe
+              if (_detailError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: Card(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text('Error cargando detalle: ${_detailError}', style: textTheme.bodySmall)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
               // Cliente
               _SectionCard(
@@ -359,10 +433,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         ? '${cliente['nombrecliente'] ?? ''} ${cliente['apellidocliente'] ?? ''}'
                         : '-',
                   ),
-                  if (cliente?['telefono'] != null)
+                  if (cliente != null && ((cliente['telefono'] != null && cliente['telefono'].toString().isNotEmpty) || (cliente['phone'] != null && cliente['phone'].toString().isNotEmpty)))
                     _DetailRow(
                       label: 'Teléfono',
-                      value: cliente['telefono'].toString(),
+                      value: (cliente['telefono'] ?? cliente['phone']).toString(),
                     ),
                 ],
               ),
@@ -558,24 +632,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Botón de acción - Enviar por WhatsApp
+              // Botón de acción - Enviar por WhatsApp (deshabilitado si loading)
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _chooseAndSendToWhatsApp,
-                  icon: Image.asset(
-                    'assets/whatsapp.png',
-                    width: 24,
-                    height: 24,
-                    color: Colors.white,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.send, color: Colors.white),
-                  ),
-                  label: const Text('Enviar por WhatsApp'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366), // Verde de WhatsApp
-                    padding: const EdgeInsets.all(16),
-                  ),
-                ),
+                child: _loadingDetail
+                    ? FilledButton.icon(
+                        onPressed: null,
+                        icon: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                        label: const Text('Cargando...'),
+                      )
+                    : FilledButton.icon(
+                        onPressed: _chooseAndSendToWhatsApp,
+                        icon: const Icon(Icons.send, color: Colors.white),
+                        label: const Text('Enviar por WhatsApp'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF25D366), // Verde de WhatsApp
+                          padding: const EdgeInsets.all(16),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -676,4 +750,6 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+
+
 

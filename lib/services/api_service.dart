@@ -1270,7 +1270,7 @@ class ApiService {
           .from('ticket')
           .select('''
             *, 
-            cliente:cliente_id(nombrecliente, apellidocliente),
+            cliente:cliente_id(nombrecliente, apellidocliente, telefono),
             sesiones:sesion(
               id,
               numero_sesion,
@@ -1278,7 +1278,7 @@ class ApiService {
               estado_sesion,
               tratamiento:tratamiento_id(id, nombretratamiento, precio)
             )
-          ''')
+          ''') // 👆 AGREGAMOS telefono
           .eq('sucursal_id', sucursalId)
           .gte('created_at', inicioDia)
           .lte('created_at', finDia)
@@ -1404,7 +1404,7 @@ class ApiService {
           sesionesParaEnviar.add({
             'tratamiento_id': idTratamiento,
             'numero_sesion': i + 1, // 1, 2, 3...
-            'precio_sesion': precioTratamiento / cantidadSesiones,
+            'precio_sesion': precioTratamiento,
             'fecha_inicio': fechas[i].toIso8601String() // ← La fecha exacta de esa sesión
           });
         }
@@ -1465,18 +1465,20 @@ class ApiService {
   /// 4. Obtener detalle completo de un ticket (con sesiones y pagos)
   Future<Map<String, dynamic>?> obtenerTicketDetalle(String ticketId) async {
     try {
+      // Evitar seleccionar relaciones que no tienen FK (p. ej. empleado_id)
+      // Si la relación existe en la DB (fk), podemos mapearla aquí; si no, retornamos el campo empleado_id sin join.
       final response = await Supabase.instance.client
           .from('ticket')
           .select('''
             *,
             cliente:cliente_id(*),
-            empleado:empleado_id(*),
             sesiones:sesion(*, tratamiento:tratamiento_id(*)),
             pagos:pago(*)
           ''')
           .eq('id', ticketId)
           .single();
 
+      // Algunas instalaciones devuelven null para relaciones faltantes; convertir a Map defensivo
       return Map<String, dynamic>.from(response);
     } catch (e) {
       print('obtenerTicketDetalle error: $e');
