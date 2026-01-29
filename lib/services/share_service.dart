@@ -32,7 +32,7 @@ class ShareService {
     if (tratamientosRaw != null && tratamientosRaw.isNotEmpty) {
       tratamientos = tratamientosRaw.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
     } else if (sesionesRaw != null && sesionesRaw.isNotEmpty) {
-      // Agrupar sesiones por tratamiento
+      // Agrupar sesiones por tratamiento y almacenar también las fechas/hora de cada sesión
       final Map<dynamic, Map<String, dynamic>> map = {};
       for (final s in sesionesRaw) {
         try {
@@ -47,9 +47,24 @@ class ShareService {
             precioSesion = double.tryParse(trat['precio'].toString()) ?? 0.0;
           }
 
+          // Formatear la fecha/hora de la sesión si existe
+          String? fechaStr;
+          if (s is Map && s['fecha_hora_inicio'] != null) {
+            try {
+              final dt = DateTime.parse(s['fecha_hora_inicio'].toString());
+              fechaStr = DateFormat('dd/MM/yyyy • HH:mm', 'es').format(dt);
+            } catch (_) {
+              fechaStr = s['fecha_hora_inicio'].toString();
+            }
+          }
+
           if (map.containsKey(tratId)) {
             map[tratId]!['cantidad'] = (map[tratId]!['cantidad'] as int) + 1;
             map[tratId]!['subtotal'] = (map[tratId]!['subtotal'] as double) + precioSesion;
+            // añadir fecha a la lista
+            final List<String> fechas = List<String>.from(map[tratId]!['fechas'] ?? <String>[]);
+            if (fechaStr != null) fechas.add(fechaStr);
+            map[tratId]!['fechas'] = fechas;
           } else {
             map[tratId] = {
               'id': tratId,
@@ -57,6 +72,7 @@ class ShareService {
               'precio': precioSesion,
               'cantidad': 1,
               'subtotal': precioSesion,
+              'fechas': fechaStr != null ? <String>[fechaStr] : <String>[],
             };
           }
         } catch (_) {}
@@ -152,18 +168,32 @@ class ShareService {
                   ),
 
                   pw.SizedBox(height: 12),
-                  // Lista de tratamientos
+                  // Lista de tratamientos con sus fechas de sesiones
                   pw.Column(children: [
                     ...tratamientos.map((t) {
                       final name = t['nombreTratamiento'] ?? t['nombre'] ?? '-';
                       final cantidad = (t['cantidad'] ?? 1).toString();
                       final subtotal = (t['subtotal'] is num) ? (t['subtotal'] as num).toDouble() : ((t['precio'] is num ? (t['precio'] as num).toDouble() : double.tryParse(t['precio']?.toString() ?? '0') ?? 0.0) * (t['cantidad'] ?? 1));
-                      return pw.Padding(
-                        padding: pw.EdgeInsets.symmetric(vertical: 6),
-                        child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                          pw.Expanded(child: pw.Text('$name x$cantidad', style: pw.TextStyle(fontSize: 11))),
-                          pw.Text('Bs ${subtotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                        ]),
+                      final fechas = List<String>.from(t['fechas'] ?? <String>[]);
+
+                      return pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                        children: [
+                          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                            pw.Expanded(child: pw.Text('$name x$cantidad', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold))),
+                            pw.Text('Bs ${subtotal.toStringAsFixed(2)}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                          ]),
+                          if (fechas.isNotEmpty)
+                            pw.Padding(
+                              padding: pw.EdgeInsets.only(top: 4, bottom: 8, left: 2),
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: fechas.map((f) => pw.Text('• $f', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600))).toList(),
+                              ),
+                            )
+                          else
+                            pw.SizedBox(height: 8),
+                        ],
                       );
                     }).toList()
                   ]),
@@ -181,21 +211,7 @@ class ShareService {
                   ),
 
                   pw.SizedBox(height: 12),
-                  // Barcode simple (simulado)
-                  pw.Container(
-                    height: 60,
-                    child: pw.Center(
-                      child: pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.center,
-                        children: List.generate(40, (i) {
-                          final w = (i % 3) + 1; // widths 1..3
-                          return pw.Container(width: w.toDouble(), height: 40, margin: pw.EdgeInsets.symmetric(horizontal: 1), color: (i % 2 == 0) ? PdfColors.black : PdfColors.grey800);
-                        }),
-                      ),
-                    ),
-                  ),
-
-                  pw.SizedBox(height: 8),
+                  // Mostrar únicamente el ID en texto (código de barras eliminado por requerimiento)
                   pw.Center(child: pw.Text(id.toString(), style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700))),
 
                 ],
