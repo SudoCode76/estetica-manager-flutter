@@ -1397,7 +1397,6 @@ class ApiService {
           throw Exception('Formato de fecha inválido');
         }).toList();
 
-        int cantidadSesiones = fechas.length;
 
         // Iteramos por CADA FECHA elegida
         for (int i = 0; i < fechas.length; i++) {

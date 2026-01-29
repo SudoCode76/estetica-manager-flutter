@@ -16,7 +16,6 @@ class SesionesScreen extends StatefulWidget {
 class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProviderStateMixin {
   DateTime _selectedDate = DateTime.now();
   SucursalProvider? _sucursalProvider;
-  bool _localeInitialized = false;
   late TabController _tabController;
   String _filtroEstado = 'agendada'; // 'agendada' o 'realizada'
   bool _isFirstLoad = true; // Bandera para controlar primera carga
@@ -27,6 +26,10 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
     _initializeLocale();
+    // CARGA AUTOMÁTICA: cargar la agenda tan pronto como termine el primer frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAgenda();
+    });
   }
 
   void _onTabChanged() {
@@ -41,18 +44,9 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
   Future<void> _initializeLocale() async {
     try {
       await initializeDateFormatting('es_ES', null);
-      if (mounted) {
-        setState(() {
-          _localeInitialized = true;
-        });
-      }
     } catch (e) {
       print('Error inicializando locale: $e');
-      if (mounted) {
-        setState(() {
-          _localeInitialized = true; // Continuar de todos modos
-        });
-      }
+      // Continuar de todos modos
     }
   }
 
@@ -69,7 +63,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
     }
 
     // Cargar agenda en primera vez o cuando cambia el provider
-    if ((_isFirstLoad || providerChanged) && _localeInitialized) {
+    if ((_isFirstLoad || providerChanged)) {
       _isFirstLoad = false;
       // Usar addPostFrameCallback para evitar llamar durante el build
       WidgetsBinding.instance.addPostFrameCallback((_) {
