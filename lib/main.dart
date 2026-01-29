@@ -1,6 +1,7 @@
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
@@ -48,6 +49,17 @@ class _MyAppState extends State<MyApp> {
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.light,
           navigatorObservers: [routeObserver],
+          // Localizations needed for DateRangePicker, DatePicker and other widgets
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('es', 'ES'),
+            Locale('en', 'US'),
+          ],
+          locale: const Locale('es', 'ES'),
           home: const Root(),
         ),
       ),

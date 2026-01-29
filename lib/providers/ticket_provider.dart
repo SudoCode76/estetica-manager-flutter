@@ -293,4 +293,40 @@ class TicketProvider extends ChangeNotifier {
     if (_lastRangeStart == null || _lastRangeEnd == null || _lastSucursalId == null) return _tickets;
     return fetchTicketsByRange(start: _lastRangeStart!, end: _lastRangeEnd!, sucursalId: _lastSucursalId!);
   }
+
+  /// Obtener agenda por rango de fechas
+  Future<List<dynamic>> fetchAgendaRango({
+    required DateTime start,
+    required DateTime end,
+    required int sucursalId,
+    String? estadoSesion,
+  }) async {
+    _lastRangeStart = start;
+    _lastRangeEnd = end;
+    _isLoadingAgenda = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      print('TicketProvider: Fetching agenda por rango $start - $end for sucursal $sucursalId, estado=$estadoSesion');
+      final data = await _api.obtenerAgendaPorRango(
+        fechaInicio: start,
+        fechaFin: end,
+        sucursalId: sucursalId,
+        estadoSesion: estadoSesion,
+      );
+      _agenda = data;
+      _error = null;
+      print('TicketProvider: Fetched ${_agenda.length} agenda items (rango)');
+      return _agenda;
+    } catch (e) {
+      _error = e.toString();
+      _agenda = [];
+      print('TicketProvider: Error fetching agenda por rango: $e');
+      return _agenda;
+    } finally {
+      _isLoadingAgenda = false;
+      notifyListeners();
+    }
+  }
 }

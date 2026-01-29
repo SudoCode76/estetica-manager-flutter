@@ -1258,6 +1258,38 @@ class ApiService {
     }
   }
 
+  /// Obtener agenda por rango de fechas
+  Future<List<dynamic>> obtenerAgendaPorRango({
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
+    required int sucursalId,
+    String? estadoSesion,
+  }) async {
+    try {
+      // Ajustar horas para cubrir el día completo en local
+      final start = DateTime(fechaInicio.year, fechaInicio.month, fechaInicio.day, 0, 0, 0).toIso8601String();
+      final end = DateTime(fechaFin.year, fechaFin.month, fechaFin.day, 23, 59, 59, 999).toIso8601String();
+
+      var query = Supabase.instance.client
+          .from('vista_agenda_diaria')
+          .select()
+          .eq('sucursal_id', sucursalId)
+          .gte('fecha_hora_inicio', start)
+          .lte('fecha_hora_inicio', end);
+
+      if (estadoSesion != null) {
+        query = query.eq('estado_sesion', estadoSesion);
+      }
+
+      final response = await query.order('fecha_hora_inicio', ascending: true);
+      print('obtenerAgendaPorRango: fetched \'${(response as List).length}\' sesiones for sucursal $sucursalId between $start and $end');
+      return response as List<dynamic>;
+    } catch (e) {
+      print('obtenerAgendaPorRango error: $e');
+      rethrow;
+    }
+  }
+
   /// 1B. Obtener tickets del día actual (para pantalla de tickets)
   Future<List<dynamic>> getTicketsDelDia({
     required DateTime fecha,

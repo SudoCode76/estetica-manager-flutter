@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
@@ -14,7 +15,8 @@ class SesionesScreen extends StatefulWidget {
 }
 
 class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProviderStateMixin {
-  DateTime _selectedDate = DateTime.now();
+  // Usamos un rango por defecto: hoy - hoy
+  DateTimeRange _selectedRange = DateTimeRange(start: DateTime.now(), end: DateTime.now());
   SucursalProvider? _sucursalProvider;
   late TabController _tabController;
   String _filtroEstado = 'agendada'; // 'agendada' o 'realizada'
@@ -99,30 +101,64 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
       return;
     }
 
-    print('SesionesScreen: Loading agenda for date=${_selectedDate.toString()} and sucursal=$sucursalId, estado=$_filtroEstado');
+    print('SesionesScreen: Loading agenda for range=${_selectedRange.start} -> ${_selectedRange.end} and sucursal=$sucursalId, estado=$_filtroEstado');
 
-    await context.read<TicketProvider>().fetchAgenda(
-      _selectedDate,
-      sucursalId: sucursalId,
-      estadoSesion: _filtroEstado, // Pasar estado para filtrar en la query
+    // Usar fetchAgendaRango para soportar rango de fechas (inicialmente hoy)
+    await context.read<TicketProvider>().fetchAgendaRango(
+      start: _selectedRange.start,
+      end: _selectedRange.end,
+      sucursalId: sucursalId!,
+      estadoSesion: _filtroEstado,
     );
   }
 
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
+  // Selector de rango
+  Future<void> _selectDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: _selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: _selectedRange,
       locale: const Locale('es', 'ES'),
+      builder: (context, child) {
+        // Asegurar que el DateRangePicker tenga MaterialLocalizations disponibles
+        return Localizations.override(
+          context: context,
+          locale: const Locale('es', 'ES'),
+          delegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+      },
     );
 
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        _selectedRange = picked;
       });
       _loadAgenda();
     }
+  }
+
+  String _getRangoTexto() {
+    final start = DateFormat('d MMM', 'es_ES').format(_selectedRange.start);
+    final end = DateFormat('d MMM', 'es_ES').format(_selectedRange.end);
+
+    if (_selectedRange.start.day == _selectedRange.end.day && _selectedRange.start.month == _selectedRange.end.month && _selectedRange.start.year == _selectedRange.end.year) {
+      return DateFormat('EEEE, d MMMM yyyy', 'es_ES').format(_selectedRange.start);
+    }
+    return '$start - $end';
   }
 
   @override
@@ -137,85 +173,83 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
         surfaceTintColor: colorScheme.surfaceTint,
         backgroundColor: colorScheme.surface,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: _selectDate,
-            tooltip: 'Cambiar fecha',
+          // Botón de refrescar estilizado similar a la pantalla de Tickets
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: FilledButton.icon(
+              onPressed: _loadAgenda,
+              icon: const Icon(Icons.refresh),
+              label: const Text(''),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(56, 56),
+                padding: const EdgeInsets.all(12),
+                backgroundColor: colorScheme.surfaceVariant,
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAgenda,
-            tooltip: 'Actualizar',
-          ),
-          const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // Selector de fecha compacto
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  colorScheme.primaryContainer,
-                  colorScheme.primaryContainer.withValues(alpha: 0.7),
+          // Selector de rango compacto
+          InkWell(
+            onTap: _selectDateRange,
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primaryContainer,
+                    colorScheme.primaryContainer.withValues(alpha: 0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.event,
+                      color: colorScheme.onPrimary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Periodo visualizado',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                            fontSize: 11,
+                          ),
+                        ),
+                        Text(
+                          _getRangoTexto(),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.edit, size: 18),
                 ],
               ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.event,
-                    color: colorScheme.onPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Fecha seleccionada',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                          fontSize: 11,
-                        ),
-                      ),
-                      Text(
-                        DateFormat('EEEE, d MMMM yyyy').format(_selectedDate),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: _selectDate,
-                  icon: const Icon(Icons.edit_calendar, size: 18),
-                  label: const Text('Cambiar'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                ),
-              ],
             ),
           ),
 
@@ -330,6 +364,8 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                       final sesion = AgendaItem.fromJson(provider.agenda[index]);
                       return _SesionCard(
                         sesion: sesion,
+                        // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
+                        showActions: _filtroEstado == 'agendada',
                         onMarcarAtendida: () async {
                           final confirmed = await showDialog<bool>(
                             context: context,
@@ -358,6 +394,10 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                                   backgroundColor: success ? Colors.green : Colors.red,
                                 ),
                               );
+                              // Si la operación fue exitosa, recargar la agenda para reflejar el cambio
+                              if (success) {
+                                _loadAgenda();
+                              }
                             }
                           }
                         },
@@ -393,6 +433,9 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                                     backgroundColor: success ? Colors.green : Colors.red,
                                   ),
                                 );
+                                if (success) {
+                                  _loadAgenda();
+                                }
                               }
                             }
                           }
@@ -414,12 +457,14 @@ class _SesionCard extends StatelessWidget {
   final AgendaItem sesion;
   final VoidCallback onMarcarAtendida;
   final VoidCallback onReprogramar;
+  final bool showActions;
 
   const _SesionCard({
     Key? key,
     required this.sesion,
     required this.onMarcarAtendida,
     required this.onReprogramar,
+    this.showActions = true,
   }) : super(key: key);
 
   @override
@@ -560,32 +605,34 @@ class _SesionCard extends StatelessWidget {
               const SizedBox(height: 16),
 
               // Acciones
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onReprogramar,
-                      icon: const Icon(Icons.schedule, size: 18),
-                      label: const Text('Reprogramar'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+              if (showActions) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onReprogramar,
+                        icon: const Icon(Icons.schedule, size: 18),
+                        label: const Text('Reprogramar'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: onMarcarAtendida,
-                      icon: const Icon(Icons.check_circle, size: 18),
-                      label: const Text('Atendida'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onMarcarAtendida,
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('Atendida'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
