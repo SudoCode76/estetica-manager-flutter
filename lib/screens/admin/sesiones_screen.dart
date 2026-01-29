@@ -107,7 +107,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
     await context.read<TicketProvider>().fetchAgendaRango(
       start: _selectedRange.start,
       end: _selectedRange.end,
-      sucursalId: sucursalId!,
+      sucursalId: sucursalId,
       estadoSesion: _filtroEstado,
     );
   }
@@ -168,12 +168,13 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agenda de Sesiones'),
+        // Título eliminado por petición del usuario (antes: 'Agenda de Sesiones')
+        title: const SizedBox.shrink(),
         elevation: 0,
         surfaceTintColor: colorScheme.surfaceTint,
         backgroundColor: colorScheme.surface,
         actions: [
-          // Botón de refrescar estilizado similar a la pantalla de Tickets
+          // Botón de refrescar visible y consistente con la UI (FilledButton.icon similar a AllTickets)
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: FilledButton.icon(
@@ -183,7 +184,6 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
               style: FilledButton.styleFrom(
                 minimumSize: const Size(56, 56),
                 padding: const EdgeInsets.all(12),
-                backgroundColor: colorScheme.surfaceVariant,
               ),
             ),
           ),
