@@ -1405,6 +1405,9 @@ class ApiService {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) throw Exception('Usuario no autenticado');
 
+      // 1.b Capturar la hora local del dispositivo para pasarla al backend
+      final fechaLocal = DateTime.now().toIso8601String();
+
       // 2. Transformar el Carrito en Sesiones Individuales
       // Ahora usamos el cronograma_sesiones que trae las fechas elegidas por el usuario
       List<Map<String, dynamic>> sesionesParaEnviar = [];
@@ -1426,6 +1429,16 @@ class ApiService {
         List<DateTime> fechas = cronogramaRaw.map((f) {
           if (f is DateTime) return f;
           if (f is String) return DateTime.parse(f);
+          // Aceptar también mapas con partes de fecha (por compatibilidad)
+          if (f is Map && f.containsKey('year')) {
+            return DateTime(
+              f['year'],
+              f['month'] ?? 1,
+              f['day'] ?? 1,
+              f['hour'] ?? 0,
+              f['minute'] ?? 0,
+            );
+          }
           throw Exception('Formato de fecha inválido');
         }).toList();
 
@@ -1453,7 +1466,9 @@ class ApiService {
           'p_sucursal_id': sucursalId,
           'p_monto_total': totalVenta,
           'p_monto_pagado_inicial': pagoInicial,
-          'p_sesiones': sesionesParaEnviar // Supabase serializa esto automágicamente
+          'p_sesiones': sesionesParaEnviar, // Supabase serializa esto automágicamente
+          // Enviar la fecha de creación usando la hora local del dispositivo (p. ej. GMT-4)
+          'p_fecha_creacion': fechaLocal,
         }
       );
 

@@ -224,12 +224,7 @@ class TicketProvider extends ChangeNotifier {
   Future<bool> marcarSesionAtendida(String sesionId) async {
     try {
       await _api.marcarSesionAtendida(sesionId);
-
-      // Refrescar agenda después de marcar sesión atendida
-      if (_lastFechaAgenda != null) {
-        await fetchAgenda(_lastFechaAgenda!, sucursalId: _lastSucursalId);
-      }
-
+      // No refrescamos aquí. La UI debe llamar a fetchAgenda/_loadAgenda para recargar con el rango correcto.
       return true;
     } catch (e) {
       _error = e.toString();
@@ -243,12 +238,7 @@ class TicketProvider extends ChangeNotifier {
   Future<bool> reprogramarSesion(String sesionId, DateTime nuevaFecha) async {
     try {
       await _api.reprogramarSesion(sesionId, nuevaFecha);
-
-      // Refrescar agenda después de reprogramar
-      if (_lastFechaAgenda != null) {
-        await fetchAgenda(_lastFechaAgenda!, sucursalId: _lastSucursalId);
-      }
-
+      // No refrescamos aquí. La UI debe volver a pedir la agenda con el rango actual.
       return true;
     } catch (e) {
       _error = e.toString();

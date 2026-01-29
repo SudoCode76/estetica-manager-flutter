@@ -22,7 +22,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   String? errorMsg;
   bool sortAscending = false; // false = nuevo→antiguo (más reciente primero)
   SucursalProvider? _sucursalProvider;
-  DateTimeRange? _selectedDateRange; // Para filtrar por rango de fechas
+  // Inicializar por defecto con HOY (fecha del dispositivo)
+  DateTimeRange? _selectedDateRange = DateTimeRange(start: DateTime.now(), end: DateTime.now()); // Para filtrar por rango de fechas
 
   @override
   void initState() {
@@ -60,14 +61,24 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       errorMsg = null;
     });
     try {
-      // Obtener TODOS los tickets de la sucursal (sin filtro de fecha)
       final sucursalId = _sucursalProvider!.selectedSucursalId!;
 
-      // Usar query directa a Supabase para obtener todos los tickets
-      final data = await api.getAllTickets(sucursalId: sucursalId);
+      // Si hay un rango seleccionado (por defecto HOY), solicitar solo ese rango al servidor
+      List<dynamic> data;
+      if (_selectedDateRange != null) {
+        data = await api.getTicketsByRange(
+          start: _selectedDateRange!.start,
+          end: _selectedDateRange!.end,
+          sucursalId: sucursalId,
+        );
+      } else {
+        // Si usuario decidió ver todo, traer todo el historial
+        data = await api.getAllTickets(sucursalId: sucursalId);
+      }
+
       tickets = data;
 
-      // Aplicar filtros
+      // Aplicar filtros locales (solo búsqueda/orden)
       applyFilters();
     } catch (e) {
       print('Error fetching tickets: $e');
@@ -98,15 +109,6 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
             tratamientosMatch;
 
         if (!matchesSearch) return false;
-      }
-
-      // Filtro por rango de fechas
-      if (_selectedDateRange != null) {
-        final createdAt = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;
-        if (createdAt == null) return false;
-
-        return createdAt.isAfter(_selectedDateRange!.start.subtract(const Duration(days: 1))) &&
-               createdAt.isBefore(_selectedDateRange!.end.add(const Duration(days: 1)));
       }
 
       return true;
@@ -142,16 +144,18 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     if (picked != null) {
       setState(() {
         _selectedDateRange = picked;
-        applyFilters();
       });
+      // Recargar desde la API con el nuevo rango
+      await fetchTickets();
     }
   }
 
   void _clearDateFilter() {
     setState(() {
       _selectedDateRange = null;
-      applyFilters();
     });
+    // Recargar desde la API (traer todo el historial)
+    fetchTickets();
   }
 
   @override
