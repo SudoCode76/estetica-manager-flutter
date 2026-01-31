@@ -654,17 +654,13 @@ class ApiService {
 
   Future<bool> eliminarTicket(dynamic documentId) async {
     try {
-      await _ensureJwtExists();
-      final id = documentId.toString();
-      final url = Uri.parse('${SupabaseConfig.supabaseUrl}/rest/v1/tickets?documentId=eq.$id');
-      final headers = await _getHeaders();
-      final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
-      if (resp.statusCode == 200 || resp.statusCode == 204) return true;
-      if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al eliminar ticket');
-      return false;
+      // Usar cliente Supabase SDK para asegurar autenticación y manejo de cabezeras
+      final id = documentId;
+      await Supabase.instance.client.from('ticket').delete().eq('id', id);
+      return true;
     } catch (e) {
       print('eliminarTicket error: $e');
-      rethrow;
+      return false;
     }
   }
 
@@ -1668,5 +1664,91 @@ class ApiService {
     }
   }
 
-  // ------------------ FIN NUEVA ARQUITECTURA ------------------
+  /// Buscar tickets por texto (server-side, eficiente)
+  /// Busca en clientes (nombre/apellido/telefono) y en tratamientos (nombre)
+  Future<List<dynamic>> searchTickets({
+    required String query,
+    required int sucursalId,
+  }) async {
+    try {
+      final q = query.trim();
+      if (q.isEmpty) return [];
+
+      // 1) Buscar clientes que coincidan
+      final pattern = '%$q%';
+      final clientsResp = await Supabase.instance.client
+          .from('cliente')
+          .select('id')
+          .eq('sucursal_id', sucursalId)
+          .or('nombrecliente.ilike.$pattern,apellidocliente.ilike.$pattern,telefono.ilike.$pattern');
+
+      final clientIds = <dynamic>[];
+      if (clientsResp is List) {
+        for (var c in clientsResp) {
+          if (c is Map && c['id'] != null) clientIds.add(c['id']);
+        }
+      }
+
+      // 2) Buscar tratamientos que coincidan y obtener sus ids
+      final tratResp = await Supabase.instance.client
+          .from('tratamiento')
+          .select('id')
+          .ilike('nombretratamiento', pattern);
+
+      final tratIds = <dynamic>[];
+      if (tratResp is List) {
+        for (var t in tratResp) {
+          if (t is Map && t['id'] != null) tratIds.add(t['id']);
+        }
+      }
+
+      // 3) Si hay tratamientos, obtener ticket ids desde sesiones
+      final ticketIdsFromSesiones = <dynamic>[];
+      if (tratIds.isNotEmpty) {
+        final sesResp = await Supabase.instance.client
+            .from('sesion')
+            .select('ticket_id')
+            .filter('tratamiento_id', 'in', '(${tratIds.map((e) => e.toString()).join(',')})');
+        if (sesResp is List) {
+          for (var s in sesResp) {
+            if (s is Map && s['ticket_id'] != null) ticketIdsFromSesiones.add(s['ticket_id']);
+          }
+        }
+      }
+
+      // 4) Armar filtro OR para tickets: por cliente_id o por id (desde sesiones)
+      final orParts = <String>[];
+      if (clientIds.isNotEmpty) {
+        // clientIds likely integers
+        orParts.add('cliente_id.in.(${clientIds.map((e) => e.toString()).join(',')})');
+      }
+      if (ticketIdsFromSesiones.isNotEmpty) {
+        orParts.add('id.in.(${ticketIdsFromSesiones.map((e) => e.toString()).join(',')})');
+      }
+
+      if (orParts.isEmpty) return [];
+
+      final orFilter = orParts.join(',');
+
+      // 5) Traer tickets completos con joins
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
+            *,
+            cliente:cliente_id(nombrecliente,apellidocliente,telefono),
+            sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))
+          ''')
+          .eq('sucursal_id', sucursalId)
+          .or(orFilter)
+          .order('created_at', ascending: false);
+
+      if (response is List) return response as List<dynamic>;
+      return [];
+    } catch (e) {
+      print('searchTickets error: $e');
+      rethrow;
+    }
+  }
+
+  // ...existing code...
 }

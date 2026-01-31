@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
@@ -6,6 +7,7 @@ import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'package:flutter/foundation.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -23,8 +25,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
   bool showOnlyToday = true; // Siempre true - solo mostrar tickets de hoy
   SucursalProvider? _sucursalProvider;
   bool _isFirstLoad = true; // Flag para controlar la primera carga
-
-  // Nuevas variables para historial
+  Timer? _debounce; // debounce for search
+  List<dynamic>? _searchResults; // when searching across history
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
   bool _showHistoryMode = false;
@@ -103,38 +105,158 @@ class _TicketsScreenState extends State<TicketsScreen> {
     setState(() {
       search = value;
     });
+
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      if (kDebugMode) print('TicketsScreen.search debounce fired for: "$search"');
+      // If empty, clear and reload today's tickets
+      if (search.trim().isEmpty) {
+        setState(() {
+          _searchResults = null;
+        });
+        _reloadTicketsForCurrentFilters();
+        return;
+      }
+
+      // Intento rápido local: buscar en los tickets que ya tenemos cargados (rápido, UX instantáneo)
+      try {
+        final providerTickets = context.read<TicketProvider>().tickets;
+        if (providerTickets.isNotEmpty && search.trim().isNotEmpty) {
+          final term = _normalize(search);
+          final localMatches = providerTickets.where((t) {
+            final clienteObj = t['cliente'] ?? t['cliente_id'];
+            String nombre = '';
+            String apellido = '';
+            if (clienteObj is Map) {
+              nombre = (clienteObj['nombrecliente'] ?? clienteObj['nombreCliente'] ?? clienteObj['nombre'] ?? '').toString();
+              apellido = (clienteObj['apellidocliente'] ?? clienteObj['apellidoCliente'] ?? clienteObj['apellido'] ?? '').toString();
+            } else if (clienteObj is List && clienteObj.isNotEmpty && clienteObj.first is Map) {
+              final c0 = clienteObj.first;
+              nombre = (c0['nombrecliente'] ?? c0['nombreCliente'] ?? c0['nombre'] ?? '').toString();
+              apellido = (c0['apellidocliente'] ?? c0['apellidoCliente'] ?? c0['apellido'] ?? '').toString();
+            }
+            final combined = _normalize('$nombre $apellido');
+            return combined.contains(term);
+          }).toList();
+          if (localMatches.isNotEmpty) {
+            setState(() {
+              _searchResults = localMatches;
+            });
+          }
+        }
+      } catch (_) {}
+
+      // Otherwise fetch all tickets for the branch and filter locally
+      try {
+        if (_sucursalProvider?.selectedSucursalId == null) {
+          if (kDebugMode) print('TicketsScreen: no sucursal selected');
+          return;
+        }
+        // Use server-side search (efficient) to avoid fetching entire history
+        final all = await api.searchTickets(query: search.trim(), sucursalId: _sucursalProvider!.selectedSucursalId!);
+        if (kDebugMode) print('TicketsScreen: searchTickets returned ${all.length} items for query="$search"');
+        setState(() {
+          _searchResults = all;
+        });
+        if (kDebugMode) {
+          for (int i = 0; i < (all.length < 10 ? all.length : 10); i++) {
+            final t = all[i];
+            final id = t['id'] ?? t['documentId'] ?? 'no-id';
+            print('TicketsScreen.debug ticket[$i] id=$id searchable="${_buildSearchableForDebug(t)}"');
+          }
+        }
+      } catch (e) {
+        print('TicketsScreen: search fetch error: $e');
+      }
+    });
+  }
+
+  String _normalize(String s) {
+    var str = s.toLowerCase();
+    const accents = {
+      'á':'a','à':'a','ä':'a','â':'a','ã':'a',
+      'é':'e','è':'e','ë':'e','ê':'e',
+      'í':'i','ì':'i','ï':'i','î':'i',
+      'ó':'o','ò':'o','ö':'o','ô':'o','õ':'o',
+      'ú':'u','ù':'u','ü':'u','û':'u','ñ':'n','ç':'c'
+    };
+    accents.forEach((k,v) { str = str.replaceAll(k, v); });
+    str = str.replaceAll(RegExp(r"[^a-z0-9\s]"), ' ');
+    return str.replaceAll(RegExp(r"\s+"), ' ').trim();
   }
 
   List<dynamic> _computeFilteredTickets(List<dynamic> tickets) {
-    // Filtrar por fecha de hoy si showOnlyToday es true
-    List<dynamic> dateFilteredTickets = tickets;
-    // Si estamos mostrando historial por rango, NO aplicamos el filtro de hoy
-    if (showOnlyToday && !_showHistoryMode) {
+    if (kDebugMode) print('TicketsScreen._computeFilteredTickets: search="$search", providerTickets=${tickets.length}, searchResults=${_searchResults?.length ?? 0}');
+    // Decide data source: if _searchResults is present (user searching), use it; else use provider tickets
+    final source = (_searchResults != null) ? _searchResults! : tickets;
+
+    // Filtrar por fecha de hoy si showOnlyToday is true AND not in history/search mode
+    List<dynamic> dateFilteredTickets = source;
+    if (showOnlyToday && !_showHistoryMode && _searchResults == null) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final tomorrow = today.add(const Duration(days: 1));
 
-      dateFilteredTickets = tickets.where((t) {
+      dateFilteredTickets = source.where((t) {
         if (t['created_at'] == null) return false;
         final ticketDate = DateTime.parse(t['created_at']);
-        return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) &&
-            ticketDate.isBefore(tomorrow);
+        return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) && ticketDate.isBefore(tomorrow);
       }).toList();
     }
 
-    // Aplicar filtro de búsqueda actual
+    // Aplicar filtro de búsqueda actual (si hay texto)
     List<dynamic> filtered;
-    if (search.isEmpty) {
+    if (search.trim().isEmpty) {
       filtered = dateFilteredTickets;
     } else {
+      final term = _normalize(search);
+      if (kDebugMode) print('TicketsScreen: normalized search term="$term"');
       filtered = dateFilteredTickets.where((t) {
-        final cliente = t['cliente']?['nombreCliente'] ?? '';
-        final apellido = t['cliente']?['apellidoCliente'] ?? '';
-        final tratamientos = t['tratamientos'] as List<dynamic>? ?? [];
-        final tratamientosMatch = tratamientos.any((tr) => (tr['nombreTratamiento'] ?? '').toLowerCase().contains(search.toLowerCase()));
-        return cliente.toLowerCase().contains(search.toLowerCase()) ||
-            apellido.toLowerCase().contains(search.toLowerCase()) ||
-            tratamientosMatch;
+        // Buscar en múltiples claves y formatos
+        String nombre = '';
+        String apellido = '';
+        String telefono = '';
+        String email = '';
+        // cliente puede ser Map o Map under different keys or List
+        final clienteObj = t['cliente'] ?? t['cliente_id'];
+        if (clienteObj is List && clienteObj.isNotEmpty) {
+          final c0 = clienteObj.first;
+          if (c0 is Map) {
+            nombre = (c0['nombrecliente'] ?? c0['nombreCliente'] ?? c0['nombre'] ?? '').toString();
+            apellido = (c0['apellidocliente'] ?? c0['apellidoCliente'] ?? c0['apellido'] ?? '').toString();
+            telefono = (c0['telefono'] ?? c0['phone'] ?? '').toString();
+            email = (c0['email'] ?? '').toString();
+          }
+        } else if (clienteObj is Map) {
+          nombre = (clienteObj['nombrecliente'] ?? clienteObj['nombreCliente'] ?? clienteObj['nombre'] ?? '').toString();
+          apellido = (clienteObj['apellidocliente'] ?? clienteObj['apellidoCliente'] ?? clienteObj['apellido'] ?? '').toString();
+          telefono = (clienteObj['telefono'] ?? clienteObj['phone'] ?? '').toString();
+          email = (clienteObj['email'] ?? '').toString();
+        }
+
+        final nNorm = _normalize(nombre);
+        final aNorm = _normalize(apellido);
+        final tNorm = _normalize(telefono);
+        final eNorm = _normalize(email);
+
+        // revisar tratamientos en sesiones o en 'tratamientos'
+        final sesiones = (t['sesiones'] as List<dynamic>?) ?? (t['tratamientos'] as List<dynamic>?) ?? [];
+        final tratamientosMatch = sesiones.any((s) {
+          try {
+            final trat = s is Map ? (s['tratamiento'] ?? s['tratamiento_id'] ?? s) : s;
+            String nombreTrat = '';
+            if (trat is Map) nombreTrat = (trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['nombre'] ?? '').toString();
+            else if (s is Map) nombreTrat = (s['nombreTratamiento'] ?? s['nombre'] ?? '').toString();
+            return _normalize(nombreTrat).contains(term);
+          } catch (e) {
+            return false;
+          }
+        });
+
+        if (nNorm.contains(term) || aNorm.contains(term) || tNorm.contains(term) || eNorm.contains(term) || tratamientosMatch) return true;
+        final clienteFull = _normalize('$nombre $apellido');
+        if (clienteFull.contains(term)) return true;
+        return false;
       }).toList();
     }
 
@@ -145,6 +267,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
       return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
 
+    if (kDebugMode) print('TicketsScreen: filtered count=${filtered.length}');
     return filtered;
   }
 
@@ -204,6 +327,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   void dispose() {
     _searchController.dispose();
     _sucursalProvider?.removeListener(_onSucursalChanged);
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -539,6 +663,44 @@ class _TicketsScreenState extends State<TicketsScreen> {
         ],
       ),
     );
+  }
+
+  // Helper para debug: construye cadena buscable simple
+  String _buildSearchableForDebug(dynamic t) {
+    try {
+      final cliente = t['cliente'] ?? t['cliente_id'];
+      String nombre = '';
+      String apellido = '';
+      String telefono = '';
+      if (cliente is List && cliente.isNotEmpty) {
+        final c = cliente.first;
+        if (c is Map) {
+          nombre = (c['nombrecliente'] ?? c['nombreCliente'] ?? c['nombre'] ?? '').toString();
+          apellido = (c['apellidocliente'] ?? c['apellidoCliente'] ?? c['apellido'] ?? '').toString();
+          telefono = (c['telefono'] ?? c['phone'] ?? '').toString();
+        }
+      } else if (cliente is Map) {
+        nombre = (cliente['nombrecliente'] ?? cliente['nombreCliente'] ?? cliente['nombre'] ?? '').toString();
+        apellido = (cliente['apellidocliente'] ?? cliente['apellidoCliente'] ?? cliente['apellido'] ?? '').toString();
+        telefono = (cliente['telefono'] ?? cliente['phone'] ?? '').toString();
+      }
+
+      final sesiones = (t['sesiones'] as List<dynamic>?) ?? (t['tratamientos'] as List<dynamic>?) ?? [];
+      final tratamientos = sesiones.map((s) {
+        try {
+          final trat = s is Map ? (s['tratamiento'] ?? s['tratamiento_id'] ?? s) : s;
+          if (trat is Map) return (trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['nombre'] ?? '').toString();
+          return (s['nombreTratamiento'] ?? s['nombre'] ?? '').toString();
+        } catch (e) {
+          return '';
+        }
+      }).join(' ');
+
+      final combined = '$nombre $apellido $telefono $tratamientos';
+      return _normalize(combined);
+    } catch (e) {
+      return '';
+    }
   }
 }
 

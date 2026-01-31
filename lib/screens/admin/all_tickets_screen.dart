@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
 import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AllTicketsScreen extends StatefulWidget {
   const AllTicketsScreen({super.key});
@@ -15,15 +18,23 @@ class AllTicketsScreen extends StatefulWidget {
 class _AllTicketsScreenState extends State<AllTicketsScreen> {
   final ApiService api = ApiService();
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> tickets = [];
-  List<dynamic> filteredTickets = [];
+
+  // Datos
+  List<dynamic> tickets = [];        // Todos los datos descargados
+  List<dynamic> filteredTickets = []; // Datos que se ven en pantalla
+
   bool isLoading = true;
   String search = '';
   String? errorMsg;
-  bool sortAscending = false; // false = nuevo→antiguo (más reciente primero)
+  bool sortAscending = false;
   SucursalProvider? _sucursalProvider;
-  // Inicializar por defecto con HOY (fecha del dispositivo)
-  DateTimeRange? _selectedDateRange = DateTimeRange(start: DateTime.now(), end: DateTime.now()); // Para filtrar por rango de fechas
+  Timer? _debounce; // Timer para debounce del buscador
+
+  // Rango de fechas (Inicializado en HOY)
+  DateTimeRange? _selectedDateRange = DateTimeRange(
+    start: DateTime.now(),
+    end: DateTime.now(),
+  );
 
   @override
   void initState() {
@@ -45,6 +56,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     _sucursalProvider?.removeListener(_onSucursalChanged);
     super.dispose();
   }
@@ -56,65 +68,202 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   Future<void> fetchTickets() async {
     if (_sucursalProvider?.selectedSucursalId == null) return;
 
-    setState(() {
-      isLoading = true;
-      errorMsg = null;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        errorMsg = null;
+      });
+    }
+
     try {
       final sucursalId = _sucursalProvider!.selectedSucursalId!;
-
-      // Si hay un rango seleccionado (por defecto HOY), solicitar solo ese rango al servidor
       List<dynamic> data;
-      if (_selectedDateRange != null) {
+
+      // --- LOGICA MAESTRA DE CARGA ---
+      // 1. Si hay búsqueda escrita, ignoramos fecha y traemos TODO el historial
+      if (search.trim().isNotEmpty) {
+        data = await api.getAllTickets(sucursalId: sucursalId);
+      }
+      // 2. Si no hay búsqueda, respetamos el RANGO DE FECHAS seleccionado
+      else if (_selectedDateRange != null) {
         data = await api.getTicketsByRange(
           start: _selectedDateRange!.start,
           end: _selectedDateRange!.end,
           sucursalId: sucursalId,
         );
-      } else {
-        // Si usuario decidió ver todo, traer todo el historial
+      }
+      // 3. Si no hay ni búsqueda ni rango, traemos todo (fallback)
+      else {
         data = await api.getAllTickets(sucursalId: sucursalId);
       }
 
-      tickets = data;
+      if (mounted) {
+        setState(() {
+          tickets = data;
+          isLoading = false;
+        });
+        if (kDebugMode) print('AllTicketsScreen.fetchTickets: search="$search", fetched=${tickets.length}');
+        applyFilters();
 
-      // Aplicar filtros locales (solo búsqueda/orden)
-      applyFilters();
+        // FALLBACK: si hay búsqueda y no hubo coincidencias, intentar buscar por clientes en el servidor
+        if (search.trim().isNotEmpty && (filteredTickets.isEmpty)) {
+          if (kDebugMode) print('AllTicketsScreen: no matches locally, attempting server-side client search for "$search"');
+          try {
+            final clients = await api.getClientes(sucursalId: sucursalId, query: search.trim());
+            final clientIds = <dynamic>[];
+            for (var c in clients) {
+              if (c == null) continue;
+              // c puede venir como Map con 'id' o 'cliente_id'
+              final id = c['id'] ?? c['cliente_id'] ?? c['user_id'];
+              if (id != null) clientIds.add(id);
+            }
+            if (clientIds.isNotEmpty) {
+              if (kDebugMode) print('AllTicketsScreen: found ${clientIds.length} matching clients; fetching tickets for them');
+              final quoted = clientIds.map((e) => "'${e.toString()}'").join(',');
+              final resp = await Supabase.instance.client
+                  .from('ticket')
+                  .select('''
+                    *, cliente:cliente_id(nombrecliente,apellidocliente,telefono),
+                    sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))
+                  ''')
+                  .filter('cliente_id', 'in', '($quoted)')
+                  .order('created_at', ascending: false);
+              final listResp = resp as List<dynamic>;
+              if (listResp.isNotEmpty) {
+                setState(() {
+                  tickets = listResp;
+                });
+                applyFilters();
+                if (kDebugMode) print('AllTicketsScreen: server-side client search produced ${listResp.length} tickets');
+              }
+            }
+          } catch (e) {
+            if (kDebugMode) print('AllTicketsScreen: server-side client search failed: $e');
+          }
+        }
+      }
     } catch (e) {
       print('Error fetching tickets: $e');
-      errorMsg = 'No se pudo conectar al servidor: $e';
+      if (mounted) {
+        setState(() {
+          errorMsg = 'Error al cargar: $e';
+          isLoading = false;
+        });
+      }
     }
-    setState(() {
-      isLoading = false;
+  }
+
+  // Helper: normaliza texto para búsqueda (minusculas y sin acentos)
+  String _normalize(String input) {
+    var s = input.toLowerCase();
+    const accents = {
+      'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a',
+      'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
+      'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
+      'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o',
+      'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
+      'ñ': 'n', 'ç': 'c'
+    };
+    accents.forEach((k, v) {
+      s = s.replaceAll(k, v);
     });
+    // eliminar caracteres no alfanumericos para comparaciones más tolerantes
+    s = s.replaceAll(RegExp(r"[^a-z0-9\s]"), ' ');
+    s = s.replaceAll(RegExp(r"\s+"), ' ').trim();
+    return s;
+  }
+
+  // Construye una cadena con los campos relevantes del ticket para búsqueda
+  String _buildSearchableString(dynamic t) {
+    final buf = StringBuffer();
+
+    try {
+      final cliente = t['cliente'] ?? t['cliente_id'];
+      if (cliente != null) {
+        if (cliente is List && cliente.isNotEmpty) {
+          final c = cliente.first;
+          if (c is Map) {
+            buf.write(' ');
+            buf.write((c['nombrecliente'] ?? ''));
+            buf.write(' ');
+            buf.write((c['apellidocliente'] ?? ''));
+            buf.write(' ');
+            buf.write((c['email'] ?? ''));
+            buf.write(' ');
+            buf.write((c['telefono'] ?? ''));
+            buf.write(' ');
+            buf.write((c['username'] ?? ''));
+          }
+        } else if (cliente is Map) {
+          buf.write(' ');
+          buf.write((cliente['nombrecliente'] ?? ''));
+          buf.write(' ');
+          buf.write((cliente['apellidocliente'] ?? ''));
+          buf.write(' ');
+          buf.write((cliente['email'] ?? ''));
+          buf.write(' ');
+          buf.write((cliente['telefono'] ?? ''));
+          // soportar posibles claves camelCase y username
+          buf.write(' ');
+          buf.write((cliente['nombreCliente'] ?? ''));
+          buf.write(' ');
+          buf.write((cliente['apellidoCliente'] ?? ''));
+          buf.write(' ');
+          buf.write((cliente['username'] ?? ''));
+        } else if (cliente is String) {
+          buf.write(' ');
+          buf.write(cliente);
+        }
+      }
+
+      // sesiones y tratamientos
+      final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+      for (var s in sesiones) {
+        if (s == null) continue;
+        // tratamiento puede estar anidado o en listas
+        var trat = s['tratamiento'] ?? s['tratamiento_id'] ?? s['tratamiento_id'];
+        if (trat is List && trat.isNotEmpty) trat = trat.first;
+        if (trat is Map) {
+          buf.write(' ');
+          buf.write(trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['nombre'] ?? '');
+        } else if (s['nombretratamiento'] != null) {
+          buf.write(' ');
+          buf.write(s['nombretratamiento']);
+        }
+         // numero_sesion
+         buf.write(' ');
+         buf.write(s['numero_sesion']?.toString() ?? '');
+       }
+
+      // Otros campos que puedan ayudar
+      buf.write(' ');
+      buf.write(t['id']?.toString() ?? '');
+      buf.write(' ');
+      buf.write((t['monto_total'] ?? '').toString());
+      buf.write(' ');
+      buf.write((t['saldo_pendiente'] ?? '').toString());
+    } catch (e) {
+      // si algo falla, retornamos lo que tengamos
+      print('Error building searchable string: $e');
+    }
+
+    return _normalize(buf.toString());
   }
 
   void applyFilters() {
-    filteredTickets = tickets.where((t) {
-      // Filtro por búsqueda de texto
-      if (search.isNotEmpty) {
-        final cliente = t['cliente'];
-        final nombreCliente = (cliente?['nombrecliente'] ?? '').toLowerCase();
-        final apellidoCliente = (cliente?['apellidocliente'] ?? '').toLowerCase();
-        final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+    final term = _normalize(search);
 
-        final tratamientosMatch = sesiones.any((sesion) {
-          final tratamiento = sesion['tratamiento'];
-          return tratamiento != null &&
-                 (tratamiento['nombretratamiento'] ?? '').toLowerCase().contains(search.toLowerCase());
-        });
+    setState(() {
+      filteredTickets = tickets.where((t) {
+        if (term.isEmpty) return true;
 
-        final matchesSearch = nombreCliente.contains(search.toLowerCase()) ||
-            apellidoCliente.contains(search.toLowerCase()) ||
-            tratamientosMatch;
+        final hay = _buildSearchableString(t);
+        return hay.contains(term);
+      }).toList();
 
-        if (!matchesSearch) return false;
-      }
-
-      return true;
-    }).toList();
-
-    sortTickets();
+      sortTickets();
+      if (kDebugMode) print('AllTicketsScreen.applyFilters: term="$term", tickets=${tickets.length}, filtered=${filteredTickets.length}');
+    });
   }
 
   void sortTickets() {
@@ -125,11 +274,21 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     });
   }
 
-  void filterTickets(String value) {
+  void _onSearchChanged(String value) {
     setState(() {
       search = value;
-      applyFilters();
     });
+
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      fetchTickets();
+    });
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    _onSearchChanged('');
   }
 
   Future<void> _selectDateRange() async {
@@ -144,9 +303,12 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     if (picked != null) {
       setState(() {
         _selectedDateRange = picked;
+        if (search.isNotEmpty) {
+          search = '';
+          _searchController.clear();
+        }
       });
-      // Recargar desde la API con el nuevo rango
-      await fetchTickets();
+      fetchTickets();
     }
   }
 
@@ -154,8 +316,22 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     setState(() {
       _selectedDateRange = null;
     });
-    // Recargar desde la API (traer todo el historial)
     fetchTickets();
+  }
+
+  Future<void> _deleteTicket(String id) async {
+    try {
+      final success = await api.eliminarTicket(id);
+      if (success) {
+        setState(() {
+          tickets.removeWhere((t) => t['id'].toString() == id);
+          applyFilters();
+        });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminado'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      if (mounted) fetchTickets();
+    }
   }
 
   @override
@@ -167,14 +343,11 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('Histórico de Tickets'),
-        backgroundColor: colorScheme.surface,
         elevation: 0,
-        scrolledUnderElevation: 3,
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Barra de búsqueda y acciones
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -182,27 +355,23 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: SearchBar(
+                        child: TextField(
                           controller: _searchController,
-                          hintText: 'Buscar por cliente o tratamiento',
-                          leading: const Icon(Icons.search),
-                          trailing: search.isNotEmpty
-                              ? [
-                                  IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      filterTickets('');
-                                    },
-                                  ),
-                                ]
-                              : null,
-                          onChanged: filterTickets,
-                          elevation: const WidgetStatePropertyAll(1),
+                          onChanged: _onSearchChanged,
+                          decoration: InputDecoration(
+                            hintText: 'Buscar en todo el historial...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: search.isNotEmpty
+                                ? IconButton(icon: const Icon(Icons.clear), onPressed: _clearSearch)
+                                : null,
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withAlpha((0.5 * 255).round()),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      // Botón de ordenamiento
+                      const SizedBox(width: 8),
                       IconButton.filledTonal(
                         onPressed: () {
                           setState(() {
@@ -211,263 +380,114 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                           });
                         },
                         icon: Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
-                        tooltip: sortAscending ? 'Ordenar: Más antiguo primero' : 'Ordenar: Más nuevo primero',
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(56, 56),
-                          padding: const EdgeInsets.all(16),
-                        ),
                       ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: fetchTickets,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text(''),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(56, 56),
-                          padding: const EdgeInsets.all(16),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Filtro de fecha
-                if (_selectedDateRange != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Chip(
-                      avatar: Icon(
-                        Icons.date_range,
-                        size: 18,
-                        color: colorScheme.primary,
-                      ),
-                      label: Text(
-                        '${DateFormat('dd/MM/yy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yy').format(_selectedDateRange!.end)}',
-                        style: textTheme.labelMedium?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      onDeleted: _clearDateFilter,
-                      backgroundColor: colorScheme.primaryContainer,
-                    ),
+                    ],
                   ),
-                Row(
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _selectDateRange,
-                      icon: const Icon(Icons.calendar_month),
-                      label: Text(_selectedDateRange == null ? 'Filtrar por fecha' : 'Cambiar fecha'),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${filteredTickets.length} ${filteredTickets.length == 1 ? 'ticket' : 'tickets'}',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-
-          // Lista de tickets
-          Expanded(
-              child: isLoading
-                  ? Center(
-                      child: CircularProgressIndicator(
-                        color: colorScheme.primary,
-                      ),
-                    )
-                  : errorMsg != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-                              const SizedBox(height: 16),
-                              Text(
-                                errorMsg!,
-                                style: textTheme.bodyLarge?.copyWith(color: colorScheme.error),
-                              ),
-                            ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: search.isNotEmpty ? null : _selectDateRange,
+                          icon: const Icon(Icons.calendar_month, size: 18),
+                          label: Text(
+                            search.isNotEmpty
+                              ? 'Buscando en todo el historial...'
+                              : (_selectedDateRange == null
+                                  ? 'Ver todo el historial'
+                                  : '${DateFormat('dd/MM/yy').format(_selectedDateRange!.start)} - ${DateFormat('dd/MM/yy').format(_selectedDateRange!.end)}'),
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          style: OutlinedButton.styleFrom(
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          ),
+                        ),
+                      ),
+                      if (_selectedDateRange != null && search.isEmpty) ...[
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.close),
+                          onPressed: _clearDateFilter,
                         )
+                      ]
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: isLoading
+                  ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+                  : errorMsg != null
+                      ? Center(child: Text(errorMsg!, style: TextStyle(color: colorScheme.error)))
                       : filteredTickets.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    Icons.search_off,
-                                    size: 64,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                                  Icon(Icons.search_off, size: 64, color: Colors.grey),
                                   const SizedBox(height: 16),
-                                  Text(
-                                    search.isNotEmpty || _selectedDateRange != null
-                                        ? 'No se encontraron tickets'
-                                        : 'No hay tickets registrados',
-                                    style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
-                                  ),
+                                  Text('No se encontraron tickets', style: textTheme.bodyLarge),
                                 ],
                               ),
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                               itemCount: filteredTickets.length,
                               itemBuilder: (context, i) {
                                 final t = filteredTickets[i];
                                 final createdAt = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;
                                 final hora = createdAt != null ? DateFormat('HH:mm').format(createdAt) : '-';
-                                final fecha = createdAt != null ? DateFormat('dd/MM/yyyy').format(createdAt) : '-';
+                                final fecha = createdAt != null ? DateFormat('dd/MM/yy').format(createdAt) : '-';
 
                                 final clienteData = t['cliente'];
                                 final nombreCliente = clienteData?['nombrecliente'] ?? '';
                                 final apellidoCliente = clienteData?['apellidocliente'] ?? '';
                                 final cliente = nombreCliente.isNotEmpty
-                                    ? (apellidoCliente.isNotEmpty ? '$nombreCliente $apellidoCliente' : nombreCliente)
-                                    : '-';
+                                    ? '$nombreCliente $apellidoCliente'
+                                    : 'Cliente sin nombre';
 
                                 final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+                                final tratamientoTexto = sesiones.isNotEmpty
+                                    ? (sesiones.first['tratamiento']?['nombretratamiento'] ?? 'Tratamiento')
+                                    : 'Sin tratamientos';
+                                final countExtra = sesiones.length > 1 ? ' (+${sesiones.length - 1})' : '';
+                                final saldo = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
 
-                                // Extraer tratamientos únicos
-                                final Set<String> tratamientosNombres = {};
-                                for (var sesion in sesiones) {
-                                  final tratamiento = sesion['tratamiento'];
-                                  if (tratamiento != null) {
-                                    tratamientosNombres.add(tratamiento['nombretratamiento'] ?? '');
-                                  }
-                                }
-
-                                final tratamientoTexto = tratamientosNombres.isEmpty
-                                    ? 'Sin tratamientos'
-                                    : tratamientosNombres.length == 1
-                                        ? tratamientosNombres.first
-                                        : '${tratamientosNombres.length} tratamientos';
-
-                                final saldoPendiente = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
-                                final tieneSaldo = saldoPendiente > 0;
-
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 12),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
-                                            blurRadius: 20,
-                                            offset: const Offset(0, 6),
-                                          ),
-                                        ],
-                                        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
+                                return Dismissible(
+                                  key: Key(t['id'].toString()),
+                                  direction: DismissDirection.endToStart,
+                                  background: Container(
+                                    color: Colors.red,
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 20),
+                                    child: const Icon(Icons.delete, color: Colors.white),
+                                  ),
+                                  confirmDismiss: (d) async {
+                                    _deleteTicket(t['id'].toString());
+                                    return false;
+                                  },
+                                  child: Card(
+                                    elevation: 0,
+                                    color: colorScheme.surfaceContainerHighest.withAlpha((0.4 * 255).round()),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    child: ListTile(
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (_) => TicketDetailScreen(ticket: t)),
+                                        );
+                                      },
+                                      leading: CircleAvatar(
+                                        child: Text(cliente.isNotEmpty ? cliente[0].toUpperCase() : '?'),
                                       ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () async {
-                                            await Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => TicketDetailScreen(ticket: t),
-                                              ),
-                                            );
-                                            await fetchTickets();
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 28,
-                                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                                  child: Text(
-                                                    cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
-                                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 16),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        cliente,
-                                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        tratamientoTexto,
-                                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                          color: Theme.of(context).colorScheme.primary,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      Row(
-                                                        children: [
-                                                          Icon(
-                                                            Icons.access_time,
-                                                            size: 16,
-                                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                          ),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            '$fecha - $hora',
-                                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      if (tieneSaldo) ...[
-                                                        const SizedBox(height: 8),
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 4,
-                                                          ),
-                                                          decoration: BoxDecoration(
-                                                            color: Theme.of(context).colorScheme.errorContainer,
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              Icon(
-                                                                Icons.warning_amber,
-                                                                size: 14,
-                                                                color: Theme.of(context).colorScheme.onErrorContainer,
-                                                              ),
-                                                              const SizedBox(width: 4),
-                                                              Text(
-                                                                'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
-                                                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                                  color: Theme.of(context).colorScheme.onErrorContainer,
-                                                                  fontWeight: FontWeight.bold,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                                      title: Text(cliente, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Text('$tratamientoTexto$countExtra\n$fecha • $hora'),
+                                      trailing: saldo > 0
+                                        ? Text('Debe Bs $saldo', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12))
+                                        : const Icon(Icons.chevron_right),
                                     ),
                                   ),
                                 );
