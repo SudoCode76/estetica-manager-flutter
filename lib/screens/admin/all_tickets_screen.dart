@@ -20,8 +20,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   // Datos
-  List<dynamic> tickets = [];        // Todos los datos descargados
-  List<dynamic> filteredTickets = []; // Datos que se ven en pantalla
+  List<dynamic> tickets = [];        // Datos recibidos (página actual o lista completa)
+  List<dynamic> filteredTickets = []; // Lista para mostrar cuando no hay búsqueda
 
   bool isLoading = true;
   String search = '';
@@ -30,11 +30,19 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   SucursalProvider? _sucursalProvider;
   Timer? _debounce; // Timer para debounce del buscador
 
+  // PAGINACIÓN para searchTickets
+  int _page = 1;
+  int _pageSize = 20;
+  int _totalPages = 1;
+  int _totalItems = 0;
+
   // Rango de fechas (Inicializado en HOY)
   DateTimeRange? _selectedDateRange = DateTimeRange(
     start: DateTime.now(),
     end: DateTime.now(),
   );
+
+  final List<int> _pageSizeOptions = [10, 20, 50, 100];
 
   @override
   void initState() {
@@ -49,6 +57,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
+      _page = 1;
       fetchTickets();
     }
   }
@@ -62,6 +71,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   }
 
   void _onSucursalChanged() {
+    _page = 1;
     fetchTickets();
   }
 
@@ -77,73 +87,36 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
     try {
       final sucursalId = _sucursalProvider!.selectedSucursalId!;
-      List<dynamic> data;
+      List<dynamic> data = [];
 
-      // --- LOGICA MAESTRA DE CARGA ---
-      // 1. Si hay búsqueda escrita, ignoramos fecha y traemos TODO el historial
+      // Si hay texto en el buscador, usar searchTickets (server-side) con paginación
       if (search.trim().isNotEmpty) {
+        final resp = await api.searchTickets(query: search.trim(), sucursalId: sucursalId, page: _page, pageSize: _pageSize);
+        data = resp['items'] as List<dynamic>;
+        final meta = resp['meta'] as Map<String, dynamic>? ?? {};
+        _totalItems = (meta['total'] is int) ? meta['total'] as int : int.tryParse('${meta['total']}') ?? 0;
+        _totalPages = (meta['totalPages'] is int) ? meta['totalPages'] as int : ( (_totalItems / _pageSize).ceil() );
+      } else if (_selectedDateRange != null) {
+        data = await api.getTicketsByRange(start: _selectedDateRange!.start, end: _selectedDateRange!.end, sucursalId: sucursalId);
+        // Reseteamos paginación local cuando no hay búsqueda
+        _totalItems = data.length;
+        _totalPages = 1;
+        _page = 1;
+      } else {
         data = await api.getAllTickets(sucursalId: sucursalId);
-      }
-      // 2. Si no hay búsqueda, respetamos el RANGO DE FECHAS seleccionado
-      else if (_selectedDateRange != null) {
-        data = await api.getTicketsByRange(
-          start: _selectedDateRange!.start,
-          end: _selectedDateRange!.end,
-          sucursalId: sucursalId,
-        );
-      }
-      // 3. Si no hay ni búsqueda ni rango, traemos todo (fallback)
-      else {
-        data = await api.getAllTickets(sucursalId: sucursalId);
+        _totalItems = data.length;
+        _totalPages = 1;
+        _page = 1;
       }
 
       if (mounted) {
         setState(() {
           tickets = data;
           isLoading = false;
+          filteredTickets = data; // cuando no hay búsqueda, mostramos toda la lista local
         });
-        if (kDebugMode) print('AllTicketsScreen.fetchTickets: search="$search", fetched=${tickets.length}');
-        applyFilters();
-
-        // FALLBACK: si hay búsqueda y no hubo coincidencias, intentar buscar por clientes en el servidor
-        if (search.trim().isNotEmpty && (filteredTickets.isEmpty)) {
-          if (kDebugMode) print('AllTicketsScreen: no matches locally, attempting server-side client search for "$search"');
-          try {
-            final clients = await api.getClientes(sucursalId: sucursalId, query: search.trim());
-            final clientIds = <dynamic>[];
-            for (var c in clients) {
-              if (c == null) continue;
-              // c puede venir como Map con 'id' o 'cliente_id'
-              final id = c['id'] ?? c['cliente_id'] ?? c['user_id'];
-              if (id != null) clientIds.add(id);
-            }
-            if (clientIds.isNotEmpty) {
-              if (kDebugMode) print('AllTicketsScreen: found ${clientIds.length} matching clients; fetching tickets for them');
-              final quoted = clientIds.map((e) => "'${e.toString()}'").join(',');
-              final resp = await Supabase.instance.client
-                  .from('ticket')
-                  .select('''
-                    *, cliente:cliente_id(nombrecliente,apellidocliente,telefono),
-                    sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))
-                  ''')
-                  .filter('cliente_id', 'in', '($quoted)')
-                  .order('created_at', ascending: false);
-              final listResp = resp as List<dynamic>;
-              if (listResp.isNotEmpty) {
-                setState(() {
-                  tickets = listResp;
-                });
-                applyFilters();
-                if (kDebugMode) print('AllTicketsScreen: server-side client search produced ${listResp.length} tickets');
-              }
-            }
-          } catch (e) {
-            if (kDebugMode) print('AllTicketsScreen: server-side client search failed: $e');
-          }
-        }
       }
     } catch (e) {
-      print('Error fetching tickets: $e');
       if (mounted) {
         setState(() {
           errorMsg = 'Error al cargar: $e';
@@ -167,116 +140,25 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     accents.forEach((k, v) {
       s = s.replaceAll(k, v);
     });
-    // eliminar caracteres no alfanumericos para comparaciones más tolerantes
     s = s.replaceAll(RegExp(r"[^a-z0-9\s]"), ' ');
     s = s.replaceAll(RegExp(r"\s+"), ' ').trim();
     return s;
   }
 
-  // Construye una cadena con los campos relevantes del ticket para búsqueda
-  String _buildSearchableString(dynamic t) {
-    final buf = StringBuffer();
-
-    try {
-      final cliente = t['cliente'] ?? t['cliente_id'];
-      if (cliente != null) {
-        if (cliente is List && cliente.isNotEmpty) {
-          final c = cliente.first;
-          if (c is Map) {
-            buf.write(' ');
-            buf.write((c['nombrecliente'] ?? ''));
-            buf.write(' ');
-            buf.write((c['apellidocliente'] ?? ''));
-            buf.write(' ');
-            buf.write((c['email'] ?? ''));
-            buf.write(' ');
-            buf.write((c['telefono'] ?? ''));
-            buf.write(' ');
-            buf.write((c['username'] ?? ''));
-          }
-        } else if (cliente is Map) {
-          buf.write(' ');
-          buf.write((cliente['nombrecliente'] ?? ''));
-          buf.write(' ');
-          buf.write((cliente['apellidocliente'] ?? ''));
-          buf.write(' ');
-          buf.write((cliente['email'] ?? ''));
-          buf.write(' ');
-          buf.write((cliente['telefono'] ?? ''));
-          // soportar posibles claves camelCase y username
-          buf.write(' ');
-          buf.write((cliente['nombreCliente'] ?? ''));
-          buf.write(' ');
-          buf.write((cliente['apellidoCliente'] ?? ''));
-          buf.write(' ');
-          buf.write((cliente['username'] ?? ''));
-        } else if (cliente is String) {
-          buf.write(' ');
-          buf.write(cliente);
-        }
-      }
-
-      // sesiones y tratamientos
-      final sesiones = t['sesiones'] as List<dynamic>? ?? [];
-      for (var s in sesiones) {
-        if (s == null) continue;
-        // tratamiento puede estar anidado o en listas
-        var trat = s['tratamiento'] ?? s['tratamiento_id'] ?? s['tratamiento_id'];
-        if (trat is List && trat.isNotEmpty) trat = trat.first;
-        if (trat is Map) {
-          buf.write(' ');
-          buf.write(trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['nombre'] ?? '');
-        } else if (s['nombretratamiento'] != null) {
-          buf.write(' ');
-          buf.write(s['nombretratamiento']);
-        }
-         // numero_sesion
-         buf.write(' ');
-         buf.write(s['numero_sesion']?.toString() ?? '');
-       }
-
-      // Otros campos que puedan ayudar
-      buf.write(' ');
-      buf.write(t['id']?.toString() ?? '');
-      buf.write(' ');
-      buf.write((t['monto_total'] ?? '').toString());
-      buf.write(' ');
-      buf.write((t['saldo_pendiente'] ?? '').toString());
-    } catch (e) {
-      // si algo falla, retornamos lo que tengamos
-      print('Error building searchable string: $e');
-    }
-
-    return _normalize(buf.toString());
-  }
-
-  void applyFilters() {
-    final term = _normalize(search);
-
-    setState(() {
-      filteredTickets = tickets.where((t) {
-        if (term.isEmpty) return true;
-
-        final hay = _buildSearchableString(t);
-        return hay.contains(term);
-      }).toList();
-
-      sortTickets();
-      if (kDebugMode) print('AllTicketsScreen.applyFilters: term="$term", tickets=${tickets.length}, filtered=${filteredTickets.length}');
-    });
-  }
-
   void sortTickets() {
-    filteredTickets.sort((a, b) {
+    final list = search.trim().isNotEmpty ? tickets : filteredTickets;
+    list.sort((a, b) {
       final dateA = a['created_at'] != null ? DateTime.parse(a['created_at']) : DateTime.now();
       final dateB = b['created_at'] != null ? DateTime.parse(b['created_at']) : DateTime.now();
       return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
+    setState(() {});
   }
 
   void _onSearchChanged(String value) {
     setState(() {
       search = value;
+      _page = 1; // reset page when query changes
     });
 
     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -307,6 +189,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
           search = '';
           _searchController.clear();
         }
+        _page = 1;
       });
       fetchTickets();
     }
@@ -315,6 +198,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
   void _clearDateFilter() {
     setState(() {
       _selectedDateRange = null;
+      _page = 1;
     });
     fetchTickets();
   }
@@ -325,7 +209,7 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       if (success) {
         setState(() {
           tickets.removeWhere((t) => t['id'].toString() == id);
-          applyFilters();
+          filteredTickets.removeWhere((t) => t['id'].toString() == id);
         });
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminado'), backgroundColor: Colors.green));
       }
@@ -334,10 +218,49 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
     }
   }
 
+  // PAGINACION: siguiente pagina
+  void _nextPage() {
+    if (_page < _totalPages) {
+      setState(() {
+        _page++;
+      });
+      fetchTickets();
+    }
+  }
+
+  // PAGINACION: pagina anterior
+  void _prevPage() {
+    if (_page > 1) {
+      setState(() {
+        _page--;
+      });
+      fetchTickets();
+    }
+  }
+
+  // Permite saltar a una pagina concreta
+  void _goToPage(int p) {
+    if (p < 1 || p > _totalPages) return;
+    setState(() {
+      _page = p;
+    });
+    fetchTickets();
+  }
+
+  void _changePageSize(int newSize) {
+    setState(() {
+      _pageSize = newSize;
+      _page = 1;
+    });
+    fetchTickets();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    final displayList = search.trim().isNotEmpty ? tickets : filteredTickets;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -416,12 +339,51 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                 ],
               ),
             ),
+
+            // PAGINATOR UI: mostrar solo cuando search tiene texto (usando server-side pagination)
+            if (search.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: _page > 1 ? _prevPage : null,
+                          icon: const Icon(Icons.arrow_back_ios_new),
+                          tooltip: 'Página anterior',
+                        ),
+                        Text('Página $_page de $_totalPages ($_totalItems)'),
+                        IconButton(
+                          onPressed: _page < _totalPages ? _nextPage : null,
+                          icon: const Icon(Icons.arrow_forward_ios),
+                          tooltip: 'Siguiente página',
+                        ),
+                      ],
+                    ),
+
+                    // Selector de pageSize
+                    Row(
+                      children: [
+                        const Text('Por página: '),
+                        DropdownButton<int>(
+                          value: _pageSize,
+                          items: _pageSizeOptions.map((e) => DropdownMenuItem(value: e, child: Text('$e'))).toList(),
+                          onChanged: (v) { if (v != null) _changePageSize(v); },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
             Expanded(
               child: isLoading
                   ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
                   : errorMsg != null
                       ? Center(child: Text(errorMsg!, style: TextStyle(color: colorScheme.error)))
-                      : filteredTickets.isEmpty
+                      : displayList.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -434,9 +396,9 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                             )
                           : ListView.builder(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              itemCount: filteredTickets.length,
+                              itemCount: displayList.length,
                               itemBuilder: (context, i) {
-                                final t = filteredTickets[i];
+                                final t = displayList[i];
                                 final createdAt = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;
                                 final hora = createdAt != null ? DateFormat('HH:mm').format(createdAt) : '-';
                                 final fecha = createdAt != null ? DateFormat('dd/MM/yy').format(createdAt) : '-';
@@ -479,6 +441,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
                                           context,
                                           MaterialPageRoute(builder: (_) => TicketDetailScreen(ticket: t)),
                                         );
+                                        // Si estamos en búsqueda, mantener la página actual; si no, recargar
+                                        if (search.trim().isEmpty) fetchTickets();
                                       },
                                       leading: CircleAvatar(
                                         child: Text(cliente.isNotEmpty ? cliente[0].toUpperCase() : '?'),

@@ -167,28 +167,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        // Título eliminado por petición del usuario (antes: 'Agenda de Sesiones')
-        title: const SizedBox.shrink(),
-        elevation: 0,
-        surfaceTintColor: colorScheme.surfaceTint,
-        backgroundColor: colorScheme.surface,
-        actions: [
-          // Botón de refrescar visible y consistente con la UI (FilledButton.icon similar a AllTickets)
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: FilledButton.icon(
-              onPressed: _loadAgenda,
-              icon: const Icon(Icons.refresh),
-              label: const Text(''),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(56, 56),
-                padding: const EdgeInsets.all(12),
-              ),
-            ),
-          ),
-        ],
-      ),
+
       body: Column(
         children: [
           // Selector de rango compacto
@@ -286,6 +265,9 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                   return const Center(child: CircularProgressIndicator());
                 }
 
+                // Mostrar contador de sesiones cargadas
+                final count = provider.agenda.length;
+
                 if (provider.error != null) {
                   return Center(
                     child: Padding(
@@ -344,105 +326,127 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'No hay citas para esta fecha',
+                          'No hay citas para este período',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                           ),
                           textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: _loadAgenda,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Actualizar'),
                         ),
                       ],
                     ),
                   );
                 }
 
-                return RefreshIndicator(
-                  onRefresh: _loadAgenda,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
-                    itemCount: provider.agenda.length,
-                    itemBuilder: (context, index) {
-                      final sesion = AgendaItem.fromJson(provider.agenda[index]);
-                      return _SesionCard(
-                        sesion: sesion,
-                        // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
-                        showActions: _filtroEstado == 'agendada',
-                        onMarcarAtendida: () async {
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Marcar como atendida'),
-                              content: Text('¿Confirmar que la sesión de ${sesion.nombreCliente} fue atendida?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancelar'),
-                                ),
-                                FilledButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Confirmar'),
-                                ),
-                              ],
-                            ),
-                          );
-
-                          if (confirmed == true) {
-                            final success = await provider.marcarSesionAtendida(sesion.sesionId);
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(success ? 'Sesión marcada como atendida' : 'Error al marcar sesión'),
-                                  backgroundColor: success ? Colors.green : Colors.red,
-                                ),
-                              );
-                              // Si la operación fue exitosa, recargar la agenda para reflejar el cambio
-                              if (success) {
-                                _loadAgenda();
-                              }
-                            }
-                          }
-                        },
-                        onReprogramar: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: sesion.fechaHora ?? DateTime.now(),
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime(2030),
-                            locale: const Locale('es', 'ES'),
-                          );
-
-                          if (picked != null) {
-                            final time = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.fromDateTime(sesion.fechaHora ?? DateTime.now()),
-                            );
-
-                            if (time != null) {
-                              final nuevaFecha = DateTime(
-                                picked.year,
-                                picked.month,
-                                picked.day,
-                                time.hour,
-                                time.minute,
-                              );
-
-                              final success = await provider.reprogramarSesion(sesion.sesionId, nuevaFecha);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(success ? 'Sesión reprogramada' : 'Error al reprogramar'),
-                                    backgroundColor: success ? Colors.green : Colors.red,
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Text('$count sesiones', style: theme.textTheme.labelLarge),
+                          const Spacer(),
+                          Text(_getRangoTexto(), style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadAgenda,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
+                          itemCount: provider.agenda.length,
+                          itemBuilder: (context, index) {
+                            final sesion = AgendaItem.fromJson(provider.agenda[index]);
+                            return _SesionCard(
+                              sesion: sesion,
+                              // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
+                              showActions: _filtroEstado == 'agendada',
+                              onMarcarAtendida: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Marcar como atendida'),
+                                    content: Text('¿Confirmar que la sesión de ${sesion.nombreCliente} fue atendida?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Confirmar'),
+                                      ),
+                                    ],
                                   ),
                                 );
-                                if (success) {
-                                  _loadAgenda();
+
+                                if (confirmed == true) {
+                                  final success = await provider.marcarSesionAtendida(sesion.sesionId);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(success ? 'Sesión marcada como atendida' : 'Error al marcar sesión'),
+                                        backgroundColor: success ? Colors.green : Colors.red,
+                                      ),
+                                    );
+                                    // Si la operación fue exitosa, recargar la agenda para reflejar el cambio
+                                    if (success) {
+                                      _loadAgenda();
+                                    }
+                                  }
                                 }
-                              }
-                            }
-                          }
-                        },
-                      );
-                    },
-                  ),
+                              },
+                              onReprogramar: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: sesion.fechaHora ?? DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime(2030),
+                                  locale: const Locale('es', 'ES'),
+                                );
+
+                                if (picked != null) {
+                                  final time = await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.fromDateTime(sesion.fechaHora ?? DateTime.now()),
+                                  );
+
+                                  if (time != null) {
+                                    final nuevaFecha = DateTime(
+                                      picked.year,
+                                      picked.month,
+                                      picked.day,
+                                      time.hour,
+                                      time.minute,
+                                    );
+
+                                    final success = await provider.reprogramarSesion(sesion.sesionId, nuevaFecha);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(success ? 'Sesión reprogramada' : 'Error al reprogramar'),
+                                          backgroundColor: success ? Colors.green : Colors.red,
+                                        ),
+                                      );
+                                      if (success) {
+                                        _loadAgenda();
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),

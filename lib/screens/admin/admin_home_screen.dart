@@ -898,7 +898,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 );
               },
             )
-          : _selectedIndex == 1
+          : _selectedIndex == 2 // <-- Cambiado: mostrar el FAB de 'Nuevo Cliente' solo cuando la pestaña seleccionada sea la de Clientes (index 2)
             ? Builder(
                 builder: (context) {
                   final screenWidth = MediaQuery.of(context).size.width;

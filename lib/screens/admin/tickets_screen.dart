@@ -7,7 +7,6 @@ import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
-import 'package:flutter/foundation.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -108,7 +107,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
-      if (kDebugMode) print('TicketsScreen.search debounce fired for: "$search"');
       // If empty, clear and reload today's tickets
       if (search.trim().isEmpty) {
         setState(() {
@@ -118,7 +116,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
         return;
       }
 
-      // Intento rápido local: buscar en los tickets que ya tenemos cargados (rápido, UX instantáneo)
+      // Quick local match on already-loaded provider tickets
       try {
         final providerTickets = context.read<TicketProvider>().tickets;
         if (providerTickets.isNotEmpty && search.trim().isNotEmpty) {
@@ -142,31 +140,21 @@ class _TicketsScreenState extends State<TicketsScreen> {
             setState(() {
               _searchResults = localMatches;
             });
+            // still fetch server results to ensure completeness, but show local instantly
           }
         }
       } catch (_) {}
 
-      // Otherwise fetch all tickets for the branch and filter locally
+      // Server-side search (paginated)
       try {
-        if (_sucursalProvider?.selectedSucursalId == null) {
-          if (kDebugMode) print('TicketsScreen: no sucursal selected');
-          return;
-        }
-        // Use server-side search (efficient) to avoid fetching entire history
-        final all = await api.searchTickets(query: search.trim(), sucursalId: _sucursalProvider!.selectedSucursalId!);
-        if (kDebugMode) print('TicketsScreen: searchTickets returned ${all.length} items for query="$search"');
+        if (_sucursalProvider?.selectedSucursalId == null) return;
+        final resp = await api.searchTickets(query: search.trim(), sucursalId: _sucursalProvider!.selectedSucursalId!, page: 1, pageSize: 50);
+        final items = resp['items'] as List<dynamic>? ?? [];
         setState(() {
-          _searchResults = all;
+          _searchResults = items;
         });
-        if (kDebugMode) {
-          for (int i = 0; i < (all.length < 10 ? all.length : 10); i++) {
-            final t = all[i];
-            final id = t['id'] ?? t['documentId'] ?? 'no-id';
-            print('TicketsScreen.debug ticket[$i] id=$id searchable="${_buildSearchableForDebug(t)}"');
-          }
-        }
       } catch (e) {
-        print('TicketsScreen: search fetch error: $e');
+        // ignore errors silently in search
       }
     });
   }
@@ -186,7 +174,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
   }
 
   List<dynamic> _computeFilteredTickets(List<dynamic> tickets) {
-    if (kDebugMode) print('TicketsScreen._computeFilteredTickets: search="$search", providerTickets=${tickets.length}, searchResults=${_searchResults?.length ?? 0}');
     // Decide data source: if _searchResults is present (user searching), use it; else use provider tickets
     final source = (_searchResults != null) ? _searchResults! : tickets;
 
@@ -210,7 +197,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
       filtered = dateFilteredTickets;
     } else {
       final term = _normalize(search);
-      if (kDebugMode) print('TicketsScreen: normalized search term="$term"');
       filtered = dateFilteredTickets.where((t) {
         // Buscar en múltiples claves y formatos
         String nombre = '';
@@ -267,7 +253,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
       return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
 
-    if (kDebugMode) print('TicketsScreen: filtered count=${filtered.length}');
     return filtered;
   }
 
@@ -665,43 +650,4 @@ class _TicketsScreenState extends State<TicketsScreen> {
     );
   }
 
-  // Helper para debug: construye cadena buscable simple
-  String _buildSearchableForDebug(dynamic t) {
-    try {
-      final cliente = t['cliente'] ?? t['cliente_id'];
-      String nombre = '';
-      String apellido = '';
-      String telefono = '';
-      if (cliente is List && cliente.isNotEmpty) {
-        final c = cliente.first;
-        if (c is Map) {
-          nombre = (c['nombrecliente'] ?? c['nombreCliente'] ?? c['nombre'] ?? '').toString();
-          apellido = (c['apellidocliente'] ?? c['apellidoCliente'] ?? c['apellido'] ?? '').toString();
-          telefono = (c['telefono'] ?? c['phone'] ?? '').toString();
-        }
-      } else if (cliente is Map) {
-        nombre = (cliente['nombrecliente'] ?? cliente['nombreCliente'] ?? cliente['nombre'] ?? '').toString();
-        apellido = (cliente['apellidocliente'] ?? cliente['apellidoCliente'] ?? cliente['apellido'] ?? '').toString();
-        telefono = (cliente['telefono'] ?? cliente['phone'] ?? '').toString();
-      }
-
-      final sesiones = (t['sesiones'] as List<dynamic>?) ?? (t['tratamientos'] as List<dynamic>?) ?? [];
-      final tratamientos = sesiones.map((s) {
-        try {
-          final trat = s is Map ? (s['tratamiento'] ?? s['tratamiento_id'] ?? s) : s;
-          if (trat is Map) return (trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['nombre'] ?? '').toString();
-          return (s['nombreTratamiento'] ?? s['nombre'] ?? '').toString();
-        } catch (e) {
-          return '';
-        }
-      }).join(' ');
-
-      final combined = '$nombre $apellido $telefono $tratamientos';
-      return _normalize(combined);
-    } catch (e) {
-      return '';
-    }
-  }
 }
-
-// Widget _AttendButton eliminado - ya no es necesario

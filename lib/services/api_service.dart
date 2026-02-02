@@ -51,8 +51,6 @@ class ApiService {
     // Siempre enviar Authorization: si hay JWT usarlo, si no enviar el anon key como Bearer
     headers['Authorization'] = hasJwt ? 'Bearer $jwt' : 'Bearer ${SupabaseConfig.supabaseAnonKey}';
 
-    // Log minimal para debugging: indicar si Authorization está presente (no imprimir token)
-    print('_getHeaders: apikey present=${SupabaseConfig.supabaseAnonKey.isNotEmpty}, authorization=${hasJwt ? "present (jwt)" : "present (anon)"}');
     return headers;
   }
 
@@ -69,7 +67,6 @@ class ApiService {
       if (jwt.isEmpty) {
         // Intentar refrescar la sesión usando el cliente de Supabase (si hay refresh token disponible)
         try {
-          print('_ensureJwtExists: no jwt found, attempting Supabase.client.auth.refreshSession()');
           final resp = await Supabase.instance.client.auth.refreshSession();
           final newSession = resp.session;
           if (newSession != null) {
@@ -81,12 +78,12 @@ class ApiService {
               if (newRefresh != null && newRefresh.isNotEmpty) {
                 await prefs.setString('refreshToken', newRefresh);
               }
-              print('_ensureJwtExists: session refreshed and saved to prefs (jwt len=${newAccess.length})');
+              // session refreshed and saved to prefs
               return;
             }
           }
         } catch (e) {
-          print('_ensureJwtExists: refreshSession failed: $e');
+          // refreshSession failed
         }
 
         // Como último recurso, intentar refrescar admin token si existe refresh token admin
@@ -96,6 +93,7 @@ class ApiService {
         throw Exception('No hay token JWT: inicia sesión para realizar esta operación.');
       }
     } catch (e) {
+      // error ensuring jwt
       rethrow;
     }
   }
@@ -106,7 +104,7 @@ class ApiService {
       final resp = await http.patch(uri, headers: headers, body: body).timeout(Duration(seconds: seconds));
       return resp;
     } catch (e) {
-      print('PATCH request timeout/error for $uri: $e');
+      // timeout/error
       rethrow;
     }
   }
@@ -117,7 +115,7 @@ class ApiService {
       final resp = await http.get(uri, headers: headers).timeout(Duration(seconds: seconds));
       return resp;
     } catch (e) {
-      print('GET request timeout/error for $uri: $e');
+      // timeout/error
       rethrow;
     }
   }
@@ -127,7 +125,7 @@ class ApiService {
       final resp = await http.post(uri, headers: headers, body: body).timeout(Duration(seconds: seconds));
       return resp;
     } catch (e) {
-      print('POST request timeout/error for $uri: $e');
+      // timeout/error
       rethrow;
     }
   }
@@ -189,7 +187,7 @@ class ApiService {
                   data['user'] = decodedUser;
                 }
               } catch (e) {
-                print('login: error normalizando user: $e');
+                // error normalizing user
               }
             }
           }
@@ -198,7 +196,7 @@ class ApiService {
       }
       throw Exception('Failed to login: ${response.statusCode} ${response.body}');
     } catch (e) {
-      print('login error: $e');
+      // login error
       rethrow;
     }
   }
@@ -220,7 +218,7 @@ class ApiService {
         return e;
       }).toList();
     } catch (e) {
-      print('getSucursales error: $e');
+      // getSucursales error
       rethrow;
     }
   }
@@ -240,7 +238,7 @@ class ApiService {
         queryBuilder = queryBuilder.ilike('username', '%$query%');
       }
 
-      print('getUsuarios: fetching profiles for sucursal=$sucursalId');
+      // fetching profiles
       final data = await queryBuilder;
 
       final normalized = (data as List<dynamic>).map((e) {
@@ -272,7 +270,7 @@ class ApiService {
 
       return normalized;
     } catch (e) {
-      print('getUsuarios error: $e');
+      // getUsuarios error
       rethrow;
     }
     }
@@ -305,7 +303,7 @@ class ApiService {
       if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener usuario');
       throw Exception('Error al obtener usuario: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('getUsuarioById error: $e');
+      // getUsuarioById error
       rethrow;
     }
     }
@@ -360,7 +358,7 @@ class ApiService {
       }
       throw Exception('Error al crear usuario: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('createUser error: $e');
+      // createUser error
       rethrow;
     }
   }
@@ -386,10 +384,10 @@ class ApiService {
           .select()
           .single();
 
-      print('updateUser: updated profile for id=$documentId');
-      return Map<String, dynamic>.from(data);
+      // updated profile
+       return Map<String, dynamic>.from(data);
     } catch (e) {
-      print('updateUser error: $e');
+      // updateUser error
       rethrow;
     }
   }
@@ -418,7 +416,7 @@ class ApiService {
       if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al actualizar perfil');
       throw Exception('Error al actualizar perfil: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('updateUserWithFlags2 error: $e');
+      // updateUserWithFlags2 error
       rethrow;
     }
   }
@@ -431,7 +429,7 @@ class ApiService {
       final resp = await http.delete(url, headers: headers).timeout(const Duration(seconds: 8));
       if (resp.statusCode != 200 && resp.statusCode != 204) throw Exception('Error al eliminar perfil: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('deleteUser error: $e');
+      // deleteUser error
       rethrow;
     }
   }
@@ -451,7 +449,7 @@ class ApiService {
         return e;
       }).toList();
     } catch (e) {
-      print('getCategorias error: $e');
+      // getCategorias error
       rethrow;
     }
   }
@@ -473,7 +471,7 @@ class ApiService {
         return e;
       }).toList();
     } catch (e) {
-      print('getTratamientos error: $e');
+      // getTratamientos error
       rethrow;
     }
   }
@@ -488,7 +486,7 @@ class ApiService {
       final res = await Supabase.instance.client.from('categoriaTratamiento').insert(payload).select().single();
       return Map<String, dynamic>.from(res);
     } catch (e) {
-      print('crearCategoria error: $e');
+      // crearCategoria error
       rethrow;
     }
   }
@@ -509,7 +507,7 @@ class ApiService {
       final res = await Supabase.instance.client.from('tratamiento').insert(payload).select().single();
       return Map<String, dynamic>.from(res);
     } catch (e) {
-      print('crearTratamiento error: $e');
+      // crearTratamiento error
       rethrow;
     }
   }
@@ -526,7 +524,7 @@ class ApiService {
       final res = await Supabase.instance.client.from('categoriaTratamiento').update(payload).eq('id', idInt).select().single();
       return Map<String, dynamic>.from(res);
     } catch (e) {
-      print('updateCategoria error: $e');
+      // updateCategoria error
       rethrow;
     }
   }
@@ -549,7 +547,7 @@ class ApiService {
       final res = await Supabase.instance.client.from('tratamiento').update(payload).eq('id', idInt).select().single();
       return Map<String, dynamic>.from(res);
     } catch (e) {
-      print('updateTratamiento error: $e');
+      // updateTratamiento error
       rethrow;
     }
   }
@@ -571,7 +569,7 @@ class ApiService {
       final res = await Supabase.instance.client.from('cliente').insert(payload).select().single();
       return Map<String, dynamic>.from(res);
     } catch (e) {
-      print('crearCliente error: $e');
+      // crearCliente error
       rethrow;
     }
   }
@@ -584,7 +582,7 @@ class ApiService {
       await Supabase.instance.client.from('categoriaTratamiento').delete().eq('id', idInt);
       return true;
     } catch (e) {
-      print('deleteCategoria error: $e');
+      // deleteCategoria error
       rethrow;
     }
   }
@@ -597,7 +595,7 @@ class ApiService {
       await Supabase.instance.client.from('tratamiento').delete().eq('id', idInt);
       return true;
     } catch (e) {
-      print('deleteTratamiento error: $e');
+      // deleteTratamiento error
       rethrow;
     }
   }
@@ -608,7 +606,7 @@ class ApiService {
       await Supabase.instance.client.from('tratamiento').update({'estadotratamiento': activo}).eq('id', id);
       return true;
     } catch (e) {
-      print('toggleTratamientoActivo error: $e');
+      // toggleTratamientoActivo error
       rethrow;
     }
   }
@@ -630,7 +628,7 @@ class ApiService {
       if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener tickets');
       throw Exception('Error al obtener tickets: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('getTickets error: $e');
+      // getTickets error
       rethrow;
     }
   }
@@ -647,7 +645,7 @@ class ApiService {
       if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al actualizar ticket');
       return false;
     } catch (e) {
-      print('actualizarEstadoTicket error: $e');
+      // actualizarEstadoTicket error
       rethrow;
     }
   }
@@ -689,7 +687,7 @@ class ApiService {
         return e;
       }).toList();
     } catch (e) {
-      print('getClientes error: $e');
+      // getClientes error
       rethrow;
     }
   }
@@ -703,7 +701,7 @@ class ApiService {
       await Supabase.instance.client.from('cliente').delete().eq('id', idInt);
       return true;
     } catch (e) {
-      print('deleteCliente error: $e');
+      // deleteCliente error
       rethrow;
     }
   }
@@ -727,7 +725,7 @@ class ApiService {
       final res = await Supabase.instance.client.from('cliente').update(payload).eq('id', idInt).select().single();
       return Map<String, dynamic>.from(res);
     } catch (e) {
-      print('updateCliente error: $e');
+      // updateCliente error
       rethrow;
     }
   }
@@ -743,7 +741,7 @@ class ApiService {
       if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener reporte de deudas');
       return [];
     } catch (e) {
-      print('getDebtReport error: $e');
+      // getDebtReport error
       rethrow;
     }
   }
@@ -768,7 +766,7 @@ class ApiService {
       if (resp.statusCode == 401 || resp.statusCode == 403) throw Exception('No autorizado al obtener reporte de ventas');
       throw Exception('Error al obtener reporte de ventas: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('getDailyReport error: $e');
+      // getDailyReport error
       rethrow;
     }
   }
@@ -792,7 +790,7 @@ class ApiService {
       }
       return {};
     } catch (e) {
-      print('getClientReport error: $e');
+      // getClientReport error
       rethrow;
     }
   }
@@ -826,7 +824,7 @@ class ApiService {
       }
       throw Exception('Error al obtener pagos: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('getPagosPaginated error: $e');
+      // getPagosPaginated error
       rethrow;
     }
   }
@@ -834,36 +832,28 @@ class ApiService {
   // ------------------ Funciones RPC / Edge Functions ------------------
   Future<Map<String, dynamic>> callFunction(String functionName, Map<String, dynamic> body, {int seconds = 12, bool preferFunctionsToken = false}) async {
     final url = Uri.parse('${SupabaseConfig.supabaseUrl}/functions/v1/$functionName');
-    try {
-      // Preparar headers: usar Anon Key en Authorization (como en Postman) y Content-Type
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'apikey': SupabaseConfig.supabaseAnonKey,
-        'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
-      };
+    // Preparar headers: usar Anon Key en Authorization (como en Postman) y Content-Type
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'apikey': SupabaseConfig.supabaseAnonKey,
+      'Authorization': 'Bearer ${SupabaseConfig.supabaseAnonKey}',
+    };
 
-      // Si el caller pidió explícitamente preferFunctionsToken y hay uno configurado, usarlo.
-      if (preferFunctionsToken) {
-        final runtimeToken = await _getRuntimeFunctionsAuthToken();
-        if (runtimeToken.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $runtimeToken';
-          print('callFunction: using functionsAuthToken (runtime) for Authorization header (len=${runtimeToken.length})');
-        } else {
-          print('callFunction: preferFunctionsToken requested but no functionsAuthToken found at compile-time or runtime');
-        }
+    // Si el caller pidió explícitamente preferFunctionsToken y hay uno configurado, usarlo.
+    if (preferFunctionsToken) {
+      final runtimeToken = await _getRuntimeFunctionsAuthToken();
+      if (runtimeToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $runtimeToken';
       }
+    }
 
-      // Log básico (no imprimir tokens completos)
-      try {
-        if (body.containsKey('token_admin')) {
-          final t = body['token_admin']?.toString() ?? '';
-          final mask = t.isEmpty ? '<empty>' : '${t.substring(0, 8)}... (len=${t.length})';
-          print('callFunction: body.token_admin=$mask');
-        }
-      } catch (_) {}
+    // Mask token_admin for diagnostics (no prints)
+    if (body.containsKey('token_admin')) {
+      // We intentionally avoid logging token content for security
+    }
 
+    try {
       final resp = await _postWithTimeout(url, headers, jsonEncode(body), seconds: seconds);
-      print('ApiService.callFunction $functionName -> status=${resp.statusCode} body=${resp.body}');
 
       if (resp.statusCode == 200 || resp.statusCode == 201) {
         if (resp.body.trim().isEmpty) return {};
@@ -877,26 +867,23 @@ class ApiService {
         final bodyText = resp.body;
         if (bodyText.contains('Invalid JWT')) {
           // Intentar reintentar con functionsAuthToken en header si está disponible y aún no se usó
-          if (SupabaseConfig.functionsAuthToken.isNotEmpty && !(preferFunctionsToken)) {
+          if (SupabaseConfig.functionsAuthToken.isNotEmpty && !preferFunctionsToken) {
             try {
-              print('callFunction: Invalid JWT detected. Retrying with functionsAuthToken in Authorization header...');
               final altHeaders = Map<String, String>.from(headers);
               altHeaders['Authorization'] = 'Bearer ${SupabaseConfig.functionsAuthToken}';
               final retryResp = await _postWithTimeout(url, altHeaders, jsonEncode(body), seconds: seconds);
-              print('callFunction retry with functionsAuthToken -> status=${retryResp.statusCode} body=${retryResp.body}');
               if (retryResp.statusCode == 200 || retryResp.statusCode == 201) {
                 if (retryResp.body.trim().isEmpty) return {};
                 final parsed = jsonDecode(retryResp.body);
                 if (parsed is Map<String, dynamic>) return parsed;
                 return {'result': parsed};
               }
-            } catch (e) {
-              print('callFunction retry with functionsAuthToken failed: $e');
+            } catch (_) {
+              // retry failed silently
             }
           }
 
-          // Intentar refrescar admin token si tenemos refresh token guardado y reintentar una vez (mantener compatibilidad con body token_admin)
-          print('callFunction: detected Invalid JWT for function $functionName. Attempting to refresh admin token...');
+          // Intentar refrescar admin token si tenemos refresh token guardado y reintentar una vez
           final refreshed = await _tryRefreshAdminToken();
           if (refreshed) {
             final prefs = await SharedPreferences.getInstance();
@@ -906,33 +893,31 @@ class ApiService {
                 final retryBody = Map<String, dynamic>.from(body);
                 retryBody['token_admin'] = newAdmin;
                 final retryResp = await _postWithTimeout(url, headers, jsonEncode(retryBody), seconds: seconds);
-                print('callFunction retry after refresh -> status=${retryResp.statusCode} body=${retryResp.body}');
                 if (retryResp.statusCode == 200 || retryResp.statusCode == 201) {
                   if (retryResp.body.trim().isEmpty) return {};
                   final parsed = jsonDecode(retryResp.body);
                   if (parsed is Map<String, dynamic>) return parsed;
                   return {'result': parsed};
                 }
-              } catch (e) {
-                print('callFunction retry after refresh failed: $e');
+              } catch (_) {
+                // retry after refresh failed
               }
             }
           }
+
           throw Exception('No autorizado llamando function $functionName (status: ${resp.statusCode}, body: ${resp.body}). La Edge Function devolvió Invalid JWT. Asegúrate de enviar token_admin correcto en el body o configura SUPABASE_FUNCTIONS_AUTH_TOKEN.');
         }
+
         throw Exception('No autorizado llamando function $functionName (status: ${resp.statusCode}, body: ${resp.body}).');
       }
 
       throw Exception('Error llamando function $functionName: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      // Distinción para errores de red (web CORS, fetch fail)
       final msg = e.toString();
       if (msg.contains('Failed to fetch') || msg.contains('Network request failed') || msg.contains('XMLHttpRequest') || msg.contains('CORS')) {
         final more = 'Error llamando function "${functionName}": "Failed to fetch" — probable error de CORS/preflight cuando la app corre en web. Asegúrate de que la Edge Function devuelva las cabeceras CORS y responda a OPTIONS.';
-        print('callFunction error for $functionName (likely CORS): $e');
         throw Exception(more);
       }
-      print('callFunction error for $functionName: $e');
       rethrow;
     }
   }
@@ -965,10 +950,7 @@ class ApiService {
         'token_admin': tokenFrescoAdmin, // Token fresco del SDK
       };
 
-      try {
-        final mask = tokenFrescoAdmin.isEmpty ? '<empty>' : '${tokenFrescoAdmin.substring(0, 8)}... (len=${tokenFrescoAdmin.length})';
-        print('crearUsuarioFunction: calling crear-usuario with FRESH token_admin=$mask and email=$email');
-      } catch (_) {}
+      // calling crear-usuario with fresh token_admin (masked)
 
       // Usar el SDK de supabase_flutter en vez de http manual
       final response = await Supabase.instance.client.functions.invoke(
@@ -976,8 +958,7 @@ class ApiService {
         body: body,
       );
 
-      print('crearUsuarioFunction: status=${response.status} data=${response.data}');
-
+      // crearUsuarioFunction status
       if (response.status == 200 || response.status == 201) {
         if (response.data == null) return {};
         if (response.data is Map<String, dynamic>) return response.data as Map<String, dynamic>;
@@ -986,7 +967,7 @@ class ApiService {
 
       throw Exception('Error creando usuario: status=${response.status} data=${response.data}');
     } catch (e) {
-      print('crearUsuarioFunction error: $e');
+      // crearUsuarioFunction error
       rethrow;
     }
   }
@@ -1009,11 +990,7 @@ class ApiService {
         'token_admin': tokenFrescoAdmin, // Token fresco del SDK
       };
 
-      // Log masking token_admin for diagnostics (do not print full token)
-      try {
-        final mask = tokenFrescoAdmin.isEmpty ? '<empty>' : '${tokenFrescoAdmin.substring(0, 8)}... (len=${tokenFrescoAdmin.length})';
-        print('eliminarUsuarioFunction: calling eliminar-usuario with FRESH token_admin=$mask and id=$idUsuario');
-      } catch (_) {}
+      // calling eliminar-usuario with fresh token_admin (masked)
 
       // Usar el SDK de supabase_flutter en vez de http manual
       final response = await Supabase.instance.client.functions.invoke(
@@ -1021,8 +998,7 @@ class ApiService {
         body: body,
       );
 
-      print('eliminarUsuarioFunction: status=${response.status} data=${response.data}');
-
+      // eliminarUsuarioFunction status
       if (response.status == 200 || response.status == 201) {
         if (response.data == null) return {};
         if (response.data is Map<String, dynamic>) return response.data as Map<String, dynamic>;
@@ -1031,7 +1007,7 @@ class ApiService {
 
       throw Exception('Error eliminando usuario: status=${response.status} data=${response.data}');
     } catch (e) {
-      print('eliminarUsuarioFunction error: $e');
+      // eliminarUsuarioFunction error
       rethrow;
     }
   }
@@ -1055,10 +1031,7 @@ class ApiService {
         'token_admin': tokenFrescoAdmin, // Token fresco del SDK
       };
 
-      try {
-        final mask = tokenFrescoAdmin.isEmpty ? '<empty>' : '${tokenFrescoAdmin.substring(0, 8)}... (len=${tokenFrescoAdmin.length})';
-        print('editarPasswordFunction: calling editar-password with FRESH token_admin=$mask and id=$idUsuario');
-      } catch (_) {}
+      // calling editar-password with fresh token_admin (masked)
 
       // Usar el SDK de supabase_flutter en vez de http manual
       final response = await Supabase.instance.client.functions.invoke(
@@ -1066,8 +1039,7 @@ class ApiService {
         body: body,
       );
 
-      print('editarPasswordFunction: status=${response.status} data=${response.data}');
-
+      // editarPasswordFunction status
       if (response.status == 200 || response.status == 201) {
         if (response.data == null) return {};
         if (response.data is Map<String, dynamic>) return response.data as Map<String, dynamic>;
@@ -1076,7 +1048,7 @@ class ApiService {
 
       throw Exception('Error editando password: status=${response.status} data=${response.data}');
     } catch (e) {
-      print('editarPasswordFunction error: $e');
+      // editarPasswordFunction error
       rethrow;
     }
   }
@@ -1088,9 +1060,9 @@ class ApiService {
       await prefs.setString('adminToken', token);
       // también actualizamos jwt por compatibilidad
       if (token.isNotEmpty) await prefs.setString('jwt', token);
-      print('saveAdminToken: adminToken saved (len=${token.length})');
+      // adminToken saved
     } catch (e) {
-      print('saveAdminToken error: $e');
+      // saveAdminToken error
     }
   }
 
@@ -1125,7 +1097,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       final refresh = prefs.getString('adminRefreshToken') ?? prefs.getString('refreshToken') ?? '';
       if (refresh.isEmpty) {
-        print('_tryRefreshAdminToken: no refresh token found in prefs');
+        // no refresh token found in prefs
         return false;
       }
 
@@ -1137,7 +1109,7 @@ class ApiService {
       };
       final body = 'refresh_token=${Uri.encodeComponent(refresh)}';
       final resp = await _postWithTimeout(url, headers, body, seconds: 8);
-      print('_tryRefreshAdminToken -> status=${resp.statusCode} body=${resp.body}');
+      // refresh admin token response
       if (resp.statusCode == 200) {
         final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
         final newAccess = parsed['access_token']?.toString() ?? '';
@@ -1146,13 +1118,13 @@ class ApiService {
           await prefs.setString('adminToken', newAccess);
           await prefs.setString('jwt', newAccess);
           if (newRefresh.isNotEmpty) await prefs.setString('adminRefreshToken', newRefresh);
-          print('_tryRefreshAdminToken: refreshed adminToken saved (len=${newAccess.length})');
+          // refreshed adminToken saved
           return true;
         }
       }
       return false;
     } catch (e) {
-      print('_tryRefreshAdminToken error: $e');
+      // _tryRefreshAdminToken error
       return false;
     }
   }
@@ -1176,7 +1148,6 @@ class ApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('functionsAuthToken', token);
-      print('saveFunctionsAuthToken: token saved (len=${token.length})');
     } catch (e) {
       print('saveFunctionsAuthToken error: $e');
     }
@@ -1246,10 +1217,10 @@ class ApiService {
       // Aplicar orden y ejecutar
       final response = await query.order('fecha_hora_inicio', ascending: true);
 
-      print('obtenerAgenda: fetched ${(response as List).length} sesiones for sucursal $sucursalId, estado=$estadoSesion');
+      // fetched agenda
       return response as List<dynamic>;
     } catch (e) {
-      print('obtenerAgenda error: $e');
+      // obtenerAgenda error
       rethrow;
     }
   }
@@ -1278,10 +1249,10 @@ class ApiService {
       }
 
       final response = await query.order('fecha_hora_inicio', ascending: true);
-      print('obtenerAgendaPorRango: fetched \'${(response as List).length}\' sesiones for sucursal $sucursalId between $start and $end');
+      // fetched agenda por rango
       return response as List<dynamic>;
     } catch (e) {
-      print('obtenerAgendaPorRango error: $e');
+      // obtenerAgendaPorRango error
       rethrow;
     }
   }
@@ -1314,7 +1285,7 @@ class ApiService {
 
       return response as List<dynamic>;
     } catch (e) {
-      print('getTicketsDelDia error: $e');
+      // getTicketsDelDia error
       rethrow;
     }
   }
@@ -1340,10 +1311,10 @@ class ApiService {
           .eq('sucursal_id', sucursalId)
           .order('created_at', ascending: false);
 
-      print('getAllTickets: fetched ${(response as List).length} tickets for sucursal $sucursalId');
+      // fetched tickets
       return response as List<dynamic>;
     } catch (e) {
-      print('getAllTickets error: $e');
+      // getAllTickets error
       rethrow;
     }
   }
@@ -1380,10 +1351,10 @@ class ApiService {
           .lte('created_at', endIso)
           .order('created_at', ascending: false);
 
-      print('getTicketsByRange: fetched ${(response as List).length} tickets for sucursal $sucursalId between $startIso and $endIso');
+      // getTicketsByRange fetched
       return response as List<dynamic>;
     } catch (e) {
-      print('getTicketsByRange error: $e');
+      // getTicketsByRange error
       rethrow;
     }
   }
@@ -1450,8 +1421,7 @@ class ApiService {
         }
       }
 
-      print('registrarVenta: Creating ticket with ${sesionesParaEnviar.length} sesiones');
-      print('registrarVenta: Sesiones: ${sesionesParaEnviar.map((s) => "Sesión ${s['numero_sesion']}: ${s['fecha_inicio']}").join(", ")}');
+      // registrarVenta: creating ticket
 
       // 3. Llamada Atómica al Backend
       final response = await Supabase.instance.client.rpc(
@@ -1475,9 +1445,9 @@ class ApiService {
         }
       }
 
-      print('registrarVenta: Venta creada exitosamente');
+      // registrarVenta: success
     } catch (e) {
-      print('registrarVenta error: $e');
+      // registrarVenta error
       rethrow;
     }
   }
@@ -1499,7 +1469,7 @@ class ApiService {
       final response = await query.order('created_at', ascending: true);
       return response as List<dynamic>;
     } catch (e) {
-      print('obtenerTicketsPendientes error: $e');
+      // obtenerTicketsPendientes error
       rethrow;
     }
   }
@@ -1523,7 +1493,7 @@ class ApiService {
       // Algunas instalaciones devuelven null para relaciones faltantes; convertir a Map defensivo
       return Map<String, dynamic>.from(response);
     } catch (e) {
-      print('obtenerTicketDetalle error: $e');
+      // obtenerTicketDetalle error
       rethrow;
     }
   }
@@ -1546,7 +1516,7 @@ class ApiService {
 
       return Map<String, dynamic>.from(response);
     } catch (e) {
-      print('registrarAbono error: $e');
+      // registrarAbono error
       rethrow;
     }
   }
@@ -1564,7 +1534,7 @@ class ApiService {
 
       return true;
     } catch (e) {
-      print('marcarSesionAtendida error: $e');
+      // marcarSesionAtendida error
       rethrow;
     }
   }
@@ -1581,7 +1551,7 @@ class ApiService {
 
       return true;
     } catch (e) {
-      print('reprogramarSesion error: $e');
+      // reprogramarSesion error
       rethrow;
     }
   }
@@ -1597,7 +1567,7 @@ class ApiService {
 
       return response as List<dynamic>;
     } catch (e) {
-      print('obtenerPagosTicket error: $e');
+      // obtenerPagosTicket error
       rethrow;
     }
   }
@@ -1613,7 +1583,7 @@ class ApiService {
 
       return response as List<dynamic>;
     } catch (e) {
-      print('obtenerSesionesTicket error: $e');
+      // obtenerSesionesTicket error
       rethrow;
     }
   }
@@ -1659,20 +1629,22 @@ class ApiService {
 
       return true;
     } catch (e) {
-      print('crearTicket (compat) error: $e');
+      // crearTicket (compat) error
       return false;
     }
   }
 
   /// Buscar tickets por texto (server-side, eficiente)
   /// Busca en clientes (nombre/apellido/telefono) y en tratamientos (nombre)
-  Future<List<dynamic>> searchTickets({
+  Future<Map<String, dynamic>> searchTickets({
     required String query,
     required int sucursalId,
+    int page = 1,
+    int pageSize = 30,
   }) async {
     try {
       final q = query.trim();
-      if (q.isEmpty) return [];
+      if (q.isEmpty) return {'items': [], 'meta': {'page': page, 'pageSize': pageSize, 'returned': 0, 'total': 0, 'totalPages': 0}};
 
       // 1) Buscar clientes que coincidan
       final pattern = '%$q%';
@@ -1683,10 +1655,8 @@ class ApiService {
           .or('nombrecliente.ilike.$pattern,apellidocliente.ilike.$pattern,telefono.ilike.$pattern');
 
       final clientIds = <dynamic>[];
-      if (clientsResp is List) {
-        for (var c in clientsResp) {
-          if (c is Map && c['id'] != null) clientIds.add(c['id']);
-        }
+      for (var c in clientsResp as List) {
+        if (c is Map && c['id'] != null) clientIds.add(c['id']);
       }
 
       // 2) Buscar tratamientos que coincidan y obtener sus ids
@@ -1696,10 +1666,8 @@ class ApiService {
           .ilike('nombretratamiento', pattern);
 
       final tratIds = <dynamic>[];
-      if (tratResp is List) {
-        for (var t in tratResp) {
-          if (t is Map && t['id'] != null) tratIds.add(t['id']);
-        }
+      for (var t in tratResp as List) {
+        if (t is Map && t['id'] != null) tratIds.add(t['id']);
       }
 
       // 3) Si hay tratamientos, obtener ticket ids desde sesiones
@@ -1709,29 +1677,42 @@ class ApiService {
             .from('sesion')
             .select('ticket_id')
             .filter('tratamiento_id', 'in', '(${tratIds.map((e) => e.toString()).join(',')})');
-        if (sesResp is List) {
-          for (var s in sesResp) {
-            if (s is Map && s['ticket_id'] != null) ticketIdsFromSesiones.add(s['ticket_id']);
-          }
+        for (var s in sesResp as List) {
+          if (s is Map && s['ticket_id'] != null) ticketIdsFromSesiones.add(s['ticket_id']);
         }
       }
 
       // 4) Armar filtro OR para tickets: por cliente_id o por id (desde sesiones)
       final orParts = <String>[];
       if (clientIds.isNotEmpty) {
-        // clientIds likely integers
         orParts.add('cliente_id.in.(${clientIds.map((e) => e.toString()).join(',')})');
       }
       if (ticketIdsFromSesiones.isNotEmpty) {
         orParts.add('id.in.(${ticketIdsFromSesiones.map((e) => e.toString()).join(',')})');
       }
 
-      if (orParts.isEmpty) return [];
+      if (orParts.isEmpty) return {'items': [], 'meta': {'page': page, 'pageSize': pageSize, 'returned': 0, 'total': 0, 'totalPages': 0}};
 
       final orFilter = orParts.join(',');
 
-      // 5) Traer tickets completos con joins
-      final response = await Supabase.instance.client
+      // 5) Calcular total (conteo) - nota: usamos una consulta separada para obtener el total exacto
+      int total = 0;
+      try {
+        final countResp = await Supabase.instance.client
+            .from('ticket')
+            .select('id')
+            .eq('sucursal_id', sucursalId)
+            .or(orFilter);
+        total = (countResp as List).length;
+      } catch (_) {
+        total = 0; // si falla el conteo, lo dejamos en 0
+      }
+
+      final totalPages = (total / pageSize).ceil();
+
+      // 6) Traer tickets completos con joins y paginación
+      final offset = (page - 1) * pageSize;
+      var queryBuilder = Supabase.instance.client
           .from('ticket')
           .select('''
             *,
@@ -1740,15 +1721,26 @@ class ApiService {
           ''')
           .eq('sucursal_id', sucursalId)
           .or(orFilter)
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .limit(pageSize)
+          .range(offset, offset + pageSize - 1);
 
-      if (response is List) return response as List<dynamic>;
-      return [];
+      final response = await queryBuilder;
+
+      final items = List<dynamic>.from(response as List);
+      return {
+        'items': items,
+        'meta': {
+          'page': page,
+          'pageSize': pageSize,
+          'returned': items.length,
+          'total': total,
+          'totalPages': totalPages,
+        }
+      };
     } catch (e) {
-      print('searchTickets error: $e');
+      // searchTickets error
       rethrow;
     }
   }
-
-  // ...existing code...
 }
