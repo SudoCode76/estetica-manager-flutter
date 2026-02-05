@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -22,12 +23,21 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
   String _filtroEstado = 'agendada'; // 'agendada' o 'realizada'
   bool _isFirstLoad = true; // Bandera para controlar primera carga
 
+  // --- NUEVO: buscador de sesiones por nombre de cliente ---
+  final TextEditingController _searchController = TextEditingController();
+  String _search = '';
+  Timer? _debounceSearch;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
     _initializeLocale();
+
+    // Inicializar listener del buscador (opcional)
+    // No añadimos listener directo; usaremos onChanged con debounce
+
     // CARGA AUTOMÁTICA: cargar la agenda tan pronto como termine el primer frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadAgenda();
@@ -80,6 +90,9 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
   void dispose() {
     _tabController.dispose();
     _sucursalProvider?.removeListener(_onSucursalChanged);
+    // --- NUEVO: limpiar buscador ---
+    _searchController.dispose();
+    _debounceSearch?.cancel();
     super.dispose();
   }
 
@@ -159,6 +172,138 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
       return DateFormat('EEEE, d MMMM yyyy', 'es_ES').format(_selectedRange.start);
     }
     return '$start - $end';
+  }
+
+  // --- NUEVAS FUNCIONES UTIL: normalizar texto y filtrar agenda ---
+  String _normalize(String s) {
+    var str = s.toLowerCase();
+    const accents = {
+      '\u00e1':'a','\u00e0':'a','\u00e4':'a','\u00e2':'a','\u00e3':'a',
+      '\u00e9':'e','\u00e8':'e','\u00eb':'e','\u00ea':'e',
+      '\u00ed':'i','\u00ec':'i','\u00ef':'i','\u00ee':'i',
+      '\u00f3':'o','\u00f2':'o','\u00f6':'o','\u00f4':'o','\u00f5':'o',
+      '\u00fa':'u','\u00f9':'u','\u00fc':'u','\u00fb':'u','\u00f1':'n','\u00e7':'c'
+    };
+    accents.forEach((k,v) { str = str.replaceAll(k, v); });
+    str = str.replaceAll(RegExp(r"[^a-z0-9\s]"), ' ');
+    return str.replaceAll(RegExp(r"\s+"), ' ').trim();
+  }
+
+  void _onSearchChanged(String value) {
+    // Actualizar inmediatamente el término de búsqueda para filtrar localmente
+    if (!mounted) return;
+    setState(() {
+      _search = value;
+    });
+
+    // Si la búsqueda quedó vacía, cancelar debounce y devolver
+    if (value.trim().isEmpty) {
+      if (_debounceSearch?.isActive ?? false) _debounceSearch!.cancel();
+      print('Sesiones: búsqueda vacía, mostrando todas las sesiones');
+      return;
+    }
+
+    // Debounce para tareas pesadas / servidor (aquí sólo usamos para log)
+    if (_debounceSearch?.isActive ?? false) _debounceSearch!.cancel();
+    _debounceSearch = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      // en futuras mejoras aquí se podría lanzar búsqueda en servidor
+      print('Sesiones: debounce exec -> "${_search}"');
+    });
+  }
+
+  List<dynamic> _computeFilteredAgenda(List<dynamic> agenda) {
+    try {
+      if (_search.trim().isEmpty) return agenda;
+      final term = _normalize(_search);
+      final filtered = <dynamic>[];
+
+      String _extractNombreCliente(dynamic item) {
+        try {
+          if (item == null) return '';
+          // Si ya es AgendaItem
+          if (item is AgendaItem) return item.nombreCliente;
+
+          final Map<String, dynamic> j = item is Map ? Map<String, dynamic>.from(item) : {};
+
+          // 1. revisar si existe clave 'cliente' y puede ser Map/List o contener 'data'
+          final cliente = j['cliente'] ?? j['cliente_id'] ?? j['clienteData'] ?? j['cliente_id'];
+          if (cliente != null) {
+            if (cliente is Map) {
+              // soporte caso cliente: { data: {...} }
+              final data = cliente['data'] ?? cliente;
+              if (data is Map) {
+                final nombre = (data['nombrecliente'] ?? data['nombreCliente'] ?? data['nombre'] ?? '').toString();
+                final apellido = (data['apellidocliente'] ?? data['apellidoCliente'] ?? data['apellido'] ?? '').toString();
+                final full = ('$nombre $apellido').trim();
+                if (full.isNotEmpty) return full;
+              }
+              // si cliente es mapa plano
+              final nombre2 = (cliente['nombrecliente'] ?? cliente['nombreCliente'] ?? cliente['nombre'] ?? '').toString();
+              final apellido2 = (cliente['apellidocliente'] ?? cliente['apellidoCliente'] ?? cliente['apellido'] ?? '').toString();
+              final full2 = ('$nombre2 $apellido2').trim();
+              if (full2.isNotEmpty) return full2;
+            } else if (cliente is List && cliente.isNotEmpty) {
+              final c0 = cliente.first;
+              if (c0 is Map) {
+                final nombre = (c0['nombrecliente'] ?? c0['nombreCliente'] ?? c0['nombre'] ?? '').toString();
+                final apellido = (c0['apellidocliente'] ?? c0['apellidoCliente'] ?? c0['apellido'] ?? '').toString();
+                final full = ('$nombre $apellido').trim();
+                if (full.isNotEmpty) return full;
+              }
+            }
+          }
+
+          // 2. revisar campos planos en el mismo objeto
+          final nombrePlain = (j['nombrecliente'] ?? j['nombre_cliente'] ?? j['nombreCliente'] ?? j['nombre'] ?? '').toString();
+          final apellidoPlain = (j['apellidocliente'] ?? j['apellidoCliente'] ?? j['apellido'] ?? '').toString();
+          final fullPlain = ('$nombrePlain $apellidoPlain').trim();
+          if (fullPlain.isNotEmpty) return fullPlain;
+
+          // 3. intentar en sesiones[0].cliente o sesiones[0].cliente.data
+          final sesiones = j['sesiones'] ?? j['sesion'] ?? j['session'];
+          if (sesiones is List && sesiones.isNotEmpty) {
+            final s0 = sesiones.first;
+            if (s0 is Map) {
+              final c = s0['cliente'] ?? s0['cliente_id'];
+              if (c is Map) {
+                final nombre = (c['nombrecliente'] ?? c['nombreCliente'] ?? c['nombre'] ?? '').toString();
+                final apellido = (c['apellidocliente'] ?? c['apellidoCliente'] ?? c['apellido'] ?? '').toString();
+                final full = ('$nombre $apellido').trim();
+                if (full.isNotEmpty) return full;
+              }
+            }
+          }
+
+          return '';
+        } catch (_) {
+          return '';
+        }
+      }
+
+      for (final item in agenda) {
+        try {
+          final nombre = _extractNombreCliente(item);
+          if (nombre.isNotEmpty && _normalize(nombre).contains(term)) {
+            filtered.add(item);
+            continue;
+          }
+          // fallback: si el item contiene un campo 'cliente' como texto
+          try {
+            final possible = (item['cliente'] is String) ? item['cliente'] : '';
+            if (possible != null && _normalize(possible.toString()).contains(term)) {
+              filtered.add(item);
+              continue;
+            }
+          } catch (_) {}
+        } catch (_) {}
+      }
+      // debug
+      print('Sesiones: filtro="$term" -> ${filtered.length}/${agenda.length} coincidencias');
+      return filtered;
+    } catch (e) {
+      return agenda;
+    }
   }
 
   @override
@@ -257,6 +402,30 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 12),
 
+          // NUEVO: Buscador por nombre de cliente
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: SearchBar(
+              controller: _searchController,
+              hintText: 'Buscar por cliente',
+              leading: const Icon(Icons.search),
+              trailing: _search.isNotEmpty
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      ),
+                    ]
+                  : null,
+              onChanged: _onSearchChanged,
+              elevation: const WidgetStatePropertyAll(1),
+            ),
+          ),
+          const SizedBox(height: 12),
+
           // Lista de sesiones
           Expanded(
             child: Consumer<TicketProvider>(
@@ -266,7 +435,8 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                 }
 
                 // Mostrar contador de sesiones cargadas
-                final count = provider.agenda.length;
+                final displayed = _computeFilteredAgenda(provider.agenda);
+                final count = displayed.length;
 
                 if (provider.error != null) {
                   return Center(
@@ -360,9 +530,9 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                         onRefresh: _loadAgenda,
                         child: ListView.builder(
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
-                          itemCount: provider.agenda.length,
+                          itemCount: displayed.length,
                           itemBuilder: (context, index) {
-                            final sesion = AgendaItem.fromJson(provider.agenda[index]);
+                            final sesion = AgendaItem.fromJson(displayed[index]);
                             return _SesionCard(
                               sesion: sesion,
                               // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
