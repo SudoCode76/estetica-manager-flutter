@@ -6,32 +6,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ApiService {
   static String? debugBaseUrl;
-
   static const String _productionUrl = 'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
-
   String get _baseUrl {
-    // Si se ha establecido una URL de debug manualmente, usarla (para testing)
     if (debugBaseUrl != null && debugBaseUrl!.isNotEmpty) return debugBaseUrl!;
-
-    // Usar URL de producción para todas las plataformas
     return _productionUrl;
-
-    // Para desarrollo local, descomentar las siguientes líneas y comentar el return de arriba:
-    /*
-    if (kIsWeb) return _localUrl;
-    try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:1337/api';
-      if (Platform.isIOS || Platform.isMacOS) return _localUrl;
-      return _localUrl;
-    } catch (_) {
-      return _localUrl;
-    }
-    */
   }
 
   Future<Map<String, String>> _getHeaders() async {
-    // Unifica headers usados en llamadas a Supabase REST.
-    // Incluye siempre la apikey (anon/public) y, si existe, Authorization con access token.
+
     String jwt = '';
     try {
       final session = Supabase.instance.client.auth.currentSession;
@@ -54,7 +36,6 @@ class ApiService {
     return headers;
   }
 
-  /// Lanza si no hay JWT disponible para llamadas autenticadas.
   Future<void> _ensureJwtExists() async {
     try {
       final session = Supabase.instance.client.auth.currentSession;
@@ -98,7 +79,6 @@ class ApiService {
     }
   }
 
-  // PATCH helper (Supabase REST usa PATCH para updates parciales)
   Future<http.Response> _patchWithTimeout(Uri uri, Map<String, String> headers, Object? body, {int seconds = 8}) async {
     try {
       final resp = await http.patch(uri, headers: headers, body: body).timeout(Duration(seconds: seconds));
@@ -109,7 +89,6 @@ class ApiService {
     }
   }
 
-  // HTTP wrappers con timeout para evitar requests colgados
   Future<http.Response> _getWithTimeout(Uri uri, Map<String, String> headers, {int seconds = 8}) async {
     try {
       final resp = await http.get(uri, headers: headers).timeout(Duration(seconds: seconds));
@@ -152,6 +131,37 @@ class ApiService {
         return attrs;
       }
       return item;
+    }).toList();
+  }
+
+  List<dynamic> _normalizarDatosVista(List<dynamic> data) {
+    return data.map((item) {
+      final newItem = Map<String, dynamic>.from(item);
+
+      // Crear estructura de cliente si no existe
+      if (newItem['cliente'] == null) {
+        newItem['cliente'] = {
+          'nombrecliente': newItem['nombrecliente'] ?? '',
+          'apellidocliente': newItem['apellidocliente'] ?? '',
+          'telefono': newItem['telefono'],
+          'id': newItem['cliente_id'],
+        };
+      }
+
+      // Crear estructura de tratamiento si no existe
+      if (newItem['tratamiento'] == null) {
+        newItem['tratamiento'] = {
+          'nombretratamiento': newItem['nombretratamiento'] ?? '',
+          'precio': newItem['precio']
+        };
+      }
+
+      // Compatibilidad de estado
+      if (newItem['estado_sesion_enum'] == null && newItem['estado_sesion'] != null) {
+        newItem['estado_sesion_enum'] = newItem['estado_sesion'];
+      }
+
+      return newItem;
     }).toList();
   }
 
@@ -1067,29 +1077,6 @@ class ApiService {
   }
 
 
-  /// Si en el futuro necesitas elegir dinámicamente un token admin, puedes
-  /// usar `_getRuntimeFunctionsAuthToken()` (para el legacy functions token)
-  /// o `saveAdminToken()` + `_tryRefreshAdminToken()` para manejar un admin token en prefs.
-  // Future<String> _chooseTokenAdmin() async {
-  //   try {
-  //     if (SupabaseConfig.functionsAuthToken.isNotEmpty) return SupabaseConfig.functionsAuthToken;
-  //     final prefs = await SharedPreferences.getInstance();
-  //     final storedAdmin = prefs.getString('adminToken') ?? '';
-  //     if (storedAdmin.isNotEmpty) return storedAdmin;
-  //     // fallback a jwt en prefs o sesión
-  //     try {
-  //       final session = Supabase.instance.client.auth.currentSession;
-  //       final jwt = session?.accessToken;
-  //       if (jwt != null && jwt.isNotEmpty) return jwt;
-  //     } catch (_) {}
-  //     final jwtPrefs = prefs.getString('jwt') ?? '';
-  //     return jwtPrefs;
-  //   } catch (e) {
-  //     print('_chooseTokenAdmin error: $e');
-  //     return '';
-  //   }
-  // }
-
   /// Intenta refrescar el admin token usando el refresh token guardado en SharedPreferences.
   /// Retorna true si se obtuvo y guardó un adminToken nuevo.
   Future<bool> _tryRefreshAdminToken() async {
@@ -1193,34 +1180,26 @@ class ApiService {
   /// 1. Obtener agenda diaria (vista de sesiones programadas)
   Future<List<dynamic>> obtenerAgenda(DateTime fecha, {int? sucursalId, String? estadoSesion}) async {
     try {
-      // Si no hay sucursal seleccionada, retornar lista vacía
-      if (sucursalId == null) {
-        print('obtenerAgenda: sucursalId is null, returning empty list');
-        return [];
-      }
-
+      if (sucursalId == null) return [];
       final (inicioDia, finDia) = _getRangoDia(fecha);
 
-      // Construir query con filtros
       var query = Supabase.instance.client
           .from('vista_agenda_diaria')
-          .select()
+          .select() // Trae datos planos
           .eq('sucursal_id', sucursalId)
           .gte('fecha_hora_inicio', inicioDia)
           .lte('fecha_hora_inicio', finDia);
 
-      // Filtrar por estado si se especifica
       if (estadoSesion != null) {
         query = query.eq('estado_sesion', estadoSesion);
       }
 
-      // Aplicar orden y ejecutar
       final response = await query.order('fecha_hora_inicio', ascending: true);
 
-      // fetched agenda
-      return response as List<dynamic>;
+      // APLICAMOS LA NORMALIZACIÓN AQUÍ
+      return _normalizarDatosVista(response as List<dynamic>);
     } catch (e) {
-      // obtenerAgenda error
+      print('obtenerAgenda error: $e');
       rethrow;
     }
   }
@@ -1233,7 +1212,6 @@ class ApiService {
     String? estadoSesion,
   }) async {
     try {
-      // Ajustar horas para cubrir el día completo en local
       final start = DateTime(fechaInicio.year, fechaInicio.month, fechaInicio.day, 0, 0, 0).toIso8601String();
       final end = DateTime(fechaFin.year, fechaFin.month, fechaFin.day, 23, 59, 59, 999).toIso8601String();
 
@@ -1249,10 +1227,72 @@ class ApiService {
       }
 
       final response = await query.order('fecha_hora_inicio', ascending: true);
-      // fetched agenda por rango
-      return response as List<dynamic>;
+      return _normalizarDatosVista(response as List<dynamic>);
     } catch (e) {
-      // obtenerAgendaPorRango error
+      print('obtenerAgendaPorRango error: $e');
+      rethrow;
+    }
+  }
+
+
+  // --- 4. BUSCADOR DE SESIONES (AGREGAR ESTA FUNCIÓN FALTANTE) ---
+  Future<Map<String, dynamic>> searchSessions({
+    required String query,
+    required int sucursalId,
+    int page = 1,
+    int pageSize = 20,
+    String? estadoSesion,
+  }) async {
+    try {
+      final cleanQuery = query.trim();
+      if (cleanQuery.isEmpty) return {'items': [], 'meta': {'total': 0}};
+
+      final pattern = '%$cleanQuery%';
+
+      // 1. Buscar IDs de clientes
+      final clientesResp = await Supabase.instance.client
+          .from('cliente')
+          .select('id')
+          .or('nombrecliente.ilike.$pattern,apellidocliente.ilike.$pattern');
+
+      final List<int> clienteIds = (clientesResp as List).map((e) => e['id'] as int).toList();
+
+      if (clienteIds.isEmpty) return {'items': [], 'meta': {'total': 0}};
+
+      // 2. Filtrar Vista
+      var queryBuilder = Supabase.instance.client
+          .from('vista_agenda_diaria')
+          .select()
+          .eq('sucursal_id', sucursalId)
+          .filter('cliente_id', 'in', '(${clienteIds.join(',')})'); // Usa filter en vez de in_
+
+      if (estadoSesion != null && estadoSesion.isNotEmpty) {
+        queryBuilder = queryBuilder.eq('estado_sesion', estadoSesion);
+      }
+
+      final from = (page - 1) * pageSize;
+      final to = from + pageSize - 1;
+
+      final response = await queryBuilder
+          .order('fecha_hora_inicio', ascending: true)
+          .range(from, to)
+          .count(CountOption.exact);
+
+      // APLICAMOS LA NORMALIZACIÓN AQUÍ TAMBIÉN
+      final adaptedData = _normalizarDatosVista(response.data as List<dynamic>);
+
+      return {
+        'items': adaptedData,
+        'meta': {
+          'page': page,
+          'pageSize': pageSize,
+          'returned': adaptedData.length,
+          'total': response.count,
+          'totalPages': (response.count / pageSize).ceil(),
+        }
+      };
+    } catch (e) {
+      print('searchSessions error: $e');
       rethrow;
     }
   }
