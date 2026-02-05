@@ -680,15 +680,31 @@ class _SesionCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.access_time, size: 16, color: colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          sesion.fechaHora != null
-                              ? DateFormat('HH:mm').format(sesion.fechaHora!)
-                              : 'Sin hora',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              sesion.fechaHora != null
+                                  ? DateFormat('HH:mm').format(sesion.fechaHora!)
+                                  : 'Sin hora',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              sesion.fechaHora != null
+                                  ? DateFormat('EEE, d MMM', 'es_ES').format(sesion.fechaHora!)
+                                  : '',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.9),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
