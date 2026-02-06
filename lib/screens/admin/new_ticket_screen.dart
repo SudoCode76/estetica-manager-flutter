@@ -30,6 +30,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
    late ClienteRepository _clienteRepo;
    late AuthRepository _authRepo;
    late TicketRepository _ticketRepo;
+   bool _initialDataLoaded = false;
    DateTime? fecha;
    List<int> tratamientosSeleccionados = [];
    Map<int, int> cantidadSesionesPorTratamiento = {}; // cantidad de sesiones por tratamiento
@@ -73,7 +74,6 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      usuarioId = null;
      usuarioNombre = null;
      _loadUserType();
-     cargarDatos();
      // listener para el campo de búsqueda de tratamientos
      _tratamientoSearchCtrl.addListener(() {
        if (_tratamientoSearchDebounce?.isActive ?? false) _tratamientoSearchDebounce!.cancel();
@@ -100,6 +100,13 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        _ticketRepo = Provider.of<TicketRepository>(context, listen: false);
        _loadClientsForSucursal();
        _loadUsuariosForSucursal();
+       // Cargar datos dependientes del catálogo (solo una vez cuando los repos estén disponibles)
+       if (!_initialDataLoaded) {
+         _initialDataLoaded = true;
+         WidgetsBinding.instance.addPostFrameCallback((_) {
+           if (mounted) cargarDatos();
+         });
+       }
      }
    }
 
@@ -192,13 +199,23 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      });
      try {
        if (kDebugMode) debugPrint('NewTicketScreen: Cargando categorías...');
-       final cats = await _catalogRepo.getCategorias();
+      List<dynamic> cats;
+      try {
+        cats = await _catalogRepo.getCategorias().timeout(const Duration(seconds: 8));
+      } on TimeoutException {
+        throw Exception('Timeout al obtener categorías (verifica conexión)');
+      }
        // Filtrar solo categorías activas (estadoCategoria == true o null->assume active)
        categorias = List<dynamic>.from(cats.where((c) => c['estadoCategoria'] == true || c['estadoCategoria'] == null));
        if (kDebugMode) debugPrint('NewTicketScreen: ${categorias.length} categorías activas cargadas (de ${cats.length})');
 
        if (kDebugMode) debugPrint('NewTicketScreen: Cargando tratamientos...');
-       final tr = await _catalogRepo.getTratamientos(); // Cargar tratamientos
+      List<dynamic> tr;
+      try {
+        tr = await _catalogRepo.getTratamientos().timeout(const Duration(seconds: 8));
+      } on TimeoutException {
+        throw Exception('Timeout al obtener tratamientos (verifica conexión)');
+      }
        // Filtrar solo tratamientos activos
        tratamientos = List<dynamic>.from(tr.where((t) => t['estadoTratamiento'] == true || t['estadoTratamiento'] == null));
        if (kDebugMode) debugPrint('NewTicketScreen: ${tratamientos.length} tratamientos activos cargados (de ${tr.length})');
@@ -817,15 +834,33 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                  Container(
                                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                                    decoration: BoxDecoration(
-                                     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                                     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.04),
                                      borderRadius: BorderRadius.circular(14),
                                    ),
-                                   child: Text(
-                                     'Cargando tratamientos...',
-                                     style: TextStyle(
-                                       fontSize: 16,
-                                       color: colorScheme.onSurfaceVariant,
-                                     ),
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.stretch,
+                                     children: [
+                                       Text(
+                                         'No hay tratamientos cargados',
+                                         style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+                                       ),
+                                       const SizedBox(height: 8),
+                                       Text(
+                                         'Es posible que haya un problema de conexión o la base de datos no contiene tratamientos activos.',
+                                         style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8)),
+                                       ),
+                                       const SizedBox(height: 12),
+                                       Align(
+                                         alignment: Alignment.centerLeft,
+                                         child: FilledButton.icon(
+                                           onPressed: () {
+                                             cargarDatos();
+                                           },
+                                           icon: const Icon(Icons.refresh),
+                                           label: const Text('Reintentar carga'),
+                                         ),
+                                       ),
+                                     ],
                                    ),
                                  )
                                else
