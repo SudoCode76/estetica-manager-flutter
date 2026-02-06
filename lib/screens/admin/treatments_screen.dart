@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   List<dynamic> _tratamientos = [];
 
   bool _loading = true;
+  String? _error;
   bool _saving = false;
   bool _showDisabled = false;
   int? _selectedCategoriaId;
@@ -59,17 +61,19 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   }
 
   Future<void> _loadAll() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _error = null; });
     try {
-      final cats = await _catalogRepo.getCategorias();
-      final trats = await _catalogRepo.getTratamientos();
+      final cats = await _catalogRepo.getCategorias().timeout(const Duration(seconds: 8));
+      final trats = await _catalogRepo.getTratamientos().timeout(const Duration(seconds: 8));
       _categoriasAll = cats;
       _tratamientosAll = trats;
       _applyFilters();
       _applyCategorySearch(_categorySearchCtrl.text);
       _applyTreatmentSearch(_treatmentSearchCtrl.text);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar datos: $e')));
+      final msg = e is TimeoutException ? 'Timeout al cargar catálogos (verifica conexión)' : e.toString();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar datos: $msg')));
+      setState(() { _error = msg; });
     } finally {
       if (mounted) setState(() => _loading = false);
     }

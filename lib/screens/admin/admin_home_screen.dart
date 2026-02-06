@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'dart:async';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;
@@ -33,6 +34,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   late CatalogRepository _catalogRepo;
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
+  String? _sucursalesError;
   bool _isInitialized = false; // NUEVO: controla si está listo para mostrar pantallas
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -219,13 +221,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     debugPrint('AdminHomeScreen: _loadSucursales started');
     debugPrint('AdminHomeScreen: Provider selectedSucursalId ANTES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     try {
-      final sucursales = await _catalogRepo.getSucursales();
+      // Intentar obtener con timeout para evitar bloqueos
+      final sucursales = await _catalogRepo.getSucursales().timeout(const Duration(seconds: 8));
       debugPrint('AdminHomeScreen: Loaded ${sucursales.length} sucursales');
       // Guardar cache local de sucursales para fallback si el servidor está lento
       await _saveSucursalesCache(sucursales);
       setState(() {
         _sucursales = sucursales;
         _isLoadingSucursales = false;
+        _sucursalesError = null;
         // Sólo seleccionar la primera sucursal si no hay selección previa persistida
         if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
           debugPrint('AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}');
@@ -240,25 +244,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       debugPrint('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     } catch (e) {
       debugPrint('AdminHomeScreen: Error loading sucursales: $e');
-
-      // Llamar a la función de debug para obtener detalles e informar al usuario
-      try {
-        final s = await _catalogRepo.getSucursales();
-        debugPrint('AdminHomeScreen: debug getSucursales returned ${s.length} items');
-        if (mounted) {
-          showDialog<void>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Error cargando sucursales (diagnóstico)'),
-              content: SingleChildScrollView(child: Text('Supabase REST fallback returned ${s.length} items.')),
-              actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
-            ),
-          );
-        }
-      } catch (debugErr) {
-        debugPrint('AdminHomeScreen: Error al ejecutar getSucursales debug: $debugErr');
-      }
-
+      final msg = e is TimeoutException ? 'Timeout al cargar sucursales (verifica conexión)' : e.toString();
       // Intentar cargar desde caché local
       final cached = await _loadSucursalesCache();
       if (cached != null && cached.isNotEmpty) {
@@ -266,6 +252,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         setState(() {
           _sucursales = cached;
           _isLoadingSucursales = false;
+          _sucursalesError = 'Usando datos en caché: servidor lento o inaccesible';
           // Si no hay selección previa, seleccionar la primera del cache
           if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
             _sucursalProvider?.setSucursal(_sucursales.first['id'], _sucursales.first['nombreSucursal']);
@@ -276,8 +263,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         // No hay caché: informar y permitir reintento
         setState(() {
           _isLoadingSucursales = false;
+          _sucursalesError = msg;
         });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando sucursales: $e')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando sucursales: $msg')));
       }
     }
   }

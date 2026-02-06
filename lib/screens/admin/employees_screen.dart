@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,7 +63,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }
 
     try {
-      final users = await _repo.getUsuarios(sucursalId: sucId);
+      final users = await _repo.getUsuarios(sucursalId: sucId).timeout(const Duration(seconds: 8));
       final allowed = {'administrador','admin','empleado','vendedor','gerente'};
       _employees = users.where((u) {
         final t = (u['tipoUsuario'] ?? u['tipo_usuario'] ?? '').toString().toLowerCase();
@@ -70,7 +71,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         return allowed.contains(t);
       }).map<Map<String,dynamic>>((u) => Map<String,dynamic>.from(u)).toList();
     } catch (e) {
-      _error = e.toString();
+      final msg = e is TimeoutException ? 'Timeout al cargar empleados (verifica conexión)' : e.toString();
+      _error = msg;
     } finally {
       if (mounted) setState(() { _loading = false; });
     }
@@ -149,7 +151,20 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
             child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                ? Center(child: Text('Error: $_error'))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.error_outline, size: 56, color: cs.error),
+                        const SizedBox(height: 12),
+                        Text('Error al cargar empleados', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.error)),
+                        const SizedBox(height: 8),
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(onPressed: _loadEmployees, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
+                      ]),
+                    ),
+                  )
                 : _filtered.isEmpty
                   ? Center(child: Text('No se encontraron empleados', style: Theme.of(context).textTheme.titleMedium))
                   : RefreshIndicator(

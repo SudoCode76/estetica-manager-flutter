@@ -93,19 +93,19 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
 
       // Si hay texto en el buscador, usar searchTickets (server-side) con paginación
       if (search.trim().isNotEmpty) {
-        final resp = await api.searchTickets(query: search.trim(), sucursalId: sucursalId, page: _page, pageSize: _pageSize);
+        final resp = await api.searchTickets(query: search.trim(), sucursalId: sucursalId, page: _page, pageSize: _pageSize).timeout(const Duration(seconds: 8));
         data = resp['items'] as List<dynamic>;
         final meta = resp['meta'] as Map<String, dynamic>? ?? {};
         _totalItems = (meta['total'] is int) ? meta['total'] as int : int.tryParse('${meta['total']}') ?? 0;
         _totalPages = (meta['totalPages'] is int) ? meta['totalPages'] as int : ( (_totalItems / _pageSize).ceil() );
       } else if (_selectedDateRange != null) {
-        data = await api.getTicketsByRange(start: _selectedDateRange!.start, end: _selectedDateRange!.end, sucursalId: sucursalId);
+        data = await api.getTicketsByRange(start: _selectedDateRange!.start, end: _selectedDateRange!.end, sucursalId: sucursalId).timeout(const Duration(seconds: 8));
         // Reseteamos paginación local cuando no hay búsqueda
         _totalItems = data.length;
         _totalPages = 1;
         _page = 1;
       } else {
-        data = await api.getAllTickets(sucursalId: sucursalId);
+        data = await api.getAllTickets(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
         _totalItems = data.length;
         _totalPages = 1;
         _page = 1;
@@ -119,9 +119,10 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
         });
       }
     } catch (e) {
+      final msg = (e is TimeoutException) ? 'Timeout al cargar tickets (verifica conexión)' : e.toString();
       if (mounted) {
         setState(() {
-          errorMsg = 'Error al cargar: $e';
+          errorMsg = 'Error al cargar: $msg';
           isLoading = false;
         });
       }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/repositories/cliente_repository.dart';
@@ -16,6 +17,7 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
   late TicketRepository _ticketRepo;
   late ClienteRepository _clienteRepo;
   bool _loading = true;
+  String? _error;
   List<dynamic> _clients = []; // all clients with history
   List<dynamic> _filteredClients = []; // clients after search
   SucursalProvider? _sucursalProvider;
@@ -63,11 +65,12 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
   }
 
   Future<void> _loadClientsHistory() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _error = null; });
     try {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
-      final tickets = await _ticketRepo.getTickets(sucursalId: sucursalId);
-      final clients = await _clienteRepo.searchClientes(sucursalId: sucursalId);
+      // Usar timeouts para evitar bloqueo indefinido
+      final tickets = await _ticketRepo.getTickets(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
+      final clients = await _clienteRepo.searchClientes(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
 
       // Map clientId -> totalPaid and flags/counters
       final Map<int, double> paidMap = {};
@@ -106,8 +109,9 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando historial: $e')));
+      final msg = e is TimeoutException ? 'Timeout al cargar historial (verifica conexión)' : e.toString();
+      setState(() { _loading = false; _error = msg; });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando historial: $msg')));
     }
   }
 
@@ -117,7 +121,7 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
 
       // Usar la nueva arquitectura: obtener tickets pendientes del cliente
-      final allTickets = await _ticketRepo.obtenerTicketsPendientes(sucursalId: sucursalId);
+      final allTickets = await _ticketRepo.obtenerTicketsPendientes(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
       final clientId = client['id'];
 
       // Filtrar tickets del cliente específico
@@ -217,8 +221,9 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
         },
       );
     } catch (e) {
+      final msg = e is TimeoutException ? 'Timeout al cargar pagos (verifica conexión)' : e.toString();
       setState(() => _loading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando pagos del cliente: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando pagos del cliente: $msg')));
     }
   }
 
@@ -229,10 +234,28 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
       appBar: AppBar(title: const Text('Clientes con historial de deuda')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
+          : (_error != null)
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 56, color: Theme.of(context).colorScheme.error),
+                        const SizedBox(height: 12),
+                        Text('Error al cargar historial', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.error)),
+                        const SizedBox(height: 8),
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(onPressed: _loadClientsHistory, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
+                      ],
+                    ),
+                  ),
+                )
+              : Padding(
+               padding: const EdgeInsets.all(12.0),
+               child: Column(
+                 children: [
                   // Search field
                   TextField(
                     controller: _searchCtrl,
