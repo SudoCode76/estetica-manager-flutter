@@ -3,7 +3,7 @@ import 'reporte_ventas_screen.dart';
 import 'package:app_estetica/config/responsive.dart';
 
 class ReportsScreen extends StatelessWidget {
-  const ReportsScreen({Key? key}) : super(key: key);
+  const ReportsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 
 class AllTicketsScreen extends StatefulWidget {
   const AllTicketsScreen({super.key});
@@ -16,7 +16,7 @@ class AllTicketsScreen extends StatefulWidget {
 }
 
 class _AllTicketsScreenState extends State<AllTicketsScreen> {
-  final ApiService api = ApiService();
+  late TicketRepository api;
   final TextEditingController _searchController = TextEditingController();
 
   // Datos
@@ -57,6 +57,8 @@ class _AllTicketsScreenState extends State<AllTicketsScreen> {
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
+      // obtener repo inyectado
+      api = Provider.of<TicketRepository>(context, listen: false);
       _page = 1;
       fetchTickets();
     }

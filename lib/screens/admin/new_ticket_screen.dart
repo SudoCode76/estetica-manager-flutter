@@ -1,8 +1,12 @@
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/catalog_repository.dart';
+import 'package:app_estetica/repositories/cliente_repository.dart';
+import 'package:app_estetica/repositories/auth_repository.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/select_client_screen.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
@@ -15,14 +19,17 @@ import 'package:app_estetica/config/responsive.dart';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
-  const NewTicketScreen({Key? key, this.currentUserId}) : super(key: key);
+  const NewTicketScreen({super.key, this.currentUserId});
 
   @override
   State<NewTicketScreen> createState() => _NewTicketScreenState();
 }
 
 class _NewTicketScreenState extends State<NewTicketScreen> {
-   final ApiService api = ApiService();
+   late CatalogRepository _catalogRepo;
+   late ClienteRepository _clienteRepo;
+   late AuthRepository _authRepo;
+   late TicketRepository _ticketRepo;
    DateTime? fecha;
    List<int> tratamientosSeleccionados = [];
    Map<int, int> cantidadSesionesPorTratamiento = {}; // cantidad de sesiones por tratamiento
@@ -86,6 +93,11 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        _sucursalProvider?.removeListener(_onSucursalChanged);
        _sucursalProvider = provider;
        _sucursalProvider?.addListener(_onSucursalChanged);
+       // Obtener repos inyectados
+       _catalogRepo = Provider.of<CatalogRepository>(context, listen: false);
+       _clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
+       _authRepo = Provider.of<AuthRepository>(context, listen: false);
+       _ticketRepo = Provider.of<TicketRepository>(context, listen: false);
        _loadClientsForSucursal();
        _loadUsuariosForSucursal();
      }
@@ -135,7 +147,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
          }
        }
      } catch (e) {
-       print('Error cargando tipo de usuario: $e');
+       if (kDebugMode) debugPrint('Error cargando tipo de usuario: $e');
      } finally {
        // IMPORTANTE: marcar que ya se cargó el tipo de usuario
        setState(() {
@@ -179,21 +191,21 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        error = null;
      });
      try {
-       print('NewTicketScreen: Cargando categorías...');
-       final cats = await api.getCategorias();
+       if (kDebugMode) debugPrint('NewTicketScreen: Cargando categorías...');
+       final cats = await _catalogRepo.getCategorias();
        // Filtrar solo categorías activas (estadoCategoria == true o null->assume active)
        categorias = List<dynamic>.from(cats.where((c) => c['estadoCategoria'] == true || c['estadoCategoria'] == null));
-       print('NewTicketScreen: ${categorias.length} categorías activas cargadas (de ${cats.length})');
+       if (kDebugMode) debugPrint('NewTicketScreen: ${categorias.length} categorías activas cargadas (de ${cats.length})');
 
-       print('NewTicketScreen: Cargando tratamientos...');
-       final tr = await api.getTratamientos(); // Cargar tratamientos
+       if (kDebugMode) debugPrint('NewTicketScreen: Cargando tratamientos...');
+       final tr = await _catalogRepo.getTratamientos(); // Cargar tratamientos
        // Filtrar solo tratamientos activos
        tratamientos = List<dynamic>.from(tr.where((t) => t['estadoTratamiento'] == true || t['estadoTratamiento'] == null));
-       print('NewTicketScreen: ${tratamientos.length} tratamientos activos cargados (de ${tr.length})');
+       if (kDebugMode) debugPrint('NewTicketScreen: ${tratamientos.length} tratamientos activos cargados (de ${tr.length})');
 
        // no cargamos clientes ni usuarios aquí; se cargan por sucursal cuando el provider esté listo
      } catch (e) {
-       print('NewTicketScreen: Error al cargar datos: $e');
+       if (kDebugMode) debugPrint('NewTicketScreen: Error al cargar datos: $e');
        error = 'Error al cargar datos: $e';
        if (mounted) {
          ScaffoldMessenger.of(context).showSnackBar(
@@ -214,26 +226,26 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      });
 
      final sucId = _sucursalProvider?.selectedSucursalId;
-     print('NewTicketScreen: _loadUsuariosForSucursal called with sucursalId=$sucId');
-     print('NewTicketScreen: Current usuarioId=$usuarioId, _isEmployee=$_isEmployee');
+     if (kDebugMode) debugPrint('NewTicketScreen: _loadUsuariosForSucursal called with sucursalId=$sucId');
+     if (kDebugMode) debugPrint('NewTicketScreen: Current usuarioId=$usuarioId, _isEmployee=$_isEmployee');
      try {
-       final data = await api.getUsuarios(sucursalId: sucId);
-       print('NewTicketScreen: Loaded ${data.length} usuarios');
-       print('NewTicketScreen: Usuario IDs en lista: ${data.map((u) => u['id']).toList()}');
+       final data = await _authRepo.getUsuarios(sucursalId: sucId);
+       if (kDebugMode) debugPrint('NewTicketScreen: Loaded ${data.length} usuarios');
+       if (kDebugMode) debugPrint('NewTicketScreen: Usuario IDs en lista: ${data.map((u) => u['id']).toList()}');
        setState(() {
          usuarios = data;
          isLoadingUsuarios = false;
          // si el usuario seleccionado no pertenece a esta sucursal, limpiarlo
          if (usuarioId != null && !usuarios.any((u) => u['id'] == usuarioId)) {
-           print('NewTicketScreen: ⚠️ Clearing usuarioId=$usuarioId (not in filtered list)');
+           if (kDebugMode) debugPrint('NewTicketScreen: ⚠️ Clearing usuarioId=$usuarioId (not in filtered list)');
            usuarioId = null;
          } else if (usuarioId != null) {
-           print('NewTicketScreen: ✓ usuarioId=$usuarioId está en la lista');
+           if (kDebugMode) debugPrint('NewTicketScreen: ✓ usuarioId=$usuarioId está en la lista');
          }
        });
      } catch (e) {
        final msg = e.toString();
-       print('NewTicketScreen: ❌ Error loading usuarios: $msg');
+       if (kDebugMode) debugPrint('NewTicketScreen: ❌ Error loading usuarios: $msg');
        setState(() {
          isLoadingUsuarios = false;
        });
@@ -251,7 +263,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        return;
      }
      try {
-       final data = await api.getClientes(sucursalId: _sucursalProvider!.selectedSucursalId, query: query);
+       final data = await _clienteRepo.searchClientes(sucursalId: _sucursalProvider!.selectedSucursalId, query: query);
        setState(() {
          clientes = data;
        });
@@ -595,9 +607,9 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
           },
         );
 
-        print('NewTicketScreen: Creating venta - cliente=$clienteId, sucursal=$sucursalId, total=$totalVenta, pago=$pago');
-        print('NewTicketScreen: Items carrito: ${itemsCarrito.map((i) => "${i['nombreTratamiento']} x${i['cantidad_sesiones']} sesiones").join(", ")}');
-        print('NewTicketScreen: Cronogramas: ${itemsCarrito.map((i) => "${i['nombreTratamiento']}: ${(i['cronograma_sesiones'] as List).map((f) => DateFormat('dd/MM HH:mm').format(f)).join(', ')}").join(" | ")}');
+        if (kDebugMode) debugPrint('NewTicketScreen: Creating venta - cliente=$clienteId, sucursal=$sucursalId, total=$totalVenta, pago=$pago');
+        if (kDebugMode) debugPrint('NewTicketScreen: Items carrito: ${itemsCarrito.map((i) => "${i['nombreTratamiento']} x${i['cantidad_sesiones']} sesiones").join(", ")}');
+        if (kDebugMode) debugPrint('NewTicketScreen: Cronogramas: ${itemsCarrito.map((i) => "${i['nombreTratamiento']}: ${(i['cronograma_sesiones'] as List).map((f) => DateFormat('dd/MM HH:mm').format(f)).join(', ')}").join(" | ")}');
 
        // Validación adicional: pago no puede superar el totalVenta
        if (pago != null && pago! > totalVenta) {
@@ -609,7 +621,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        }
 
        // 5. LLAMAR AL SERVICIO (Transacción atómica)
-         await api.registrarVenta(
+         await _ticketRepo.registrarVenta(
            clienteId: clienteId!,
            sucursalId: sucursalId, // Ahora obligatorio
            totalVenta: totalVenta,
@@ -631,10 +643,10 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
            try {
              final sucId = _sucursalProvider?.selectedSucursalId;
              if (sucId != null) {
-               await context.read<TicketProvider>().fetchAgenda(DateTime.now(), sucursalId: sucId);
+               await Provider.of<TicketProvider>(context, listen: false).fetchAgenda(DateTime.now(), sucursalId: sucId);
              }
            } catch (e) {
-             print('NewTicketScreen: Error al refrescar agenda: $e');
+             if (kDebugMode) debugPrint('NewTicketScreen: Error al refrescar agenda: $e');
            }
 
            // Volver a la pantalla anterior
@@ -643,7 +655,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
      } catch (e) {
        // Mostrar error real (útil para depurar RPC)
        final msg = e.toString();
-       print('NewTicketScreen: Error creando venta: $msg');
+       if (kDebugMode) debugPrint('NewTicketScreen: Error creando venta: $msg');
 
        setState(() {
          validationError = 'Error al crear venta: ${msg.replaceAll('Exception: ', '')}';
@@ -1001,13 +1013,13 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                      child: FilledButton.icon(
                                        onPressed: () async {
                                          // Debug: ver qué sucursal tiene el provider
-                                         print('NewTicketScreen: _sucursalProvider = $_sucursalProvider');
-                                         print('NewTicketScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
-                                         print('NewTicketScreen: selectedSucursalName = ${_sucursalProvider?.selectedSucursalName}');
+                                         if (kDebugMode) debugPrint('NewTicketScreen: _sucursalProvider = $_sucursalProvider');
+                                         if (kDebugMode) debugPrint('NewTicketScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+                                         if (kDebugMode) debugPrint('NewTicketScreen: selectedSucursalName = ${_sucursalProvider?.selectedSucursalName}');
 
                                          // Validar que haya provider
                                          if (_sucursalProvider == null) {
-                                           print('NewTicketScreen: ERROR - _sucursalProvider is NULL!');
+                                           if (kDebugMode) debugPrint('NewTicketScreen: ERROR - _sucursalProvider is NULL!');
                                            ScaffoldMessenger.of(context).showSnackBar(
                                              const SnackBar(content: Text('Error: Provider no disponible. Intenta reiniciar la app.')),
                                            );
@@ -1016,14 +1028,14 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
 
                                          // Validar que haya sucursal seleccionada
                                          if (_sucursalProvider?.selectedSucursalId == null) {
-                                           print('NewTicketScreen: ERROR - selectedSucursalId is NULL!');
+                                           if (kDebugMode) debugPrint('NewTicketScreen: ERROR - selectedSucursalId is NULL!');
                                            ScaffoldMessenger.of(context).showSnackBar(
                                              const SnackBar(content: Text('Selecciona una sucursal en el menú lateral antes de continuar')),
                                            );
                                            return;
                                          }
 
-                                         print('NewTicketScreen: Opening SelectClientScreen with sucursalId=${_sucursalProvider?.selectedSucursalId}');
+                                         if (kDebugMode) debugPrint('NewTicketScreen: Opening SelectClientScreen with sucursalId=${_sucursalProvider?.selectedSucursalId}');
                                          final selected = await Navigator.push(
                                            context,
                                            MaterialPageRoute(builder: (context) => SelectClientScreen(sucursalId: _sucursalProvider!.selectedSucursalId!)),

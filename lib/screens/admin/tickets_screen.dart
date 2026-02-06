@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
-import 'package:app_estetica/services/api_service.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'package:flutter/foundation.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -16,7 +16,6 @@ class TicketsScreen extends StatefulWidget {
 }
 
 class _TicketsScreenState extends State<TicketsScreen> {
-  final ApiService api = ApiService();
   final TextEditingController _searchController = TextEditingController();
   String search = '';
   String? errorMsg;
@@ -67,14 +66,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
     if (!mounted) return;
 
     try {
-      final ticketProvider = context.read<TicketProvider>();
+      final ticketProvider = Provider.of<TicketProvider>(context, listen: false);
       // Cargar tickets del día actual
       await ticketProvider.fetchTickets(
         sucursalId: _sucursalProvider?.selectedSucursalId,
       );
     } catch (e) {
       // Registrar pero no interrumpir UI
-      print('TicketsScreen: Error recargando tickets: $e');
+      if (kDebugMode) debugPrint('TicketsScreen: Error recargando tickets: $e');
       if (mounted) {
         setState(() {
           errorMsg = 'Error al cargar tickets: $e';
@@ -118,7 +117,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
       // Quick local match on already-loaded provider tickets
       try {
-        final providerTickets = context.read<TicketProvider>().tickets;
+        final providerTickets = Provider.of<TicketProvider>(context, listen: false).tickets;
         if (providerTickets.isNotEmpty && search.trim().isNotEmpty) {
           final term = _normalize(search);
           final localMatches = providerTickets.where((t) {
@@ -148,7 +147,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
       // Server-side search (paginated)
       try {
         if (_sucursalProvider?.selectedSucursalId == null) return;
-        final resp = await api.searchTickets(query: search.trim(), sucursalId: _sucursalProvider!.selectedSucursalId!, page: 1, pageSize: 50);
+        final resp = await Provider.of<TicketProvider>(context, listen: false).searchTickets(query: search.trim(), sucursalId: _sucursalProvider!.selectedSucursalId!, page: 1, pageSize: 50);
         final items = resp['items'] as List<dynamic>? ?? [];
         setState(() {
           _searchResults = items;
@@ -298,7 +297,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
         return;
       }
 
-      await context.read<TicketProvider>().fetchTicketsByRange(
+      await Provider.of<TicketProvider>(context, listen: false).fetchTicketsByRange(
         start: _rangeStart!,
         end: _rangeEnd!,
         sucursalId: _sucursalProvider!.selectedSucursalId!,
@@ -460,7 +459,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               FilledButton.icon(
                                 onPressed: () {
                                   // Forzar recarga
-                                  context.read<TicketProvider>().clearError();
+                                  Provider.of<TicketProvider>(context, listen: false).clearError();
                                   _onRefreshPressed();
                                 },
                                 icon: const Icon(Icons.refresh),

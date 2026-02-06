@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:app_estetica/config/responsive.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -57,47 +57,47 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     });
 
     try {
-      print('=== Iniciando login con email: ${_emailController.text} ===');
+      debugPrint('=== Iniciando login con email: ${_emailController.text} ===');
       final result = await _authService.login(
         _emailController.text,
         _passwordController.text,
       );
 
-      print('=== Login exitoso, resultado: $result ===');
-      
+      debugPrint('=== Login exitoso, resultado: $result ===');
+
       final user = result['user'];
-      print('=== Usuario obtenido: $user ===');
-      
+      debugPrint('=== Usuario obtenido: $user ===');
+
       final userType = user['tipoUsuario'];
-      print('=== Tipo de usuario: $userType ===');
+      debugPrint('=== Tipo de usuario: $userType ===');
 
       // Guardar sesión en SharedPreferences
       await _authService.saveSessionToPrefs(result);
 
-      print('=== Datos guardados en SharedPreferences ===');
+      debugPrint('=== Datos guardados en SharedPreferences ===');
 
       if (!mounted) return;
 
       // Navegar según el tipo de usuario
       if (userType == 'admin' || userType == 'administrador' || userType == 'gerente') {
-        print('=== Navegando a AdminHomeScreen ===');
+        debugPrint('=== Navegando a AdminHomeScreen ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
         );
       } else if (userType == 'empleado' || userType == 'vendedor') {
-        print('=== Navegando a AdminHomeScreen (modo empleado) ===');
+        debugPrint('=== Navegando a AdminHomeScreen (modo empleado) ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen(isEmployee: true)),
         );
       } else {
-        print('=== Tipo de usuario desconocido: $userType, usando modo administrador ===');
+        debugPrint('=== Tipo de usuario desconocido: $userType, usando modo administrador ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
         );
       }
     } catch (e, stackTrace) {
-      print('=== ERROR EN LOGIN: $e ===');
-      print('=== STACK TRACE: $stackTrace ===');
+      debugPrint('=== ERROR EN LOGIN: ${e.toString()} ===');
+      debugPrint('=== STACK TRACE: $stackTrace ===');
       setState(() {
         if (e.toString().contains('Credenciales inválidas') ||
             e.toString().contains('Invalid login credentials') ||
@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           } else {
             _errorMessage = 'Error: $errorMsg';
           }
-          print('=== Error específico mostrado al usuario: $_errorMessage ===');
+          debugPrint('=== Error específico mostrado al usuario: $_errorMessage ===');
         }
         _isLoading = false;
       });

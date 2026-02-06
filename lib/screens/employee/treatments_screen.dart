@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
 
 class EmployeeTreatmentsScreen extends StatelessWidget {
-  const EmployeeTreatmentsScreen({Key? key}) : super(key: key);
+  const EmployeeTreatmentsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

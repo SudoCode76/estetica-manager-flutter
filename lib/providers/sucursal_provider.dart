@@ -10,12 +10,12 @@ class SucursalProvider extends ChangeNotifier {
   String? get selectedSucursalName => _selectedSucursalName;
 
   SucursalProvider() {
-    print('SucursalProvider: Constructor called');
+    debugPrint('SucursalProvider: Constructor called');
     _loadFromPrefs();
   }
 
   void setSucursal(int id, String name) {
-    print('SucursalProvider: setSucursal called with id=$id, name=$name');
+    debugPrint('SucursalProvider: setSucursal called with id=$id, name=$name');
     _selectedSucursalId = id;
     _selectedSucursalName = name;
     _wasSetManually = true; // Marcar que fue establecido manualmente
@@ -24,7 +24,7 @@ class SucursalProvider extends ChangeNotifier {
   }
 
   void clearSucursal() {
-    print('SucursalProvider: clearSucursal called');
+    debugPrint('SucursalProvider: clearSucursal called');
     _selectedSucursalId = null;
     _selectedSucursalName = null;
     _wasSetManually = false; // Reset flag al limpiar
@@ -37,33 +37,33 @@ class SucursalProvider extends ChangeNotifier {
     if (_selectedSucursalId != null) {
       await prefs.setInt('selectedSucursalId', _selectedSucursalId!);
       await prefs.setString('selectedSucursalName', _selectedSucursalName ?? '');
-      print('SucursalProvider: Saved to prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
+      debugPrint('SucursalProvider: Saved to prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
     } else {
       await prefs.remove('selectedSucursalId');
       await prefs.remove('selectedSucursalName');
-      print('SucursalProvider: Removed from prefs');
+      debugPrint('SucursalProvider: Removed from prefs');
     }
   }
 
   Future<void> _loadFromPrefs() async {
-    print('SucursalProvider: _loadFromPrefs started');
+    debugPrint('SucursalProvider: _loadFromPrefs started');
     // No sobrescribir si ya fue establecido manualmente
     if (_wasSetManually) {
-      print('SucursalProvider: Skipping _loadFromPrefs - value was set manually');
+      debugPrint('SucursalProvider: Skipping _loadFromPrefs - value was set manually');
       return;
     }
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getInt('selectedSucursalId');
     final name = prefs.getString('selectedSucursalName');
-    print('SucursalProvider: Loaded from prefs - id=$id, name=$name');
+    debugPrint('SucursalProvider: Loaded from prefs - id=$id, name=$name');
     // Solo establecer si no fue establecido manualmente mientras tanto
     if (id != null && !_wasSetManually) {
       _selectedSucursalId = id;
       _selectedSucursalName = name;
       notifyListeners();
-      print('SucursalProvider: Set from prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
+      debugPrint('SucursalProvider: Set from prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
     } else {
-      print('SucursalProvider: No saved sucursal in prefs or was set manually');
+      debugPrint('SucursalProvider: No saved sucursal in prefs or was set manually');
     }
   }
 }

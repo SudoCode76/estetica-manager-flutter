@@ -10,7 +10,7 @@ import 'package:app_estetica/screens/admin/employees_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/services/supabase_auth_service.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,7 +21,7 @@ import 'package:app_estetica/providers/ticket_provider.dart';
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;
 
-  const AdminHomeScreen({Key? key, this.isEmployee = false}) : super(key: key);
+  const AdminHomeScreen({super.key, this.isEmployee = false});
 
   @override
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
@@ -30,7 +30,7 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _selectedIndex = 0;
   SucursalProvider? _sucursalProvider;
-  final ApiService _api = ApiService();
+  late CatalogRepository _catalogRepo;
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
   bool _isInitialized = false; // NUEVO: controla si está listo para mostrar pantallas
@@ -100,7 +100,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         }
       }
     } catch (e) {
-      print('AdminHomeScreen: Error extrayendo sucursal: $e');
+      debugPrint('AdminHomeScreen: Error extrayendo sucursal: $e');
     }
     return null;
   }
@@ -111,7 +111,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final userString = prefs.getString('user');
       if (userString != null) {
         final user = jsonDecode(userString);
-        print('AdminHomeScreen: Empleado data: $user');
+        debugPrint('AdminHomeScreen: Empleado data: $user');
         _employeeData = user;
 
         if (user['sucursal'] != null) {
@@ -119,15 +119,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           if (extracted != null) {
             _employeeSucursalId = extracted['id'];
             _employeeSucursalName = extracted['nombreSucursal'] ?? 'Sin nombre';
-            print('AdminHomeScreen: Sucursal del empleado (extraida): $_employeeSucursalId - $_employeeSucursalName');
+            debugPrint('AdminHomeScreen: Sucursal del empleado (extraida): $_employeeSucursalId - $_employeeSucursalName');
           } else {
-            print('AdminHomeScreen: Warning: user.sucursal exists but could not extract');
+            debugPrint('AdminHomeScreen: Warning: user.sucursal exists but could not extract');
           }
         }
         return user;
       }
     } catch (e) {
-      print('AdminHomeScreen: Error cargando datos empleado: $e');
+      debugPrint('AdminHomeScreen: Error cargando datos empleado: $e');
     }
     return null;
   }
@@ -137,9 +137,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     super.didChangeDependencies();
     if (_sucursalProvider == null) {
       _sucursalProvider = SucursalInherited.of(context);
-      print('AdminHomeScreen: Got provider from context: $_sucursalProvider');
-      print('AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}');
-      print('AdminHomeScreen: isEmployee: ${widget.isEmployee}');
+      // Obtener repositorios inyectados
+      _catalogRepo = Provider.of<CatalogRepository>(context, listen: false);
+      debugPrint('AdminHomeScreen: Got provider from context: $_sucursalProvider');
+      debugPrint('AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint('AdminHomeScreen: isEmployee: ${widget.isEmployee}');
 
       // Inicializar según el tipo de usuario
       _initializeForUserType();
@@ -147,29 +149,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _initializeForUserType() async {
-    print('AdminHomeScreen: _initializeForUserType started, isEmployee=${widget.isEmployee}');
+    debugPrint('AdminHomeScreen: _initializeForUserType started, isEmployee=${widget.isEmployee}');
 
     // Cargar datos del usuario siempre (necesario tanto para admin como employee)
-    print('AdminHomeScreen: Cargando datos del usuario (común)');
+    debugPrint('AdminHomeScreen: Cargando datos del usuario (común)');
     await _loadEmployeeData();
 
     if (widget.isEmployee) {
       // Para empleado: primero limpiar cualquier sucursal anterior
-      print('AdminHomeScreen: Limpiando sucursal anterior...');
+      debugPrint('AdminHomeScreen: Limpiando sucursal anterior...');
       _sucursalProvider?.clearSucursal();
 
       // Esperar un poco para que se limpie
       await Future.delayed(const Duration(milliseconds: 50));
 
       // Luego cargar datos y establecer sucursal del empleado
-      print('AdminHomeScreen: Cargando datos del empleado...');
+      debugPrint('AdminHomeScreen: Cargando datos del empleado...');
       await _loadEmployeeData();
 
-      print('AdminHomeScreen: Estableciendo sucursal del empleado...');
+      debugPrint('AdminHomeScreen: Estableciendo sucursal del empleado...');
       await _setupEmployeeSucursal();
 
       // Verificar que se estableció correctamente
-      print('AdminHomeScreen: Sucursal después de setup: ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint('AdminHomeScreen: Sucursal después de setup: ${_sucursalProvider?.selectedSucursalId}');
     } else {
       // Para admin: cargar todas las sucursales
       await _loadSucursales();
@@ -177,7 +179,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     // Marcar como inicializado DESPUÉS de establecer la sucursal
     if (mounted) {
-      print('AdminHomeScreen: Marcando como inicializado');
+      debugPrint('AdminHomeScreen: Marcando como inicializado');
       setState(() {
         _isInitialized = true;
       });
@@ -185,7 +187,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _setupEmployeeSucursal() async {
-    print('AdminHomeScreen: _setupEmployeeSucursal started');
+    debugPrint('AdminHomeScreen: _setupEmployeeSucursal started');
 
     // Esperar a que se carguen los datos del empleado si aún no están listos
     if (_employeeSucursalId == null) {
@@ -193,7 +195,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
 
     if (_employeeSucursalId != null && _employeeSucursalName != null) {
-      print('AdminHomeScreen: ✓ Estableciendo sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
+      debugPrint('AdminHomeScreen: ✓ Estableciendo sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
       _sucursalProvider?.setSucursal(_employeeSucursalId!, _employeeSucursalName!);
 
       // Crear lista de sucursales con solo la del empleado (para mostrar en el drawer)
@@ -206,19 +208,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       await Future.delayed(const Duration(milliseconds: 100));
 
       // Verificar que la sucursal se estableció correctamente
-      print('AdminHomeScreen: Sucursal en provider después de setup: ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint('AdminHomeScreen: Sucursal en provider después de setup: ${_sucursalProvider?.selectedSucursalId}');
     } else {
-      print('AdminHomeScreen: ⚠️ Empleado sin sucursal asignada');
+      debugPrint('AdminHomeScreen: ⚠️ Empleado sin sucursal asignada');
       _isLoadingSucursales = false;
     }
   }
 
   Future<void> _loadSucursales() async {
-    print('AdminHomeScreen: _loadSucursales started');
-    print('AdminHomeScreen: Provider selectedSucursalId ANTES de cargar = ${_sucursalProvider?.selectedSucursalId}');
+    debugPrint('AdminHomeScreen: _loadSucursales started');
+    debugPrint('AdminHomeScreen: Provider selectedSucursalId ANTES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     try {
-      final sucursales = await _api.getSucursales();
-      print('AdminHomeScreen: Loaded ${sucursales.length} sucursales');
+      final sucursales = await _catalogRepo.getSucursales();
+      debugPrint('AdminHomeScreen: Loaded ${sucursales.length} sucursales');
       // Guardar cache local de sucursales para fallback si el servidor está lento
       await _saveSucursalesCache(sucursales);
       setState(() {
@@ -226,23 +228,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         _isLoadingSucursales = false;
         // Sólo seleccionar la primera sucursal si no hay selección previa persistida
         if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
-          print('AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}');
+          debugPrint('AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}');
           _sucursalProvider?.setSucursal(
             _sucursales.first['id'],
             _sucursales.first['nombreSucursal'],
           );
         } else {
-          print('AdminHomeScreen: Sucursal ya establecida: ${_sucursalProvider?.selectedSucursalId} - ${_sucursalProvider?.selectedSucursalName}');
+          debugPrint('AdminHomeScreen: Sucursal ya establecida: ${_sucursalProvider?.selectedSucursalId} - ${_sucursalProvider?.selectedSucursalName}');
         }
       });
-      print('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
     } catch (e) {
-      print('AdminHomeScreen: Error loading sucursales: $e');
+      debugPrint('AdminHomeScreen: Error loading sucursales: $e');
 
       // Llamar a la función de debug para obtener detalles e informar al usuario
       try {
-        final s = await _api.getSucursales();
-        print('AdminHomeScreen: debug getSucursales returned ${s.length} items');
+        final s = await _catalogRepo.getSucursales();
+        debugPrint('AdminHomeScreen: debug getSucursales returned ${s.length} items');
         if (mounted) {
           showDialog<void>(
             context: context,
@@ -254,13 +256,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           );
         }
       } catch (debugErr) {
-        print('AdminHomeScreen: Error al ejecutar getSucursales debug: $debugErr');
+        debugPrint('AdminHomeScreen: Error al ejecutar getSucursales debug: $debugErr');
       }
 
       // Intentar cargar desde caché local
       final cached = await _loadSucursalesCache();
       if (cached != null && cached.isNotEmpty) {
-        print('AdminHomeScreen: Using cached sucursales (${cached.length}) as fallback');
+        debugPrint('AdminHomeScreen: Using cached sucursales (${cached.length}) as fallback');
         setState(() {
           _sucursales = cached;
           _isLoadingSucursales = false;
@@ -286,9 +288,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final s = jsonEncode(sucursales);
       await prefs.setString('cachedSucursales', s);
-      print('AdminHomeScreen: Saved ${sucursales.length} sucursales to cache');
+      debugPrint('AdminHomeScreen: Saved ${sucursales.length} sucursales to cache');
     } catch (e) {
-      print('AdminHomeScreen: Error saving sucursales cache: $e');
+      debugPrint('AdminHomeScreen: Error saving sucursales cache: $e');
     }
   }
 
@@ -301,7 +303,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final decoded = jsonDecode(s) as List<dynamic>;
       return decoded;
     } catch (e) {
-      print('AdminHomeScreen: Error loading sucursales cache: $e');
+      debugPrint('AdminHomeScreen: Error loading sucursales cache: $e');
       return null;
     }
   }
@@ -346,7 +348,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     );
                   }
                 } catch (e) {
-                  print('Error al cerrar sesión: $e');
+                  debugPrint('Error al cerrar sesión: $e');
                   // Aún así navegar al login
                   if (mounted) {
                     Navigator.pushReplacement(
@@ -849,7 +851,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       if (result == true) {
                         // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
                         try {
-                          await context.read<TicketProvider>().fetchCurrent();
+                          await Provider.of<TicketProvider>(context, listen: false).fetchCurrent();
                         } catch (e) {
                           setState(() {});
                         }
@@ -886,7 +888,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     if (result == true) {
                       // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
                       try {
-                        await context.read<TicketProvider>().fetchCurrent();
+                        await Provider.of<TicketProvider>(context, listen: false).fetchCurrent();
                       } catch (e) {
                         setState(() {});
                       }

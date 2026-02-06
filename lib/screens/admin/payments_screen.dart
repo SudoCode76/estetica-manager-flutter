@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:provider/provider.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/payment_detail_screen.dart' as pd;
 import 'package:app_estetica/screens/admin/payments_history_screen.dart';
@@ -7,14 +8,14 @@ import 'package:app_estetica/screens/admin/payments_history_screen.dart';
 
 
 class PaymentsScreen extends StatefulWidget {
-  const PaymentsScreen({Key? key}) : super(key: key);
+  const PaymentsScreen({super.key});
 
   @override
   State<PaymentsScreen> createState() => _PaymentsScreenState();
 }
 
 class _PaymentsScreenState extends State<PaymentsScreen> {
-  final ApiService _api = ApiService();
+  late TicketRepository _api;
   List<dynamic> _clients = [];
   bool _loading = true;
   SucursalProvider? _sucursalProvider;
@@ -24,6 +25,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     super.didChangeDependencies();
     if (_sucursalProvider == null) {
       _sucursalProvider = SucursalInherited.of(context);
+      _api = Provider.of<TicketRepository>(context, listen: false);
       _loadClientsWithDebt();
     }
   }

@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../../repositories/report_repository.dart';
 import '../../providers/sucursal_provider.dart';
 import 'package:app_estetica/navigation/route_observer.dart';
 import 'package:app_estetica/widgets/report_chart.dart';
 
 class ReporteRangoScreen extends StatefulWidget {
-  const ReporteRangoScreen({Key? key}) : super(key: key);
+  const ReporteRangoScreen({super.key});
 
   @override
   State<ReporteRangoScreen> createState() => _ReporteRangoScreenState();
 }
 
 class _ReporteRangoScreenState extends State<ReporteRangoScreen> with RouteAware {
-  final ApiService _api = ApiService();
+  late ReportRepository _reportRepo;
   Map<String, dynamic>? _report;
   bool _loading = false;
   String? _error;
@@ -42,6 +43,7 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> with RouteAware
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _reportRepo = Provider.of<ReportRepository>(context, listen: false);
     final provider = SucursalInherited.of(context);
     if (provider != _sucursalProvider) {
       _sucursalProvider?.removeListener(_onSucursalChanged);
@@ -76,7 +78,7 @@ class _ReporteRangoScreenState extends State<ReporteRangoScreen> with RouteAware
       _error = null;
     });
     try {
-      final r = await _api.getDailyReport(start: _start, end: _end, sucursalId: _sucursalId);
+      final r = await _reportRepo.getDailyReport(start: _start, end: _end, sucursalId: _sucursalId);
       setState(() => _report = r);
     } catch (e) {
       setState(() => _error = e.toString());

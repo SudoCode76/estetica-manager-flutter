@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/config/responsive.dart';
+import 'package:provider/provider.dart';
 
 class CreateClientDialog extends StatefulWidget {
   final int sucursalId;
 
   const CreateClientDialog({
-    Key? key,
+    super.key,
     required this.sucursalId,
-  }) : super(key: key);
+  });
 
   @override
   State<CreateClientDialog> createState() => _CreateClientDialogState();
@@ -29,7 +30,6 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
   final _apellidoController = TextEditingController();
   final _telefonoController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  final _api = ApiService();
 
   @override
   void dispose() {
@@ -77,12 +77,12 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
         'sucursal_id': widget.sucursalId, // SIEMPRE incluir la sucursal (clave DB)
       };
 
-      print('CreateClientDialog: Creando cliente con sucursal=${widget.sucursalId}');
-      print('CreateClientDialog: Datos: $nuevo');
+      debugPrint('CreateClientDialog: Creando cliente en sucursal=${widget.sucursalId}');
+      debugPrint('CreateClientDialog: Datos: $nuevo');
 
-      final creado = await _api.crearCliente(nuevo);
+      final creado = await Provider.of<ClienteRepository>(context, listen: false).crearCliente(nuevo);
 
-      print('CreateClientDialog: Cliente creado exitosamente: ${creado['id']}');
+      debugPrint('CreateClientDialog: Cliente creado exitosamente');
 
       // Cerrar loading
       if (mounted) Navigator.pop(context);
@@ -107,8 +107,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
         );
       }
     } catch (e) {
-      print('CreateClientDialog: Error al crear cliente: $e');
-
+      debugPrint('CreateClientDialog: Error al crear cliente: ${e.toString()}');
       // Cerrar loading
       if (mounted) Navigator.pop(context);
 

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../repositories/report_repository.dart';
 
 class ReportProvider extends ChangeNotifier {
-  final ApiService api;
+  final ReportRepository repo;
 
-  ReportProvider({required this.api});
+  ReportProvider({required this.repo});
 
   bool isLoading = false;
   String? error;
@@ -24,7 +24,7 @@ class ReportProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      dailyReport = await api.getDailyReport(start: start, end: end, sucursalId: sucursalId);
+      dailyReport = await repo.getDailyReport(start: start, end: end, sucursalId: sucursalId);
     } catch (e) {
       error = e.toString();
       dailyReport = null;
@@ -38,7 +38,7 @@ class ReportProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      debtList = await api.getDebtReport(sucursalId: sucursalId);
+      debtList = await repo.getDebtReport(sucursalId: sucursalId);
     } catch (e) {
       error = e.toString();
       debtList = null;
@@ -49,7 +49,7 @@ class ReportProvider extends ChangeNotifier {
 
   Future<Map<String, dynamic>?> fetchClientDetail(int clientId) async {
     try {
-      final r = await api.getClientReport(clientId);
+      final r = await repo.getClientReport(clientId);
       return r;
     } catch (e) {
       error = e.toString();
@@ -70,7 +70,7 @@ class ReportProvider extends ChangeNotifier {
     }
 
     try {
-      final res = await api.getPagosPaginated(start: start, end: end, sucursalId: sucursalId, page: page, pageSize: pageSize);
+      final res = await repo.getPagosPaginated(start: start, end: end, sucursalId: sucursalId, page: page, pageSize: pageSize);
       final items = List<dynamic>.from(res['items'] ?? []);
       final meta = res['meta'] ?? {};
 

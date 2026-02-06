@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_estetica/services/share_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ticket;
@@ -16,7 +18,7 @@ class TicketDetailScreen extends StatefulWidget {
 }
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
-  final ApiService api = ApiService();
+  // Usar el TicketRepository inyectado por Provider cuando sea necesario
   final GlobalKey _ticketKey = GlobalKey();
   bool isUpdating = false;
   bool localeReady = false;
@@ -45,7 +47,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         _isEmployee = userType == 'empleado';
       });
     } catch (e) {
-      print('Error cargando tipo de usuario: $e');
+      if (kDebugMode) debugPrint('Error cargando tipo de usuario: $e');
     }
   }
 
@@ -67,7 +69,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         final id = widget.ticket['id']?.toString() ?? widget.ticket['documentId']?.toString();
         if (id != null) {
           try {
-            final resp = await api.obtenerTicketDetalle(id.toString());
+            final repo = Provider.of<TicketRepository>(context, listen: false);
+            final resp = await repo.obtenerTicketDetalle(id.toString());
             if (resp != null) {
               setState(() {
                 _detailedTicket = resp;
@@ -78,7 +81,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             setState(() {
               _detailError = e.toString();
             });
-            print('Error cargando detalle completo del ticket: $e');
+            if (kDebugMode) debugPrint('Error cargando detalle completo del ticket: $e');
           }
         }
 
@@ -87,7 +90,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         });
       }
     } catch (e) {
-      print('Error en _loadDetailedTicketIfNeeded: $e');
+      if (kDebugMode) debugPrint('Error en _loadDetailedTicketIfNeeded: $e');
     }
   }
 
@@ -128,7 +131,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     try {
       final documentId = widget.ticket['documentId'];
-      final success = await api.eliminarTicket(documentId);
+      final repo = Provider.of<TicketRepository>(context, listen: false);
+      final success = await repo.eliminarTicket(documentId);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -347,7 +351,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       }
     } catch (e) {
       // Mostrar detalle del error y sugerir usar el texto en su lugar
-      print('Error generando o compartiendo PDF: $e');
+      if (kDebugMode) debugPrint('Error generando o compartiendo PDF: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error preparando archivo: $e')));
       }
@@ -771,10 +775,5 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
 
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
 
 class TicketProvider extends ChangeNotifier {
-  final ApiService _api = ApiService();
+  final TicketRepository _repo;
+
+  TicketProvider({required TicketRepository repo}) : _repo = repo;
 
   List<dynamic> _tickets = [];
   List<dynamic> _agenda = []; // Nueva: sesiones del día
@@ -44,7 +46,7 @@ class TicketProvider extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 500));
       if (_fetchInProgress) {
         // Si aún está en progreso después de esperar, resetear para evitar bloqueo permanente
-        print('TicketProvider: Fetch stuck, resetting state');
+        debugPrint('TicketProvider: Fetch stuck, resetting state');
         _fetchInProgress = false;
       }
     }
@@ -63,25 +65,25 @@ class TicketProvider extends ChangeNotifier {
       if (sucursalId == null) {
         _error = 'Debe seleccionar una sucursal primero';
         _tickets = [];
-        print('TicketProvider: Cannot fetch tickets - sucursalId is null');
+        debugPrint('TicketProvider: Cannot fetch tickets - sucursalId is null');
         return _tickets;
       }
 
-      print('TicketProvider: Fetching tickets del día for sucursalId=$sucursalId');
+      debugPrint('TicketProvider: Fetching tickets del día for sucursalId=$sucursalId');
 
-      // Usar getTicketsDelDia para obtener tickets creados hoy
-      final data = await _api.getTicketsDelDia(
+      // Usar getTicketsDelDia del repositorio para obtener tickets creados hoy
+      final data = await _repo.getTicketsDelDia(
         fecha: DateTime.now(),
         sucursalId: sucursalId,
       );
 
       _tickets = data;
       _error = null;
-      print('TicketProvider: Fetched ${_tickets.length} tickets del día');
+      debugPrint('TicketProvider: Fetched ${_tickets.length} tickets del día');
       return _tickets;
     } catch (e) {
       _error = e.toString();
-      print('TicketProvider: Error fetching tickets: $e');
+      debugPrint('TicketProvider: Error fetching tickets: ${e.toString()}');
       return _tickets;
     } finally {
       _isLoading = false;
@@ -136,19 +138,19 @@ class TicketProvider extends ChangeNotifier {
       if (sucursalId == null) {
         _error = 'Debe seleccionar una sucursal primero';
         _agenda = [];
-        print('TicketProvider: Cannot fetch agenda - sucursalId is null');
+        debugPrint('TicketProvider: Cannot fetch agenda - sucursalId is null');
         return _agenda;
       }
 
-      print('TicketProvider: Fetching agenda for fecha=$fecha, sucursalId=$sucursalId, estado=$estadoSesion');
-      final data = await _api.obtenerAgenda(fecha, sucursalId: sucursalId, estadoSesion: estadoSesion);
+      debugPrint('TicketProvider: Fetching agenda for fecha=$fecha, sucursalId=$sucursalId, estado=$estadoSesion');
+      final data = await _repo.obtenerAgenda(fecha, sucursalId: sucursalId, estadoSesion: estadoSesion);
       _agenda = data;
       _error = null;
-      print('TicketProvider: Fetched ${_agenda.length} agenda items');
+      debugPrint('TicketProvider: Fetched ${_agenda.length} agenda items');
       return _agenda;
     } catch (e) {
       _error = e.toString();
-      print('TicketProvider: Error fetching agenda: $e');
+      debugPrint('TicketProvider: Error fetching agenda: $e');
       return _agenda;
     } finally {
       _isLoadingAgenda = false;
@@ -169,13 +171,13 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = await _api.obtenerTicketsPendientes(sucursalId: sucursalId);
+      final data = await _repo.obtenerTicketsPendientes(sucursalId: sucursalId);
       _tickets = data;
       _error = null;
       return _tickets;
     } catch (e) {
       _error = e.toString();
-      print('TicketProvider: Error fetching tickets pendientes: $e');
+      debugPrint('TicketProvider: Error fetching tickets pendientes: $e');
       return _tickets;
     } finally {
       _isLoading = false;
@@ -186,11 +188,11 @@ class TicketProvider extends ChangeNotifier {
   /// Obtener detalle completo de un ticket
   Future<Map<String, dynamic>?> fetchTicketDetalle(String ticketId) async {
     try {
-      return await _api.obtenerTicketDetalle(ticketId);
+      return await _repo.obtenerTicketDetalle(ticketId);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      print('TicketProvider: Error fetching ticket detalle: $e');
+      debugPrint('TicketProvider: Error fetching ticket detalle: $e');
       return null;
     }
   }
@@ -202,7 +204,7 @@ class TicketProvider extends ChangeNotifier {
     String metodoPago = 'efectivo',
   }) async {
     try {
-      await _api.registrarAbono(
+      await _repo.registrarAbono(
         ticketId: ticketId,
         montoAbono: montoAbono,
         metodoPago: metodoPago,
@@ -215,7 +217,7 @@ class TicketProvider extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      print('TicketProvider: Error registrando abono: $e');
+      debugPrint('TicketProvider: Error registrando abono: $e');
       return false;
     }
   }
@@ -223,13 +225,13 @@ class TicketProvider extends ChangeNotifier {
   /// Marcar sesión como atendida
   Future<bool> marcarSesionAtendida(String sesionId) async {
     try {
-      await _api.marcarSesionAtendida(sesionId);
+      await _repo.marcarSesionAtendida(sesionId);
       // No refrescamos aquí. La UI debe llamar a fetchAgenda/_loadAgenda para recargar con el rango correcto.
       return true;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      print('TicketProvider: Error marcando sesión atendida: $e');
+      debugPrint('TicketProvider: Error marcando sesión atendida: $e');
       return false;
     }
   }
@@ -237,13 +239,13 @@ class TicketProvider extends ChangeNotifier {
   /// Reprogramar sesión
   Future<bool> reprogramarSesion(String sesionId, DateTime nuevaFecha) async {
     try {
-      await _api.reprogramarSesion(sesionId, nuevaFecha);
+      await _repo.reprogramarSesion(sesionId, nuevaFecha);
       // No refrescamos aquí. La UI debe volver a pedir la agenda con el rango actual.
       return true;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      print('TicketProvider: Error reprogramando sesión: $e');
+      debugPrint('TicketProvider: Error reprogramando sesión: $e');
       return false;
     }
   }
@@ -264,13 +266,13 @@ class TicketProvider extends ChangeNotifier {
       _lastRangeStart = start;
       _lastRangeEnd = end;
 
-      final data = await _api.getTicketsByRange(start: start, end: end, sucursalId: sucursalId);
+      final data = await _repo.getTicketsByRange(start: start, end: end, sucursalId: sucursalId);
       _tickets = data;
       _error = null;
       return _tickets;
     } catch (e) {
       _error = e.toString();
-      print('TicketProvider: Error fetching tickets by range: $e');
+      debugPrint('TicketProvider: Error fetching tickets by range: $e');
       return _tickets;
     } finally {
       _isLoading = false;
@@ -298,8 +300,8 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('TicketProvider: Fetching agenda por rango $start - $end for sucursal $sucursalId, estado=$estadoSesion');
-      final data = await _api.obtenerAgendaPorRango(
+      debugPrint('TicketProvider: Fetching agenda por rango $start - $end for sucursal $sucursalId, estado=$estadoSesion');
+      final data = await _repo.obtenerAgendaPorRango(
         fechaInicio: start,
         fechaFin: end,
         sucursalId: sucursalId,
@@ -307,16 +309,52 @@ class TicketProvider extends ChangeNotifier {
       );
       _agenda = data;
       _error = null;
-      print('TicketProvider: Fetched ${_agenda.length} agenda items (rango)');
+      debugPrint('TicketProvider: Fetched ${_agenda.length} agenda items (rango)');
       return _agenda;
     } catch (e) {
       _error = e.toString();
       _agenda = [];
-      print('TicketProvider: Error fetching agenda por rango: $e');
+      debugPrint('TicketProvider: Error fetching agenda por rango: $e');
       return _agenda;
     } finally {
       _isLoadingAgenda = false;
       notifyListeners();
+    }
+  }
+
+  /// Buscar sesiones (servidor-side) por término y sucursal.
+  /// Retorna la lista de items (no modifica agenda automáticamente).
+  Future<List<dynamic>> searchSessions({
+    required String query,
+    required int sucursalId,
+    String? estadoSesion,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final resp = await _repo.searchSessions(query: query, sucursalId: sucursalId, page: page, pageSize: pageSize, estadoSesion: estadoSesion);
+      final items = resp['items'] as List<dynamic>? ?? [];
+      return items;
+    } catch (e) {
+      debugPrint('TicketProvider.searchSessions error: ${e.toString()}');
+      return [];
+    }
+  }
+
+  /// Buscar tickets (servidor-side) por término y sucursal.
+  /// Retorna un Map {'items': List, 'meta': Map} similar al repositorio.
+  Future<Map<String, dynamic>> searchTickets({
+    required String query,
+    required int sucursalId,
+    int page = 1,
+    int pageSize = 50,
+  }) async {
+    try {
+      final result = await _repo.searchTickets(query: query, sucursalId: sucursalId, page: page, pageSize: pageSize);
+      return {'items': result['items'] ?? result, 'meta': result['meta'] ?? {}};
+    } catch (e) {
+      debugPrint('TicketProvider.searchTickets error: ${e.toString()}');
+      return {'items': [], 'meta': {}};
     }
   }
 }

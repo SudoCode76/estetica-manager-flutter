@@ -11,7 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 
 class EmployeeHomeScreen extends StatefulWidget {
-  const EmployeeHomeScreen({Key? key}) : super(key: key);
+  const EmployeeHomeScreen({super.key});
 
   @override
   State<EmployeeHomeScreen> createState() => _EmployeeHomeScreenState();
@@ -78,7 +78,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
         }
       }
     } catch (e) {
-      print('EmployeeHome: Error extrayendo sucursal: $e');
+      debugPrint('EmployeeHome: Error extrayendo sucursal: ${e.toString()}');
     }
     return null;
   }
@@ -88,11 +88,11 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userString = prefs.getString('user');
 
-      print('EmployeeHome: User string from prefs: $userString');
+      debugPrint('EmployeeHome: User string from prefs: $userString');
 
       if (userString != null) {
         final user = jsonDecode(userString);
-        print('EmployeeHome: User decoded: $user');
+        debugPrint('EmployeeHome: User decoded: $user');
 
         setState(() {
           _userData = user;
@@ -101,7 +101,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
         // Establecer la sucursal aquí después de cargar los datos
         final extracted = _extractSucursal(user['sucursal']);
         if (extracted == null) {
-          print('EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada');
+          debugPrint('EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -112,13 +112,13 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
             );
           }
         } else {
-          print('EmployeeHome: Sucursal del empleado (extraida): $extracted');
+          debugPrint('EmployeeHome: Sucursal del empleado (extraida): $extracted');
           // Establecer la sucursal inmediatamente después de cargar los datos
           _setupEmployeeSucursal(extracted);
         }
       }
     } catch (e) {
-      print('EmployeeHome: ❌ Error cargando datos del usuario: $e');
+      debugPrint('EmployeeHome: ❌ Error cargando datos del usuario: ${e.toString()}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -138,29 +138,29 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     final sucursalId = sucursal['id'];
     final sucursalNombre = sucursal['nombreSucursal'] ?? 'Sin nombre';
 
-    print('EmployeeHome: _setupEmployeeSucursal - id=$sucursalId, nombre=$sucursalNombre');
+    debugPrint('EmployeeHome: _setupEmployeeSucursal - id=$sucursalId, nombre=$sucursalNombre');
 
     // Obtener el provider del contexto
     final provider = SucursalInherited.of(context);
     if (provider != null) {
-      print('EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre');
+      debugPrint('EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre');
       provider.setSucursal(sucursalId, sucursalNombre);
       _sucursalProvider = provider;
     } else {
-      print('EmployeeHome: ⚠️ Provider no disponible aún');
+      debugPrint('EmployeeHome: ⚠️ Provider no disponible aún');
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    print('EmployeeHome: didChangeDependencies called');
+    debugPrint('EmployeeHome: didChangeDependencies called');
 
     final provider = SucursalInherited.of(context);
 
     // Si el provider cambió o es la primera vez
     if (provider != null && provider != _sucursalProvider) {
-      print('EmployeeHome: Provider disponible');
+      debugPrint('EmployeeHome: Provider disponible');
       _sucursalProvider = provider;
 
       // Si ya tenemos los datos del usuario con sucursal, establecerla ahora
@@ -484,7 +484,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 if (result == true) {
                   // Usar el provider para refrescar la lista con los mismos filtros
                   try {
-                    await context.read<TicketProvider>().fetchCurrent();
+                    await Provider.of<TicketProvider>(context, listen: false).fetchCurrent();
                   } catch (e) {
                     setState(() {});
                   }

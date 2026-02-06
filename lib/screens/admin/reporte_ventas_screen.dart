@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import '../../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../../repositories/report_repository.dart';
 import '../../providers/sucursal_provider.dart';
 import '../../widgets/report_chart.dart';
 
 class ReporteVentasScreen extends StatefulWidget {
-  const ReporteVentasScreen({Key? key}) : super(key: key);
+  const ReporteVentasScreen({super.key});
 
   @override
   State<ReporteVentasScreen> createState() => _ReporteVentasScreenState();
@@ -14,7 +15,7 @@ class ReporteVentasScreen extends StatefulWidget {
 
 class _ReporteVentasScreenState extends State<ReporteVentasScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final ApiService _api = ApiService();
+  late ReportRepository _reportRepo;
 
   Map<String, dynamic>? _dailyReport;
   List<dynamic> _recentTransactions = [];
@@ -51,6 +52,7 @@ class _ReporteVentasScreenState extends State<ReporteVentasScreen> with SingleTi
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _reportRepo = Provider.of<ReportRepository>(context, listen: false);
     final provider = SucursalInherited.of(context);
     if (provider != _sucursalProvider) {
       _sucursalProvider?.removeListener(_onSucursalChanged);
@@ -90,7 +92,7 @@ class _ReporteVentasScreenState extends State<ReporteVentasScreen> with SingleTi
       _dailyError = null;
     });
     try {
-      final report = await _api.getDailyReport(
+      final report = await _reportRepo.getDailyReport(
         start: _dailyDate,
         end: _dailyDate,
         sucursalId: _selectedSucursalId,
@@ -117,14 +119,14 @@ class _ReporteVentasScreenState extends State<ReporteVentasScreen> with SingleTi
       _monthlyError = null;
     });
     try {
-      final report = await _api.getDailyReport(
+      final report = await _reportRepo.getDailyReport(
         start: _monthStart,
         end: _monthEnd,
         sucursalId: _selectedSucursalId,
       );
       
-      final debtReport = await _api.getDebtReport(sucursalId: _selectedSucursalId);
-      
+      final debtReport = await _reportRepo.getDebtReport(sucursalId: _selectedSucursalId);
+
       setState(() {
         _monthlyReport = report;
         _debtList = debtReport.take(5).toList();

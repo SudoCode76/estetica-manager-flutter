@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 
 Future<void> main() async {
   final base = 'http://localhost:1337/api';
@@ -13,10 +14,9 @@ Future<void> main() async {
 
   try {
     final resp = await http.put(url, headers: {'Content-Type': 'application/json'}, body: body).timeout(const Duration(seconds: 8));
-    print('Status: \\${resp.statusCode}');
-    print('Body: \\${resp.body}');
+    if (kDebugMode) debugPrint('Status: ${resp.statusCode}');
+    if (kDebugMode) debugPrint('Body: ${resp.body}');
   } catch (e) {
-    print('Error: $e');
+    if (kDebugMode) debugPrint('Error: $e');
   }
 }
-

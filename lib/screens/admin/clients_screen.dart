@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:ui';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/config/responsive.dart';
-
+import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
 class ClientsScreen extends StatefulWidget {
-  const ClientsScreen({Key? key}) : super(key: key);
+  const ClientsScreen({super.key});
 
   @override
   State<ClientsScreen> createState() => _ClientsScreenState();
 }
 
 class _ClientsScreenState extends State<ClientsScreen> {
-  final ApiService api = ApiService();
+  // use injected ClienteRepository via Provider
   List<dynamic> clients = [];
   List<dynamic> filteredClients = [];
   bool isLoading = true;
@@ -41,22 +42,22 @@ class _ClientsScreenState extends State<ClientsScreen> {
         _isEmployee = userType == 'empleado';
       });
     } catch (e) {
-      print('Error cargando tipo de usuario: $e');
+      debugPrint('Error cargando tipo de usuario: $e');
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    print('ClientsScreen: didChangeDependencies called');
+    debugPrint('ClientsScreen: didChangeDependencies called');
     final provider = SucursalInherited.of(context);
-    print('ClientsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}');
+    debugPrint('ClientsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}');
     if (provider != _sucursalProvider) {
-      print('ClientsScreen: Provider changed, removing old listener');
+      debugPrint('ClientsScreen: Provider changed, removing old listener');
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
-      print('ClientsScreen: Calling fetchClients()');
+      debugPrint('ClientsScreen: Calling fetchClients()');
       fetchClients();
     }
   }
@@ -70,16 +71,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
   }
 
   void _onSucursalChanged() {
-    print('ClientsScreen: _onSucursalChanged called');
+    debugPrint('ClientsScreen: _onSucursalChanged called');
     fetchClients();
   }
 
   Future<void> fetchClients() async {
-    print('ClientsScreen: fetchClients() called');
-    print('ClientsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+    debugPrint('ClientsScreen: fetchClients() called');
+    debugPrint('ClientsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
 
     if (_sucursalProvider?.selectedSucursalId == null) {
-      print('ClientsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
+      debugPrint('ClientsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
       setState(() {
         isLoading = false;
         errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
@@ -89,22 +90,23 @@ class _ClientsScreenState extends State<ClientsScreen> {
       return;
     }
 
-    print('ClientsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}');
+    debugPrint('ClientsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}');
     setState(() {
       isLoading = true;
       errorMsg = null;
     });
     try {
-      print('ClientsScreen: Llamando api.getClientes con sucursalId=${_sucursalProvider!.selectedSucursalId}');
-      final data = await api.getClientes(
+      debugPrint('ClientsScreen: Llamando api.getClientes con sucursalId=${_sucursalProvider!.selectedSucursalId}');
+      final repo = Provider.of<ClienteRepository>(context, listen: false);
+      final data = await repo.searchClientes(
         sucursalId: _sucursalProvider!.selectedSucursalId,
         query: search.isEmpty ? null : search,
       );
-      print('ClientsScreen: ✓ Recibidos ${data.length} clientes');
+      debugPrint('ClientsScreen: ✓ Recibidos ${data.length} clientes');
       clients = data;
       filteredClients = clients;
     } catch (e) {
-      print('ClientsScreen: ❌ Error: $e');
+      debugPrint('ClientsScreen: ❌ Error: $e');
       errorMsg = 'No se pudo conectar al servidor.';
     }
     setState(() {
@@ -217,7 +219,8 @@ class _ClientsScreenState extends State<ClientsScreen> {
           }
           return;
         }
-        await api.deleteCliente(docIdForDelete);
+        final clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
+        await clienteRepo.deleteCliente(docIdForDelete);
 
         if (mounted) Navigator.pop(context); // Cerrar loading
 
@@ -593,7 +596,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
   late final TextEditingController _apellidoController;
   late final TextEditingController _telefonoController;
   final _formKey = GlobalKey<FormState>();
-  final _api = ApiService();
 
   @override
   void initState() {
@@ -660,7 +662,8 @@ class _EditClientDialogState extends State<_EditClientDialog> {
         }
         return;
       }
-      await _api.updateCliente(docIdForUpdate, actualizado);
+      final clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
+      await clienteRepo.updateCliente(docIdForUpdate, actualizado);
 
       // Cerrar loading
       if (mounted) Navigator.pop(context);

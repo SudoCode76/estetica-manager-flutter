@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
+import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/payment_detail_screen.dart';
+import 'package:provider/provider.dart';
 
 class PaymentsHistoryScreen extends StatefulWidget {
-  const PaymentsHistoryScreen({Key? key}) : super(key: key);
+  const PaymentsHistoryScreen({super.key});
 
   @override
   State<PaymentsHistoryScreen> createState() => _PaymentsHistoryScreenState();
 }
 
 class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
-  final ApiService _api = ApiService();
+  late TicketRepository _ticketRepo;
+  late ClienteRepository _clienteRepo;
   bool _loading = true;
   List<dynamic> _clients = []; // all clients with history
   List<dynamic> _filteredClients = []; // clients after search
@@ -52,6 +55,9 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
     super.didChangeDependencies();
     if (_sucursalProvider == null) {
       _sucursalProvider = SucursalInherited.of(context);
+      // Obtener repos inyectados
+      _ticketRepo = Provider.of<TicketRepository>(context, listen: false);
+      _clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
       _loadClientsHistory();
     }
   }
@@ -60,8 +66,8 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
     setState(() => _loading = true);
     try {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
-      final tickets = await _api.getTickets(sucursalId: sucursalId);
-      final clients = await _api.getClientes(sucursalId: sucursalId);
+      final tickets = await _ticketRepo.getTickets(sucursalId: sucursalId);
+      final clients = await _clienteRepo.searchClientes(sucursalId: sucursalId);
 
       // Map clientId -> totalPaid and flags/counters
       final Map<int, double> paidMap = {};
@@ -111,29 +117,25 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
 
       // Usar la nueva arquitectura: obtener tickets pendientes del cliente
-      final allTickets = await _api.obtenerTicketsPendientes(sucursalId: sucursalId);
+      final allTickets = await _ticketRepo.obtenerTicketsPendientes(sucursalId: sucursalId);
       final clientId = client['id'];
 
       // Filtrar tickets del cliente específico
       final clientTickets = allTickets.where((t) {
-        final cliente = t['cliente'];
-        if (cliente is Map) {
-          return cliente['id'] == clientId;
-        }
-        return false;
+        final cid = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
+        return cid == clientId;
       }).toList();
 
-      // Obtener pagos de cada ticket del cliente
-      List<dynamic> pagosCliente = [];
-      for (final ticket in clientTickets) {
+      // Calcular pagos para el cliente
+      final List<dynamic> pagos = [];
+      for (final t in clientTickets) {
         try {
-          final ticketId = ticket['id']?.toString();
-          if (ticketId != null && ticketId.isNotEmpty) {
-            final pagosTicket = await _api.obtenerPagosTicket(ticketId);
-            pagosCliente.addAll(pagosTicket);
-          }
+          final ticketId = t['id']?.toString();
+          if (ticketId == null || ticketId.isEmpty) continue;
+          final pagosTicket = await _ticketRepo.obtenerPagosTicket(ticketId);
+          pagos.addAll(pagosTicket);
         } catch (e) {
-          print('Error obteniendo pagos de ticket ${ticket['id']}: $e');
+          debugPrint('Error obteniendo pagos para ticket ${t['id']}: ${e.toString()}');
         }
       }
 
@@ -172,20 +174,20 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
                       const SizedBox(width: 8),
                       Chip(
                         avatar: Icon(Icons.account_balance_wallet, size: 18, color: Colors.white),
-                        label: Text('Pagos: ${pagosCliente.length}'),
+                        label: Text('Pagos: ${pagos.length}'),
                         backgroundColor: theme.colorScheme.secondary,
                       ),
                       const Spacer(),
                     ]),
                     const SizedBox(height: 12),
                     Expanded(
-                      child: pagosCliente.isEmpty
+                      child: pagos.isEmpty
                           ? Center(child: Text('No hay registros de pago', style: theme.textTheme.bodyLarge))
                           : ListView.separated(
-                              itemCount: pagosCliente.length,
+                              itemCount: pagos.length,
                               separatorBuilder: (_, __) => const Divider(height: 8),
                               itemBuilder: (context, i) {
-                                final p = pagosCliente[i];
+                                final p = pagos[i];
                                 final monto = double.tryParse(p['montoPagado']?.toString() ?? '0') ?? 0;
                                 final fecha = p['fechaPago'] ?? p['createdAt'] ?? '';
                                 final ticket = p['ticket'] is Map ? (p['ticket']['documentId'] ?? p['ticket']['id']) : p['ticket'];

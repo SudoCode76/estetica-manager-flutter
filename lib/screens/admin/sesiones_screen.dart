@@ -9,7 +9,7 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/models/agenda_item.dart';
 
 class SesionesScreen extends StatefulWidget {
-  const SesionesScreen({Key? key}) : super(key: key);
+  const SesionesScreen({super.key});
 
   @override
   State<SesionesScreen> createState() => _SesionesScreenState();
@@ -27,6 +27,9 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
   final TextEditingController _searchController = TextEditingController();
   String _search = '';
   Timer? _debounceSearch;
+  bool _searching = false; // indica que se está consultando al servidor
+  int _searchToken = 0; // token para invalidar búsquedas antiguas
+  List<dynamic>? _searchResults; // resultados de búsqueda en servidor
 
   @override
   void initState() {
@@ -57,7 +60,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
     try {
       await initializeDateFormatting('es_ES', null);
     } catch (e) {
-      print('Error inicializando locale: $e');
+      debugPrint('Error inicializando locale: ${e.toString()}');
       // Continuar de todos modos
     }
   }
@@ -105,7 +108,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
 
     // Verificar que hay sucursal seleccionada
     if (sucursalId == null) {
-      print('SesionesScreen: No hay sucursal seleccionada, no se puede cargar agenda');
+      debugPrint('SesionesScreen: No hay sucursal seleccionada, no se puede cargar agenda');
       if (mounted) {
         setState(() {
           // El provider manejará el estado de error
@@ -114,10 +117,10 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
       return;
     }
 
-    print('SesionesScreen: Loading agenda for range=${_selectedRange.start} -> ${_selectedRange.end} and sucursal=$sucursalId, estado=$_filtroEstado');
+    debugPrint('SesionesScreen: Loading agenda for range=${_selectedRange.start} -> ${_selectedRange.end} and sucursal=$sucursalId, estado=$_filtroEstado');
 
     // Usar fetchAgendaRango para soportar rango de fechas (inicialmente hoy)
-    await context.read<TicketProvider>().fetchAgendaRango(
+    await Provider.of<TicketProvider>(context, listen: false).fetchAgendaRango(
       start: _selectedRange.start,
       end: _selectedRange.end,
       sucursalId: sucursalId,
@@ -194,21 +197,42 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
     if (!mounted) return;
     setState(() {
       _search = value;
+      // limpiar resultados previos mientras se escribe
+      if (value.trim().isEmpty) _searchResults = null;
     });
 
     // Si la búsqueda quedó vacía, cancelar debounce y devolver
     if (value.trim().isEmpty) {
       if (_debounceSearch?.isActive ?? false) _debounceSearch!.cancel();
-      print('Sesiones: búsqueda vacía, mostrando todas las sesiones');
+      // Limpiar resultados de búsqueda en servidor cuando se borra el término
+      if (mounted) setState(() { _searchResults = null; });
+      debugPrint('Sesiones: búsqueda vacía, mostrando todas las sesiones');
       return;
     }
 
-    // Debounce para tareas pesadas / servidor (aquí sólo usamos para log)
+    // Debounce para tareas pesadas / servidor
     if (_debounceSearch?.isActive ?? false) _debounceSearch!.cancel();
-    _debounceSearch = Timer(const Duration(milliseconds: 400), () {
+    final currentToken = ++_searchToken;
+    _debounceSearch = Timer(const Duration(milliseconds: 400), () async {
       if (!mounted) return;
-      // en futuras mejoras aquí se podría lanzar búsqueda en servidor
-      print('Sesiones: debounce exec -> "${_search}"');
+      final sucursalId = _sucursalProvider?.selectedSucursalId;
+      if (sucursalId == null || _search.trim().isEmpty) return;
+      setState(() { _searching = true; });
+      try {
+        debugPrint('Sesiones: buscando "${_search.trim()}" en sucursal $sucursalId');
+        final res = await Provider.of<TicketProvider>(context, listen: false).searchSessions(query: _search.trim(), sucursalId: sucursalId, estadoSesion: _filtroEstado, page: 1, pageSize: 200);
+        // Si durante la espera se lanzó otra búsqueda, ignorar este resultado
+        if (currentToken != _searchToken) return;
+        if (!mounted) return;
+        setState(() {
+          _searchResults = res;
+        });
+      } catch (e) {
+        debugPrint('Sesiones: search error: ${e.toString()}');
+        if (mounted) setState(() { _searchResults = []; });
+      } finally {
+        if (mounted) setState(() { _searching = false; });
+      }
     });
   }
 
@@ -290,7 +314,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
           }
           // fallback: si el item contiene un campo 'cliente' como texto
           try {
-            final possible = (item['cliente'] is String) ? item['cliente'] : '';
+            final possible = (item is Map && item['cliente'] is String) ? item['cliente'] : '';
             if (possible != null && _normalize(possible.toString()).contains(term)) {
               filtered.add(item);
               continue;
@@ -299,7 +323,7 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
         } catch (_) {}
       }
       // debug
-      print('Sesiones: filtro="$term" -> ${filtered.length}/${agenda.length} coincidencias');
+      debugPrint('Sesiones: filtro="$term" -> ${filtered.length}/${agenda.length} coincidencias');
       return filtered;
     } catch (e) {
       return agenda;
@@ -402,26 +426,33 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 12),
 
-          // NUEVO: Buscador por nombre de cliente
+          // NUEVO: Buscador por nombre de cliente (TextField con debounce para máxima compatibilidad)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: SearchBar(
+            child: TextField(
               controller: _searchController,
-              hintText: 'Buscar por cliente',
-              leading: const Icon(Icons.search),
-              trailing: _search.isNotEmpty
-                  ? [
-                      IconButton(
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Buscar por cliente',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _search.isNotEmpty
+                    ? IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
                           _onSearchChanged('');
+                          // Al limpiar la búsqueda, recargar la agenda desde el provider
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) _loadAgenda();
+                          });
                         },
-                      ),
-                    ]
-                  : null,
-              onChanged: _onSearchChanged,
-              elevation: const WidgetStatePropertyAll(1),
+                      )
+                    : null,
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -434,9 +465,15 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // Mostrar contador de sesiones cargadas
-                final displayed = _computeFilteredAgenda(provider.agenda);
+                // Mostrar contador de sesiones cargadas o resultados de búsqueda
+                final dataSource = _searchResults ?? provider.agenda;
+                final displayed = _computeFilteredAgenda(dataSource);
                 final count = displayed.length;
+
+                // Si estamos buscando mostrar un indicador leve
+                if (_searching) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
                 if (provider.error != null) {
                   return Center(
@@ -474,7 +511,26 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                   );
                 }
 
-                if (provider.agenda.isEmpty) {
+                if (dataSource.isEmpty) {
+                  // Diferenciar entre estado de búsqueda y vista normal
+                  if (_searchResults != null || _search.trim().isNotEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_off, size: 72, color: colorScheme.outlineVariant),
+                            const SizedBox(height: 20),
+                            Text('No se encontraron sesiones para "${_search.trim()}"', style: theme.textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 8),
+                            FilledButton.icon(onPressed: () { _searchController.clear(); _onSearchChanged(''); }, icon: const Icon(Icons.clear), label: const Text('Limpiar búsqueda')),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -634,12 +690,12 @@ class _SesionCard extends StatelessWidget {
   final bool showActions;
 
   const _SesionCard({
-    Key? key,
+    super.key,
     required this.sesion,
     required this.onMarcarAtendida,
     required this.onReprogramar,
     this.showActions = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

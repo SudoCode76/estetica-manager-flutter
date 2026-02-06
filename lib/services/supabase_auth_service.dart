@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 /// Servicio de autenticación con Supabase
 class SupabaseAuthService {
@@ -16,24 +17,23 @@ class SupabaseAuthService {
   /// Retorna un Map con los datos del usuario autenticado y su perfil
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      print('=== Iniciando login con Supabase ===');
-      print('Email: $email');
-      
+      debugPrint('=== Iniciando login con Supabase ===');
+
       // Autenticar con Supabase
       final AuthResponse response = await client.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      print('=== Login exitoso ===');
-      
+      debugPrint('=== Login exitoso ===');
+
       final user = response.user;
       if (user == null) {
         throw Exception('No se pudo obtener el usuario');
       }
 
-      print('Usuario ID: ${user.id}');
-      print('User metadata: ${user.userMetadata}');
+      debugPrint('Usuario ID: ${user.id}');
+      debugPrint('User metadata present');
 
       // Obtener el perfil del usuario desde la tabla profiles
       Map<String, dynamic>? profileResponse;
@@ -46,7 +46,7 @@ class SupabaseAuthService {
             .eq('id', user.id)
             .maybeSingle();
 
-        print('=== Perfil obtenido: $profileResponse ===');
+        debugPrint('=== Perfil obtenido (present) ===');
 
         // Si el perfil tiene sucursal_id, obtener los datos de la sucursal
         if (profileResponse != null && profileResponse['sucursal_id'] != null) {
@@ -56,10 +56,10 @@ class SupabaseAuthService {
               .eq('id', profileResponse['sucursal_id'])
               .maybeSingle();
 
-          print('=== Sucursal obtenida: $sucursalData ===');
+          debugPrint('=== Sucursal obtenida (present) ===');
         }
       } catch (profileError) {
-        print('=== ERROR AL OBTENER PERFIL: $profileError ===');
+        debugPrint('=== ERROR AL OBTENER PERFIL ===');
         // Continuar sin perfil, usar solo user_metadata
       }
 
@@ -81,7 +81,7 @@ class SupabaseAuthService {
         'updatedAt': user.updatedAt,
       };
 
-      print('=== Usuario mapeado: $userMap ===');
+      debugPrint('=== Usuario mapeado (present) ===');
 
       return {
         'user': userMap,
@@ -89,12 +89,12 @@ class SupabaseAuthService {
         'session': response.session?.toJson(),
       };
     } catch (e) {
-      print('=== ERROR EN LOGIN SUPABASE: $e ===');
-      print('=== Tipo de error: ${e.runtimeType} ===');
+      debugPrint('=== ERROR EN LOGIN SUPABASE: ${e.toString()} ===');
+      debugPrint('=== Tipo de error: ${e.runtimeType} ===');
       if (e is AuthException) {
-        print('=== AuthException message: ${e.message} ===');
-        print('=== AuthException statusCode: ${e.statusCode} ===');
-        if (e.message.contains('Invalid login credentials') || 
+        debugPrint('=== AuthException message: ${e.message} ===');
+        debugPrint('=== AuthException statusCode: ${e.statusCode} ===');
+        if (e.message.contains('Invalid login credentials') ||
             e.message.contains('invalid') ||
             e.statusCode == '400') {
           throw Exception('Credenciales inválidas');
@@ -117,8 +117,8 @@ class SupabaseAuthService {
     int? sucursalId,
   }) async {
     try {
-      print('=== Registrando usuario en Supabase ===');
-      
+      debugPrint('=== Registrando usuario en Supabase ===');
+
       final AuthResponse response = await client.auth.signUp(
         email: email,
         password: password,
@@ -134,8 +134,8 @@ class SupabaseAuthService {
         throw Exception('No se pudo crear el usuario');
       }
 
-      print('=== Usuario registrado exitosamente ===');
-      print('Usuario ID: ${user.id}');
+      debugPrint('=== Usuario registrado exitosamente ===');
+      debugPrint('Usuario ID: ${user.id}');
 
       // Actualizar el perfil en la tabla profiles si es necesario
       if (sucursalId != null || tipoUsuario != 'empleado') {
@@ -156,7 +156,7 @@ class SupabaseAuthService {
         'jwt': response.session?.accessToken,
       };
     } catch (e) {
-      print('=== ERROR EN REGISTRO SUPABASE: $e ===');
+      debugPrint('=== ERROR EN REGISTRO SUPABASE: ${e.toString()} ===');
       if (e is AuthException) {
         throw Exception(e.message);
       }
@@ -177,9 +177,9 @@ class SupabaseAuthService {
       await prefs.remove('selectedSucursalId');
       await prefs.remove('selectedSucursalName');
       
-      print('=== Sesión cerrada exitosamente ===');
+      debugPrint('=== Sesión cerrada exitosamente ===');
     } catch (e) {
-      print('=== ERROR AL CERRAR SESIÓN: $e ===');
+      debugPrint('=== ERROR AL CERRAR SESIÓN: ${e.toString()} ===');
       rethrow;
     }
   }
@@ -207,7 +207,7 @@ class SupabaseAuthService {
         throw Exception('No se pudo refrescar la sesión');
       }
     } catch (e) {
-      print('=== ERROR AL REFRESCAR SESIÓN: $e ===');
+      debugPrint('=== ERROR AL REFRESCAR SESIÓN: ${e.toString()} ===');
       rethrow;
     }
   }
@@ -246,7 +246,7 @@ class SupabaseAuthService {
               .eq('id', profileResponse['sucursal_id'])
               .maybeSingle();
         } catch (e) {
-          print('=== ERROR AL OBTENER SUCURSAL: $e ===');
+          debugPrint('=== ERROR AL OBTENER SUCURSAL: ${e.toString()} ===');
         }
       }
 
@@ -259,7 +259,7 @@ class SupabaseAuthService {
         'sucursalId': profileResponse['sucursal_id'],
       };
     } catch (e) {
-      print('=== ERROR AL OBTENER PERFIL: $e ===');
+      debugPrint('=== ERROR AL OBTENER PERFIL: ${e.toString()} ===');
       return null;
     }
   }
@@ -306,14 +306,14 @@ class SupabaseAuthService {
           if (refreshToken != null && refreshToken.isNotEmpty) {
             await prefs2.setString('adminRefreshToken', refreshToken);
           }
-          print('saveSessionToPrefs: admin token saved in prefs because user is administrador');
+          debugPrint('saveSessionToPrefs: admin token saved in prefs because user is administrador');
         } catch (e) {
-          print('saveSessionToPrefs: could not save admin token in prefs: $e');
+          debugPrint('saveSessionToPrefs: could not save admin token in prefs: ${e.toString()}');
         }
       }
     } catch (_) {}
 
-    print('=== Sesión guardada en SharedPreferences ===');
+    debugPrint('=== Sesión guardada en SharedPreferences ===');
   }
 
   /// Restaurar sesión desde SharedPreferences
@@ -321,12 +321,12 @@ class SupabaseAuthService {
     try {
       final session = getCurrentSession();
       if (session != null) {
-        print('=== Sesión de Supabase activa ===');
+        debugPrint('=== Sesión de Supabase activa ===');
         return true;
       }
       return false;
     } catch (e) {
-      print('=== ERROR AL RESTAURAR SESIÓN: $e ===');
+      debugPrint('=== ERROR AL RESTAURAR SESIÓN: ${e.toString()} ===');
       return false;
     }
   }

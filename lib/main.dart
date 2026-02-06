@@ -1,12 +1,19 @@
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'package:app_estetica/providers/report_provider.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
+import 'package:app_estetica/repositories/auth_repository.dart';
+import 'package:app_estetica/repositories/catalog_repository.dart';
+import 'package:app_estetica/repositories/cliente_repository.dart';
+import 'package:app_estetica/repositories/report_repository.dart';
 import 'package:app_estetica/navigation/route_observer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_estetica/config/supabase_config.dart';
@@ -36,11 +43,26 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Crear instancias compartidas de repositorios
+    final ticketRepo = TicketRepository();
+    final authRepo = AuthRepository();
+    final catalogRepo = CatalogRepository();
+    final clienteRepo = ClienteRepository();
+    final reportRepo = ReportRepository();
+
     return SucursalInherited(
       provider: _globalSucursalProvider,
       child: MultiProvider(
         providers: [
-          ChangeNotifierProvider<TicketProvider>(create: (_) => TicketProvider()),
+          Provider<TicketRepository>.value(value: ticketRepo),
+          Provider<AuthRepository>.value(value: authRepo),
+          Provider<CatalogRepository>.value(value: catalogRepo),
+          Provider<ClienteRepository>.value(value: clienteRepo),
+          Provider<ReportRepository>.value(value: reportRepo),
+
+          // Providers que dependen de repos
+          ChangeNotifierProvider<TicketProvider>(create: (_) => TicketProvider(repo: ticketRepo)),
+          ChangeNotifierProvider<ReportProvider>(create: (_) => ReportProvider(repo: reportRepo)),
         ],
         child: MaterialApp(
           title: 'App Estetica',
@@ -68,7 +90,7 @@ class _MyAppState extends State<MyApp> {
 }
 
 class Root extends StatefulWidget {
-  const Root({Key? key}) : super(key: key);
+  const Root({super.key});
 
   @override
   State<Root> createState() => _RootState();
@@ -89,7 +111,7 @@ class _RootState extends State<Root> {
     final supabaseUser = Supabase.instance.client.auth.currentUser;
 
     if (supabaseUser != null) {
-      print('=== Usuario autenticado en Supabase: ${supabaseUser.email} ===');
+      if (kDebugMode) debugPrint('=== Usuario autenticado en Supabase: ${supabaseUser.email} ===');
 
       // Obtener datos del usuario desde SharedPreferences o metadata
       final prefs = await SharedPreferences.getInstance();
@@ -111,7 +133,7 @@ class _RootState extends State<Root> {
         _initial = const AdminHomeScreen();
       }
     } else {
-      print('=== No hay usuario autenticado ===');
+      if (kDebugMode) debugPrint('=== No hay usuario autenticado ===');
       _initial = const LoginScreen();
     }
 

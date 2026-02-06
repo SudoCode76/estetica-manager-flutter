@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:app_estetica/repositories/catalog_repository.dart';
+import 'package:provider/provider.dart';
 
 class TreatmentsScreen extends StatefulWidget {
-  const TreatmentsScreen({Key? key}) : super(key: key);
+  const TreatmentsScreen({super.key});
 
   @override
   State<TreatmentsScreen> createState() => _TreatmentsScreenState();
 }
 
 class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerProviderStateMixin {
-  final ApiService _api = ApiService();
+  late CatalogRepository _catalogRepo;
   late TabController _tabController;
 
   List<dynamic> _categoriasAll = [];
@@ -30,7 +31,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _loadAll();
+    // _loadAll() will be called from didChangeDependencies once _catalogRepo is available
     _categorySearchCtrl.addListener(() => _applyCategorySearch(_categorySearchCtrl.text));
     _treatmentSearchCtrl.addListener(() => _applyTreatmentSearch(_treatmentSearchCtrl.text));
     _tabController = TabController(length: 2, vsync: this);
@@ -38,6 +39,15 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
       // Rebuild when tab index changes (swipe or programmatic)
       if (mounted) setState(() {});
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // inicializar repositorio inyectado
+    _catalogRepo = Provider.of<CatalogRepository>(context, listen: false);
+    // llamar carga una sola vez
+    if (_categoriasAll.isEmpty && _tratamientosAll.isEmpty) _loadAll();
   }
 
   @override
@@ -51,8 +61,8 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   Future<void> _loadAll() async {
     setState(() => _loading = true);
     try {
-      final cats = await _api.getCategorias();
-      final trats = await _api.getTratamientos();
+      final cats = await _catalogRepo.getCategorias();
+      final trats = await _catalogRepo.getTratamientos();
       _categoriasAll = cats;
       _tratamientosAll = trats;
       _applyFilters();
@@ -163,11 +173,11 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                   if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La categoría ya existe')));
                 } else {
                   // reactivar
-                  await _api.updateCategoria(existing['documentId'] ?? existing['id'].toString(), {'estadoCategoria': true});
+                  await _catalogRepo.updateCategoria(existing['documentId'] ?? existing['id'].toString(), {'estadoCategoria': true});
                   await _loadAll();
                 }
               } else {
-                await _api.crearCategoria({'nombreCategoria': nombre});
+                await _catalogRepo.crearCategoria({'nombreCategoria': nombre});
                 await _loadAll();
               }
             } catch (e) {
@@ -235,13 +245,13 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                   if (existing['estadoTratamiento'] == true) {
                     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El tratamiento ya existe')));
                   } else {
-                    await _api.updateTratamiento(existing['documentId'] ?? existing['id'].toString(), {'estadoTratamiento': true});
+                    await _catalogRepo.updateTratamiento(existing['documentId'] ?? existing['id'].toString(), {'estadoTratamiento': true});
                     await _loadAll();
                   }
                 } else {
                   final Map<String, dynamic> payload = {'nombreTratamiento': nombre, 'precio': precio, 'estadoTratamiento': true};
                   if (selectedCatId != null) payload['categoria_tratamiento'] = selectedCatId;
-                  await _api.crearTratamiento(payload);
+                  await _catalogRepo.crearTratamiento(payload);
                   await _loadAll();
                 }
               } catch (e) {
@@ -302,7 +312,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
               setState(() => _saving = true);
               try {
                 final Map<String, dynamic> payload = {'nombreTratamiento': nombre, 'precio': precio, 'categoria_tratamiento': selectedCatId, 'estadoTratamiento': t['estadoTratamiento'] ?? true};
-                await _api.updateTratamiento(t['documentId'] ?? t['id'].toString(), payload);
+                await _catalogRepo.updateTratamiento(t['documentId'] ?? t['id'].toString(), payload);
                 await _loadAll();
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error actualizando: $e')));
@@ -322,7 +332,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     setState(() => _saving = true);
     try {
       final newEstado = !(t['estadoTratamiento'] == true);
-      await _api.updateTratamiento(docId, {'estadoTratamiento': newEstado});
+      await _catalogRepo.updateTratamiento(docId, {'estadoTratamiento': newEstado});
       await _loadAll();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -346,7 +356,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
             Navigator.pop(ctx, true);
             setState(() => _saving = true);
             try {
-              await _api.updateCategoria(c['documentId'] ?? c['id'].toString(), {'nombreCategoria': nombre, 'estadoCategoria': c['estadoCategoria'] ?? true});
+              await _catalogRepo.updateCategoria(c['documentId'] ?? c['id'].toString(), {'nombreCategoria': nombre, 'estadoCategoria': c['estadoCategoria'] ?? true});
               await _loadAll();
             } catch (e) {
               if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -365,7 +375,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     setState(() => _saving = true);
     try {
       final newEstado = !(c['estadoCategoria'] == true);
-      await _api.updateCategoria(docId, {'estadoCategoria': newEstado});
+      await _catalogRepo.updateCategoria(docId, {'estadoCategoria': newEstado});
       await _loadAll();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -377,114 +387,19 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   // UI builders
   Widget _buildCategoryListItem(Map<String, dynamic> c, ColorScheme cs, TextTheme tt, bool isNarrow) {
     final int count = _countTratamientosPorCategoria(c['id']);
-    final bool selected = _selectedCategoriaId == c['id'];
     final bool activo = c['estadoCategoria'] == true || c['estadoCategoria'] == null;
 
-    return Container(
+    return Card(
       margin: EdgeInsets.symmetric(horizontal: isNarrow ? 4 : 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: activo ? cs.surface : cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: selected ? Border.all(color: cs.primary, width: 2) : Border.all(color: cs.outlineVariant.withValues(alpha: 0.3), width: 1),
-        boxShadow: activo ? [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ] : null,
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(isNarrow ? 12.0 : 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    c['nombreCategoria'] ?? '-',
-                    style: tt.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: activo ? cs.onSurface : cs.onSurfaceVariant,
-                      fontSize: isNarrow ? 15 : null,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Botones de acción
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.edit_outlined, size: 18),
-                      onPressed: () => _showEditCategoriaDialog(c),
-                      style: IconButton.styleFrom(
-                        backgroundColor: cs.primaryContainer.withValues(alpha: 0.5),
-                        foregroundColor: cs.primary,
-                        minimumSize: const Size(36, 36),
-                        padding: EdgeInsets.zero,
-                      ),
-                      tooltip: 'Editar',
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: Icon(activo ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18),
-                      onPressed: () => _toggleCategoriaEstado(c),
-                      style: IconButton.styleFrom(
-                        backgroundColor: activo ? cs.errorContainer.withValues(alpha: 0.5) : cs.primaryContainer.withValues(alpha: 0.5),
-                        foregroundColor: activo ? cs.error : cs.primary,
-                        minimumSize: const Size(36, 36),
-                        padding: EdgeInsets.zero,
-                      ),
-                      tooltip: activo ? 'Desactivar' : 'Reactivar',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: activo ? cs.secondaryContainer : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$count tratamiento${count != 1 ? 's' : ''}',
-                    style: tt.bodySmall?.copyWith(
-                      color: activo ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: isNarrow ? 11 : null,
-                    ),
-                  ),
-                ),
-                if (!activo)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: cs.errorContainer.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Desactivada',
-                      style: tt.bodySmall?.copyWith(
-                        color: cs.error,
-                        fontWeight: FontWeight.w600,
-                        fontSize: isNarrow ? 11 : null,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: isNarrow ? 8 : 12),
+        title: Text(c['nombreCategoria'] ?? '-', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        subtitle: Text('$count tratamiento${count != 1 ? 's' : ''}', style: tt.bodySmall),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showEditCategoriaDialog(c)),
+          IconButton(icon: Icon(activo ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18), onPressed: () => _toggleCategoriaEstado(c)),
+        ]),
       ),
     );
   }
@@ -493,249 +408,72 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Barra de búsqueda y controles mejorada
         Padding(
           padding: EdgeInsets.symmetric(horizontal: isNarrow ? 0 : 4.0, vertical: 8.0),
           child: Row(
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                  ),
-                  child: TextField(
-                    controller: _categorySearchCtrl,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.search, color: cs.onSurfaceVariant, size: isNarrow ? 20 : 24),
-                      hintText: 'Buscar categorías...',
-                      hintStyle: TextStyle(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                        fontSize: isNarrow ? 14 : null,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: isNarrow ? 12 : 14),
-                    ),
-                    style: TextStyle(fontSize: isNarrow ? 14 : null),
-                  ),
+                child: TextField(
+                  controller: _categorySearchCtrl,
+                  decoration: InputDecoration(prefixIcon: Icon(Icons.search, color: cs.onSurfaceVariant), hintText: 'Buscar categorías...', border: InputBorder.none),
                 ),
               ),
               SizedBox(width: isNarrow ? 8 : 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: _showDisabled ? cs.primaryContainer : cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    _showDisabled ? Icons.visibility : Icons.visibility_off_outlined,
-                    color: _showDisabled ? cs.primary : cs.onSurfaceVariant,
-                    size: isNarrow ? 20 : 24,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _showDisabled = !_showDisabled;
-                      _applyFilters();
-                      _applyCategorySearch(_categorySearchCtrl.text);
-                      _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                    });
-                  },
-                  padding: EdgeInsets.all(isNarrow ? 8 : 12),
-                  constraints: BoxConstraints(minWidth: isNarrow ? 40 : 48, minHeight: isNarrow ? 40 : 48),
-                  tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',
-                ),
+              IconButton(
+                icon: Icon(_showDisabled ? Icons.visibility : Icons.visibility_off_outlined, color: _showDisabled ? cs.primary : cs.onSurfaceVariant),
+                onPressed: () => setState(() {
+                  _showDisabled = !_showDisabled;
+                  _applyFilters();
+                  _applyCategorySearch(_categorySearchCtrl.text);
+                  _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                }),
               ),
             ],
           ),
         ),
         const SizedBox(height: 8),
         Expanded(
-          child: Card(
-            child: _categorias.isEmpty
-                ? Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Text('No hay categorías', style: tt.bodyMedium)))
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _categorias.length,
-                    itemBuilder: (context, index) {
-                      final c = _categorias[index] as Map<String, dynamic>;
-                      return _buildCategoryListItem(c, cs, tt, isNarrow);
-                    },
-                  ),
-          ),
+          child: _categorias.isEmpty
+              ? Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Text('No hay categorías', style: tt.bodyMedium)))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: _categorias.length,
+                  itemBuilder: (context, index) {
+                    final c = _categorias[index] as Map<String, dynamic>;
+                    return _buildCategoryListItem(c, cs, tt, isNarrow);
+                  },
+                ),
         ),
-        SizedBox(height: isNarrow ? 8 : 12),
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              'Total de ${_categorias.length} categorías registradas',
-              style: tt.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontSize: isNarrow ? 11 : null,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        SizedBox(height: isNarrow ? 72 : 60), // espacio para FAB
+        SizedBox(height: isNarrow ? 72 : 60),
       ],
     );
   }
 
   Widget _buildTratamientoItem(Map<String, dynamic> t, ColorScheme cs, TextTheme tt, bool isNarrow) {
+    // Versión simplificada y robusta para evitar errores de balance de paréntesis.
     final bool activoTrat = t['estadoTratamiento'] == true || t['estadoTratamiento'] == null;
     final String categoriaNombre = _getCategoriaNombreFromTratamiento(t);
     final String precio = t['precio']?.toString() ?? '-';
 
-    return Container(
+    return Card(
       margin: EdgeInsets.symmetric(horizontal: isNarrow ? 4 : 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: activoTrat ? cs.surface : cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3), width: 1),
-        boxShadow: activoTrat ? [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ] : null,
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(isNarrow ? 12.0 : 16.0),
-        child: Column(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: isNarrow ? 8 : 12),
+        title: Text(t['nombreTratamiento'] ?? '-', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    t['nombreTratamiento'] ?? '-',
-                    style: tt.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: activoTrat ? cs.onSurface : cs.onSurfaceVariant,
-                      fontSize: isNarrow ? 15 : null,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Botones de acción
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      onPressed: () => _showEditTratamientoDialog(t),
-                      style: IconButton.styleFrom(
-                        backgroundColor: cs.primaryContainer.withValues(alpha: 0.5),
-                        foregroundColor: cs.primary,
-                        minimumSize: const Size(36, 36),
-                        padding: EdgeInsets.zero,
-                      ),
-                      tooltip: 'Editar',
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: Icon(activoTrat ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18),
-                      onPressed: () => _toggleTratamientoEstado(t),
-                      style: IconButton.styleFrom(
-                        backgroundColor: activoTrat ? cs.errorContainer.withValues(alpha: 0.5) : cs.primaryContainer.withValues(alpha: 0.5),
-                        foregroundColor: activoTrat ? cs.error : cs.primary,
-                        minimumSize: const Size(36, 36),
-                        padding: EdgeInsets.zero,
-                      ),
-                      tooltip: activoTrat ? 'Desactivar' : 'Reactivar',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                // Badge de categoría
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: activoTrat ? cs.secondaryContainer : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.label_outline,
-                        size: 12,
-                        color: activoTrat ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          categoriaNombre,
-                          style: tt.bodySmall?.copyWith(
-                            color: activoTrat ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                            fontSize: isNarrow ? 11 : null,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Badge de precio
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: activoTrat ? cs.tertiaryContainer : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.attach_money,
-                        size: 12,
-                        color: activoTrat ? cs.onTertiaryContainer : cs.onSurfaceVariant,
-                      ),
-                      Text(
-                        precio,
-                        style: tt.bodySmall?.copyWith(
-                          color: activoTrat ? cs.onTertiaryContainer : cs.onSurfaceVariant,
-                          fontWeight: FontWeight.bold,
-                          fontSize: isNarrow ? 11 : null,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!activoTrat)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: cs.errorContainer.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Desactivado',
-                      style: tt.bodySmall?.copyWith(
-                        color: cs.error,
-                        fontWeight: FontWeight.w600,
-                        fontSize: isNarrow ? 11 : null,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            const SizedBox(height: 6),
+            Text(categoriaNombre, style: tt.bodySmall),
+            const SizedBox(height: 4),
+            Text(precio, style: tt.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
           ],
         ),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showEditTratamientoDialog(t)),
+          IconButton(icon: Icon(activoTrat ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18), onPressed: () => _toggleTratamientoEstado(t)),
+        ]),
       ),
     );
   }
@@ -787,14 +525,12 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                         color: _showDisabled ? cs.primary : cs.onSurfaceVariant,
                         size: isNarrow ? 20 : 24,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _showDisabled = !_showDisabled;
-                          _applyFilters();
-                          _applyCategorySearch(_categorySearchCtrl.text);
-                          _applyTreatmentSearch(_treatmentSearchCtrl.text);
-                        });
-                      },
+                      onPressed: () => setState(() {
+                        _showDisabled = !_showDisabled;
+                        _applyFilters();
+                        _applyCategorySearch(_categorySearchCtrl.text);
+                        _applyTreatmentSearch(_treatmentSearchCtrl.text);
+                      }),
                       padding: EdgeInsets.all(isNarrow ? 8 : 12),
                       constraints: BoxConstraints(minWidth: isNarrow ? 40 : 48, minHeight: isNarrow ? 40 : 48),
                       tooltip: _showDisabled ? 'Ocultar desactivados' : 'Mostrar desactivados',

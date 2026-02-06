@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class EmployeeTicketsScreen extends StatefulWidget {
-  const EmployeeTicketsScreen({Key? key}) : super(key: key);
+  const EmployeeTicketsScreen({super.key});
 
   @override
   State<EmployeeTicketsScreen> createState() => _EmployeeTicketsScreenState();
@@ -18,4 +18,3 @@ class _EmployeeTicketsScreenState extends State<EmployeeTicketsScreen> {
     );
   }
 }
-

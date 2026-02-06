@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/services/api_service.dart';
+import 'package:provider/provider.dart';
+import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
-
 
 
 class PaymentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> cliente;
-  const PaymentDetailScreen({Key? key, required this.cliente}) : super(key: key);
+  const PaymentDetailScreen({super.key, required this.cliente});
 
   @override
   State<PaymentDetailScreen> createState() => _PaymentDetailScreenState();
 }
 
 class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
-  final ApiService _api = ApiService();
   List<dynamic> _tickets = [];
   Map<int, bool> _selected = {};
   bool _loading = true;
@@ -30,7 +29,8 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
     setState(() => _loading = true);
     try {
       final sucursalId = SucursalInherited.of(context)?.selectedSucursalId;
-      final allTickets = await _api.getTickets(sucursalId: sucursalId);
+      final repo = Provider.of<TicketRepository>(context, listen: false);
+      final allTickets = await repo.getTickets(sucursalId: sucursalId);
       final cid = widget.cliente['id'];
 
       // Tickets con deuda (solo para mostrar en la columna de tickets)
@@ -58,11 +58,11 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         try {
           final ticketId = ticket['id']?.toString();
           if (ticketId != null && ticketId.isNotEmpty) {
-            final pagosTicket = await _api.obtenerPagosTicket(ticketId);
+            final pagosTicket = await repo.obtenerPagosTicket(ticketId);
             pagosCliente.addAll(pagosTicket);
           }
         } catch (e) {
-          print('Error obteniendo pagos de ticket ${ticket['id']}: $e');
+          debugPrint('Error obteniendo pagos de ticket ${ticket['id']}: ${e.toString()}');
         }
       }
 
@@ -220,53 +220,20 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         return fa.compareTo(fb);
       });
 
+      final repo = Provider.of<TicketRepository>(context, listen: false);
       for (final t in ticketsSorted) {
-        if (remaining <= 0) break;
-        
-        // Obtener saldo pendiente
-        final saldo = (t['saldo_pendiente'] is num) 
-            ? (t['saldo_pendiente'] as num).toDouble() 
-            : 0.0;
-            
-        if (saldo <= 0) continue;
-        
-        // Calcular monto a aplicar en este ticket
-        final apply = remaining >= saldo ? saldo : remaining;
-        
-        // Obtener ID del ticket
-        final ticketId = t['id']?.toString();
-        if (ticketId == null || ticketId.isEmpty) {
-          print('PaymentDetail: ticket sin ID válido, skipping');
-          continue;
-        }
-
-        try {
-          // Usar la nueva arquitectura: registrarAbono
-          // El trigger automáticamente actualiza el ticket
-          await _api.registrarAbono(
-            ticketId: ticketId,
-            montoAbono: apply,
-            metodoPago: 'efectivo',
-          );
-          
-          remaining -= apply;
-        } catch (e) {
-          // Mostrar error detallado y continuar con el siguiente ticket
-          print('Error al registrar abono en ticket $ticketId: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error en ticket ${ticketId.substring(0, 8)}: $e'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-        }
+        final tid = t['id']?.toString();
+        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
+        final pago = (saldo <= remaining) ? saldo : remaining;
+        if (pago <= 0) break;
+        // registrarAbono registra un pago para un ticket dado
+        await repo.registrarAbono(ticketId: tid!, montoAbono: pago);
+        remaining -= pago;
       }
 
       // Recargar tickets después de procesar pagos
       await _loadTickets();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

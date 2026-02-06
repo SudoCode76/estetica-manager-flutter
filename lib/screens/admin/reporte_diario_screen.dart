@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+import '../../repositories/report_repository.dart';
+import '../../repositories/catalog_repository.dart';
 import '../../providers/sucursal_provider.dart';
 import 'package:app_estetica/navigation/route_observer.dart';
 import 'package:app_estetica/widgets/report_chart.dart';
 
 class ReporteDiarioScreen extends StatefulWidget {
-  const ReporteDiarioScreen({Key? key}) : super(key: key);
+  const ReporteDiarioScreen({super.key});
 
   @override
   State<ReporteDiarioScreen> createState() => _ReporteDiarioScreenState();
 }
 
 class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> with RouteAware {
-  final ApiService _api = ApiService();
+  late ReportRepository _reportRepo;
+  late CatalogRepository _catalogRepo;
   Map<String, dynamic>? _dailyReport;
   bool _isLoading = false;
   String? _error;
@@ -45,14 +49,14 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> with RouteAwa
       _error = null;
     });
     try {
-      final r = await _api.getDailyReport(start: _start, end: _end, sucursalId: _selectedSucursalId);
-      print('ReporteDiarioScreen: received report data: $r');
-      print('ReporteDiarioScreen: totalPayments=${r['totalPayments']}, pendingDebt=${r['pendingDebt']}, totalTickets=${r['totalTickets']}');
+      final r = await _reportRepo.getDailyReport(start: _start, end: _end, sucursalId: _selectedSucursalId);
+      debugPrint('ReporteDiarioScreen: received report data: $r');
+      debugPrint('ReporteDiarioScreen: totalPayments=${r['totalPayments']}, pendingDebt=${r['pendingDebt']}, totalTickets=${r['totalTickets']}');
       setState(() {
         _dailyReport = r;
       });
     } catch (e) {
-      print('ReporteDiarioScreen: error fetching daily report: $e');
+      debugPrint('ReporteDiarioScreen: error fetching daily report: $e');
       setState(() {
         _error = e.toString();
       });
@@ -73,7 +77,7 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> with RouteAwa
 
   Future<void> _loadSucursales() async {
     try {
-      final s = await _api.getSucursales();
+      final s = await _catalogRepo.getSucursales();
       setState(() => _sucursales = s);
     } catch (e) {
       // ignore
@@ -86,6 +90,9 @@ class _ReporteDiarioScreenState extends State<ReporteDiarioScreen> with RouteAwa
   void didChangeDependencies() {
     super.didChangeDependencies();
     // cargar sucursales una sola vez
+    // Obtener repositorios inyectados
+    _reportRepo = Provider.of<ReportRepository>(context, listen: false);
+    _catalogRepo = Provider.of<CatalogRepository>(context, listen: false);
     if (_sucursales == null) _loadSucursales();
 
     // Obtener provider de sucursal desde el Inherited widget y suscribirse a cambios

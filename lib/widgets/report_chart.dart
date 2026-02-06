@@ -6,7 +6,7 @@ class ReportChart extends StatelessWidget {
   final List<Map<String, dynamic>> data; // items: { 'date': 'YYYY-MM-DD' or 'YYYY-MM', 'payments': num, 'pendingDebt': num }
   final bool isBar;
 
-  const ReportChart({Key? key, required this.data, this.isBar = false}) : super(key: key);
+  const ReportChart({super.key, required this.data, this.isBar = false});
 
   List<double> _toDoubleList(List<Map<String, dynamic>> raw, String key) {
     return raw.map<double>((e) {
@@ -95,7 +95,7 @@ class ReportChart extends StatelessWidget {
             gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primary.withAlpha(180)]),
             barWidth: 3,
             dotData: FlDotData(show: true),
-            belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary.withOpacity(0.12), Colors.transparent])),
+            belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary.withValues(alpha: 0.12), Colors.transparent])),
           ),
         ],
       ),
