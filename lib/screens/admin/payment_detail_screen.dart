@@ -145,7 +145,11 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pago registrado correctamente'), backgroundColor: Colors.green));
-        Navigator.pop(context, true); // Volver y recargar lista anterior
+        // Recargar datos en esta misma pantalla y limpiar selección para actualizar la UI in-place
+        await _loadData();
+        // Asegurar que el input y selección queden limpios
+        _selectedTickets.clear();
+        _montoController.clear();
       }
     } catch (e) {
       if (mounted) {
