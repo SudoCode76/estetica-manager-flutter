@@ -28,6 +28,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
   bool _showHistoryMode = false;
+  // IDs de tickets que se están borrando (para mostrar loading por item)
+  final Set<String> _deletingIds = <String>{};
 
   @override
   void initState() {
@@ -492,6 +494,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                             itemCount: filteredTickets.length,
                             itemBuilder: (context, i) {
                               final t = filteredTickets[i];
+                              final idStr = (t['id'] ?? t['documentId'])?.toString() ?? '';
                               final fechaDateTime = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;                              final hora = fechaDateTime != null ? DateFormat('HH:mm').format(fechaDateTime) : '-';
                               final fecha = fechaDateTime != null ? DateFormat('dd/MM/yyyy').format(fechaDateTime) : '-';
                               final clienteObj = t['cliente'];
@@ -520,7 +523,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               // final estadoTicket = t['estadoTicket'] == true; // variable no usada, eliminada
 
                               return Dismissible(
-                                key: Key(t['id']?.toString() ?? t['documentId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString()),
+                                key: Key(idStr.isNotEmpty ? idStr : DateTime.now().millisecondsSinceEpoch.toString()),
                                 direction: DismissDirection.endToStart,
                                 background: Container(
                                   color: Colors.red,
@@ -546,6 +549,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                   );
 
                                   if (confirm == true) {
+                                    // Mostrar indicador de carga en el item
+                                    if (idStr.isNotEmpty) {
+                                      setState(() { _deletingIds.add(idStr); });
+                                    }
                                     try {
                                       final id = t['id'] ?? t['documentId'];
                                       final success = await Provider.of<TicketProvider>(context, listen: false).deleteTicket(id);
@@ -559,137 +566,158 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                       }
                                     } catch (e) {
                                       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red));
+                                    } finally {
+                                      if (idStr.isNotEmpty) {
+                                        setState(() { _deletingIds.remove(idStr); });
+                                      }
                                     }
                                   }
 
                                   // Devolvemos false para que Dismissible no quite el widget; la lista será actualizada por el Provider
                                   return false;
                                 },
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 12),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
-                                            blurRadius: 20,
-                                            offset: const Offset(0, 6),
-                                          ),
-                                        ],
-                                        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
-                                      ),
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () async {
-                                            await Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => TicketDetailScreen(ticket: t),
+                                child: Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                        child: Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
+                                            borderRadius: BorderRadius.circular(12),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(alpha: 0.06),
+                                                blurRadius: 20,
+                                                offset: const Offset(0, 6),
                                               ),
-                                            );
-                                            _reloadTicketsForCurrentFilters();
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 28,
-                                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                                  child: Text(
-                                                    cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
-                                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
+                                            ],
+                                            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
+                                          ),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              onTap: () async {
+                                                await Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => TicketDetailScreen(ticket: t),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 16),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        cliente,
-                                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                );
+                                                _reloadTicketsForCurrentFilters();
+                                              },
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(16),
+                                                child: Row(
+                                                  children: [
+                                                    CircleAvatar(
+                                                      radius: 28,
+                                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                                      child: Text(
+                                                        cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
+                                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                                                           fontWeight: FontWeight.bold,
                                                         ),
                                                       ),
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        tratamientoTexto,
-                                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                          color: Theme.of(context).colorScheme.primary,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      Row(
+                                                    ),
+                                                    const SizedBox(width: 16),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
                                                         children: [
-                                                          Icon(
-                                                            Icons.access_time,
-                                                            size: 16,
-                                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                          ),
-                                                          const SizedBox(width: 4),
                                                           Text(
-                                                            '$fecha - $hora',
-                                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                            cliente,
+                                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                              fontWeight: FontWeight.bold,
                                                             ),
                                                           ),
-                                                        ],
-                                                      ),
-                                                      if (tieneSaldo) ...[
-                                                        const SizedBox(height: 8),
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 4,
+                                                          const SizedBox(height: 4),
+                                                          Text(
+                                                            tratamientoTexto,
+                                                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                              color: Theme.of(context).colorScheme.primary,
+                                                            ),
                                                           ),
-                                                          decoration: BoxDecoration(
-                                                            color: Theme.of(context).colorScheme.errorContainer,
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize: MainAxisSize.min,
+                                                          const SizedBox(height: 8),
+                                                          Row(
                                                             children: [
                                                               Icon(
-                                                                Icons.warning_amber,
-                                                                size: 14,
-                                                                color: Theme.of(context).colorScheme.onErrorContainer,
+                                                                Icons.access_time,
+                                                                size: 16,
+                                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                               ),
                                                               const SizedBox(width: 4),
                                                               Text(
-                                                                'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
-                                                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                                  color: Theme.of(context).colorScheme.onErrorContainer,
-                                                                  fontWeight: FontWeight.bold,
+                                                                '$fecha - $hora',
+                                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                                 ),
                                                               ),
                                                             ],
                                                           ),
-                                                        ),
-                                                      ],
-                                                    ],
-                                                  ),
+                                                          if (tieneSaldo) ...[
+                                                            const SizedBox(height: 8),
+                                                            Container(
+                                                              padding: const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4,
+                                                              ),
+                                                              decoration: BoxDecoration(
+                                                                color: Theme.of(context).colorScheme.errorContainer,
+                                                                borderRadius: BorderRadius.circular(6),
+                                                              ),
+                                                              child: Row(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons.warning_amber,
+                                                                    size: 14,
+                                                                    color: Theme.of(context).colorScheme.onErrorContainer,
+                                                                  ),
+                                                                  const SizedBox(width: 4),
+                                                                  Text(
+                                                                    'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                                      color: Theme.of(context).colorScheme.onErrorContainer,
+                                                                      fontWeight: FontWeight.bold,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
+                                    if (_deletingIds.contains(idStr) && idStr.isNotEmpty)
+                                      Positioned.fill(
+                                        child: Container(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.35),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: const Center(
+                                            child: SizedBox(width: 36, height: 36, child: CircularProgressIndicator(strokeWidth: 3)),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ); // ✅ SOLO UNO (aquí estaba el extra)
-                            },
-                          ),
+                               ); // ✅ SOLO UNO (aquí estaba el extra)
+                             },
+                           ),
           ),
         ],
       ),

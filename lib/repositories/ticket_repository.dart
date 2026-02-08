@@ -450,27 +450,95 @@ class TicketRepository {
 
   Future<bool> eliminarTicket(dynamic documentId) async {
     try {
-      final id = documentId?.toString();
-      if (id == null || id.isEmpty) throw Exception('ID inválido');
+      final idRaw = documentId?.toString();
+      if (idRaw == null || idRaw.isEmpty) throw Exception('ID inválido');
 
-      // Eliminar pagos asociados
+      // Primero intentar RPC (si la función existe y es correcta)
       try {
-        await Supabase.instance.client.from('pago').delete().eq('ticket_id', id);
-      } catch (e) {
-        // No fatal: registrar y continuar
-        debugPrint('TicketRepository.eliminarTicket: warning al eliminar pagos: ${e.toString()}');
+        final response = await Supabase.instance.client.rpc(
+          'eliminar_ticket_atomico',
+          params: {'p_ticket_id': idRaw},
+        );
+
+        debugPrint('TicketRepository.eliminarTicket RPC raw response (type=${response?.runtimeType}): $response');
+
+        if (response != null) {
+          // Caso Map
+          if (response is Map) {
+            if (response['success'] == true) return true;
+            for (final v in response.values) {
+              if (v is Map && v['success'] == true) return true;
+            }
+            if (response.containsKey('data')) {
+              final d = response['data'];
+              if (d is List && d.isNotEmpty) {
+                final first = d.first;
+                if (first is Map && first['success'] == true) return true;
+              }
+            }
+            debugPrint('TicketRepository.eliminarTicket: RPC returned map but no success flag: $response');
+          } else if (response is List) {
+            if (response.isNotEmpty) {
+              for (final el in response) {
+                if (el is bool && el == true) return true;
+                if (el is Map) {
+                  if (el['success'] == true) return true;
+                  for (final v in el.values) {
+                    if (v is Map && v['success'] == true) return true;
+                  }
+                }
+              }
+            }
+            debugPrint('TicketRepository.eliminarTicket: RPC returned list but no success found: $response');
+            return false;
+          } else if (response is bool) {
+            return response;
+          } else {
+            debugPrint('TicketRepository.eliminarTicket: RPC returned unhandled type ${response.runtimeType}');
+          }
+        } else {
+          debugPrint('TicketRepository.eliminarTicket: RPC devolvió null');
+        }
+
+        // Si llegamos aquí, la RPC no indicó éxito; hacer fallback manual
+        debugPrint('TicketRepository.eliminarTicket: RPC no confirmó eliminación, ejecutando fallback manual');
+      } catch (rpcError) {
+        // Registrar el error arrojado por la RPC (tipo mismatch u otros)
+        debugPrint('TicketRepository.eliminarTicket: RPC attempt failed: ${rpcError.toString()} -- ejecutando fallback manual');
       }
 
-      // Eliminar sesiones asociadas
+      // FALLBACK MANUAL: eliminar pagos, sesiones y ticket por pasos
       try {
-        await Supabase.instance.client.from('sesion').delete().eq('ticket_id', id);
-      } catch (e) {
-        debugPrint('TicketRepository.eliminarTicket: warning al eliminar sesiones: ${e.toString()}');
-      }
+        final id = idRaw;
+        debugPrint('TicketRepository.eliminarTicket: realizando borrado manual para ticket id=$id');
 
-      // Finalmente eliminar el ticket
-      await Supabase.instance.client.from('ticket').delete().eq('id', id);
-      return true;
+        // Eliminar pagos asociados
+        try {
+          await Supabase.instance.client.from('pago').delete().eq('ticket_id', id);
+        } catch (e) {
+          debugPrint('TicketRepository.eliminarTicket: warning al eliminar pagos: ${e.toString()}');
+        }
+
+        // Eliminar sesiones asociadas
+        try {
+          await Supabase.instance.client.from('sesion').delete().eq('ticket_id', id);
+        } catch (e) {
+          debugPrint('TicketRepository.eliminarTicket: warning al eliminar sesiones: ${e.toString()}');
+        }
+
+        // Finalmente eliminar el ticket
+        try {
+          await Supabase.instance.client.from('ticket').delete().eq('id', id);
+        } catch (e) {
+          debugPrint('TicketRepository.eliminarTicket: error al eliminar ticket: ${e.toString()}');
+          return false;
+        }
+
+        return true;
+      } catch (e) {
+        debugPrint('TicketRepository.eliminarTicket fallback error: ${e.toString()}');
+        return false;
+      }
     } catch (e) {
       debugPrint('TicketRepository.eliminarTicket error: ${e.toString()}');
       return false;
