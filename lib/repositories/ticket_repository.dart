@@ -217,6 +217,58 @@ class TicketRepository {
     }
   }
 
+  /// Obtiene solo los tickets que tienen deuda (saldo > 0) para un cliente específico.
+  /// Esto es mucho más rápido que traer todos los tickets y filtrar en el celular.
+  Future<List<dynamic>> obtenerTicketsDeudaPorCliente(int clientId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
+            *,
+            sesiones:sesion(
+              numero_sesion,
+              tratamiento:tratamiento_id(nombretratamiento)
+            )
+          ''')
+          .eq('cliente_id', clientId)
+          .gt('saldo_pendiente', 0) // Solo tickets con deuda
+          .order('created_at', ascending: true); // Los más viejos primero para cobrar
+
+      return response as List<dynamic>;
+    } catch (e) {
+      debugPrint('TicketRepository.obtenerTicketsDeudaPorCliente error: $e');
+      return [];
+    }
+  }
+
+  /// Obtiene el historial completo de pagos de un cliente
+  Future<List<dynamic>> obtenerHistorialPagosCliente(int clientId) async {
+    try {
+      // 1. Primero obtenemos los IDs de los tickets de este cliente
+      final ticketsResp = await Supabase.instance.client
+          .from('ticket')
+          .select('id')
+          .eq('cliente_id', clientId);
+
+      final ticketIds = (ticketsResp as List).map((t) => t['id']).toList();
+
+      if (ticketIds.isEmpty) return [];
+
+      // 2. Buscamos los pagos asociados a esos tickets
+      // Usamos .filter con 'in' para filtrar por la lista de IDs
+      final response = await Supabase.instance.client
+          .from('pago')
+          .select('*, ticket(id, created_at)')
+          .filter('ticket_id', 'in', '(${ticketIds.join(',')})')
+          .order('fecha_pago', ascending: false);
+
+      return response as List<dynamic>;
+    } catch (e) {
+      debugPrint('TicketRepository.obtenerHistorialPagosCliente error: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>?> obtenerTicketDetalle(String ticketId) async {
     try {
       final response = await Supabase.instance.client
