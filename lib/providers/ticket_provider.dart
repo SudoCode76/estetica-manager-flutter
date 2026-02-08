@@ -385,4 +385,34 @@ class TicketProvider extends ChangeNotifier {
       return {'items': [], 'meta': {}};
     }
   }
+
+  /// Eliminar un ticket por ID
+  Future<bool> deleteTicket(dynamic id) async {
+    try {
+      final success = await _repo.eliminarTicket(id);
+      if (success) {
+        try {
+          _tickets.removeWhere((t) => (t['id']?.toString() ?? t['documentId']?.toString()) == id.toString());
+        } catch (_) {}
+        // También eliminar de la agenda local por si apareció allí
+        try {
+          _agenda.removeWhere((a) {
+            try {
+              final sid = (a is Map) ? (a['ticket_id']?.toString() ?? a['ticket']?.toString()) : null;
+              return sid != null && sid == id.toString();
+            } catch (_) {
+              return false;
+            }
+          });
+        } catch (_) {}
+        notifyListeners();
+      }
+      return success;
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('TicketProvider.deleteTicket error: $e');
+      notifyListeners();
+      return false;
+    }
+  }
 }

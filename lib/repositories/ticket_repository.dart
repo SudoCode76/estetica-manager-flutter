@@ -450,7 +450,25 @@ class TicketRepository {
 
   Future<bool> eliminarTicket(dynamic documentId) async {
     try {
-      final id = documentId;
+      final id = documentId?.toString();
+      if (id == null || id.isEmpty) throw Exception('ID inválido');
+
+      // Eliminar pagos asociados
+      try {
+        await Supabase.instance.client.from('pago').delete().eq('ticket_id', id);
+      } catch (e) {
+        // No fatal: registrar y continuar
+        debugPrint('TicketRepository.eliminarTicket: warning al eliminar pagos: ${e.toString()}');
+      }
+
+      // Eliminar sesiones asociadas
+      try {
+        await Supabase.instance.client.from('sesion').delete().eq('ticket_id', id);
+      } catch (e) {
+        debugPrint('TicketRepository.eliminarTicket: warning al eliminar sesiones: ${e.toString()}');
+      }
+
+      // Finalmente eliminar el ticket
       await Supabase.instance.client.from('ticket').delete().eq('id', id);
       return true;
     } catch (e) {

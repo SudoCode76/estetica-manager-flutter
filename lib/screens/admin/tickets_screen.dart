@@ -519,121 +519,168 @@ class _TicketsScreenState extends State<TicketsScreen> {
                               final saldoPendiente = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;                              final tieneSaldo = saldoPendiente > 0;
                               // final estadoTicket = t['estadoTicket'] == true; // variable no usada, eliminada
 
-                              return ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.06),
-                                          blurRadius: 20,
-                                          offset: const Offset(0, 6),
+                              return Dismissible(
+                                key: Key(t['id']?.toString() ?? t['documentId']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString()),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  color: Colors.red,
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  child: const Icon(Icons.delete, color: Colors.white),
+                                ),
+                                confirmDismiss: (direction) async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Eliminar Ticket'),
+                                      content: const Text('¿Estás seguro? Se borrarán también las sesiones y pagos asociados.'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: const Text('Eliminar'),
                                         ),
                                       ],
-                                      border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
                                     ),
-                                    child: Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        onTap: () async {
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => TicketDetailScreen(ticket: t),
-                                            ),
-                                          );
-                                          _reloadTicketsForCurrentFilters();
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Row(
-                                            children: [
-                                              CircleAvatar(
-                                                radius: 28,
-                                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                                child: Text(
-                                                  cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
-                                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                                    fontWeight: FontWeight.bold,
+                                  );
+
+                                  if (confirm == true) {
+                                    try {
+                                      final id = t['id'] ?? t['documentId'];
+                                      final success = await Provider.of<TicketProvider>(context, listen: false).deleteTicket(id);
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(success ? 'Ticket eliminado correctamente' : 'Error al eliminar ticket'),
+                                            backgroundColor: success ? Colors.green : Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red));
+                                    }
+                                  }
+
+                                  // Devolvemos false para que Dismissible no quite el widget; la lista será actualizada por el Provider
+                                  return false;
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.06),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () async {
+                                            await Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => TicketDetailScreen(ticket: t),
+                                              ),
+                                            );
+                                            _reloadTicketsForCurrentFilters();
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(16),
+                                            child: Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 28,
+                                                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                                  child: Text(
+                                                    cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
+                                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                              const SizedBox(width: 16),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      cliente,
-                                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      tratamientoTexto,
-                                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                        color: Theme.of(context).colorScheme.primary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons.access_time,
-                                                          size: 16,
-                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                const SizedBox(width: 16),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        cliente,
+                                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                                          fontWeight: FontWeight.bold,
                                                         ),
-                                                        const SizedBox(width: 4),
-                                                        Text(
-                                                          '$fecha - $hora',
-                                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        tratamientoTexto,
+                                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                          color: Theme.of(context).colorScheme.primary,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Row(
+                                                        children: [
+                                                          Icon(
+                                                            Icons.access_time,
+                                                            size: 16,
                                                             color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            '$fecha - $hora',
+                                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      if (tieneSaldo) ...[
+                                                        const SizedBox(height: 8),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
+                                                          decoration: BoxDecoration(
+                                                            color: Theme.of(context).colorScheme.errorContainer,
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Icon(
+                                                                Icons.warning_amber,
+                                                                size: 14,
+                                                                color: Theme.of(context).colorScheme.onErrorContainer,
+                                                              ),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                                  color: Theme.of(context).colorScheme.onErrorContainer,
+                                                                  fontWeight: FontWeight.bold,
+                                                                ),
+                                                              ),
+                                                            ],
                                                           ),
                                                         ),
                                                       ],
-                                                    ),
-                                                    if (tieneSaldo) ...[
-                                                      const SizedBox(height: 8),
-                                                      Container(
-                                                        padding: const EdgeInsets.symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 4,
-                                                        ),
-                                                        decoration: BoxDecoration(
-                                                          color: Theme.of(context).colorScheme.errorContainer,
-                                                          borderRadius: BorderRadius.circular(6),
-                                                        ),
-                                                        child: Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            Icon(
-                                                              Icons.warning_amber,
-                                                              size: 14,
-                                                              color: Theme.of(context).colorScheme.onErrorContainer,
-                                                            ),
-                                                            const SizedBox(width: 4),
-                                                            Text(
-                                                              'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
-                                                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                                color: Theme.of(context).colorScheme.onErrorContainer,
-                                                                fontWeight: FontWeight.bold,
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
                                                     ],
-                                                  ],
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),

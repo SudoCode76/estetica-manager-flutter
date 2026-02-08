@@ -7,6 +7,7 @@ import 'package:app_estetica/services/share_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:app_estetica/providers/ticket_provider.dart';
 
 class TicketDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ticket;
@@ -130,9 +131,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     });
 
     try {
-      final documentId = widget.ticket['documentId'];
-      final repo = Provider.of<TicketRepository>(context, listen: false);
-      final success = await repo.eliminarTicket(documentId);
+      final documentId = widget.ticket['documentId'] ?? widget.ticket['id'];
+      final success = await Provider.of<TicketProvider>(context, listen: false).deleteTicket(documentId);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -775,5 +775,7 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+
+
 
 
