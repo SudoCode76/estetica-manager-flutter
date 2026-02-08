@@ -226,7 +226,21 @@ class TicketProvider extends ChangeNotifier {
   Future<bool> marcarSesionAtendida(String sesionId) async {
     try {
       await _repo.marcarSesionAtendida(sesionId);
-      // No refrescamos aquí. La UI debe llamar a fetchAgenda/_loadAgenda para recargar con el rango correcto.
+      // Actualizar agenda local eliminando la sesión atendida para evitar que siga mostrándose
+      try {
+        _agenda.removeWhere((item) {
+          try {
+            final sid = (item is Map)
+                ? (item['sesion_id']?.toString() ?? item['id']?.toString())
+                : (item is String ? item : null);
+            return sid != null && sid == sesionId;
+          } catch (_) {
+            return false;
+          }
+        });
+      } catch (_) {}
+      _error = null;
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -240,7 +254,21 @@ class TicketProvider extends ChangeNotifier {
   Future<bool> reprogramarSesion(String sesionId, DateTime nuevaFecha) async {
     try {
       await _repo.reprogramarSesion(sesionId, nuevaFecha);
-      // No refrescamos aquí. La UI debe volver a pedir la agenda con el rango actual.
+      // Si la sesión fue reprogramada, eliminarla de la agenda local (podría estar fuera del rango)
+      try {
+        _agenda.removeWhere((item) {
+          try {
+            final sid = (item is Map)
+                ? (item['sesion_id']?.toString() ?? item['id']?.toString())
+                : (item is String ? item : null);
+            return sid != null && sid == sesionId;
+          } catch (_) {
+            return false;
+          }
+        });
+      } catch (_) {}
+      _error = null;
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();

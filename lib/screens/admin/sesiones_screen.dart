@@ -590,10 +590,11 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                           itemBuilder: (context, index) {
                             final sesion = AgendaItem.fromJson(displayed[index]);
                             return _SesionCard(
+                              key: ValueKey(sesion.sesionId),
                               sesion: sesion,
-                              // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
-                              showActions: _filtroEstado == 'agendada',
-                              onMarcarAtendida: () async {
+                               // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
+                               showActions: _filtroEstado == 'agendada',
+                               onMarcarAtendida: () async {
                                 final confirmed = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
@@ -621,14 +622,32 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                                         backgroundColor: success ? Colors.green : Colors.red,
                                       ),
                                     );
-                                    // Si la operación fue exitosa, recargar la agenda para reflejar el cambio
+
                                     if (success) {
-                                      _loadAgenda();
+                                      // Remover de resultados de búsqueda locales si aplica
+                                      try {
+                                        if (_searchResults != null) {
+                                          _searchResults!.removeWhere((it) {
+                                            try {
+                                              final Map<String, dynamic> m = (it is Map)
+                                                  ? Map<String, dynamic>.from(it)
+                                                  : (it is AgendaItem ? it.toJson() : <String, dynamic>{});
+                                              final sid = (m['sesion_id']?.toString() ?? m['id']?.toString());
+                                              return sid != null && sid == sesion.sesionId;
+                                            } catch (_) { return false; }
+                                          });
+                                        }
+                                      } catch (_) {}
+
+                                      // No re-fetch inmediato: programar re-fetch con un pequeño delay para que la vista en BD se actualice
+                                      Future.delayed(const Duration(milliseconds: 600), () {
+                                        if (mounted) _loadAgenda();
+                                      });
                                     }
                                   }
                                 }
-                              },
-                              onReprogramar: () async {
+                               },
+                               onReprogramar: () async {
                                 final picked = await showDatePicker(
                                   context: context,
                                   initialDate: sesion.fechaHora ?? DateTime.now(),
@@ -661,228 +680,245 @@ class _SesionesScreenState extends State<SesionesScreen> with SingleTickerProvid
                                         ),
                                       );
                                       if (success) {
-                                        _loadAgenda();
+                                        // Si hay resultados de búsqueda, eliminar la sesión reprogramada ya que pudo quedar fuera de rango
+                                        try {
+                                          if (_searchResults != null) {
+                                            _searchResults!.removeWhere((it) {
+                                              try {
+                                                final Map<String, dynamic> m = (it is Map)
+                                                    ? Map<String, dynamic>.from(it)
+                                                    : (it is AgendaItem ? it.toJson() : <String, dynamic>{});
+                                                final sid = (m['sesion_id']?.toString() ?? m['id']?.toString());
+                                                return sid != null && sid == sesion.sesionId;
+                                              } catch (_) { return false; }
+                                            });
+                                          }
+                                        } catch (_) {}
+
+                                        Future.delayed(const Duration(milliseconds: 600), () {
+                                          if (mounted) _loadAgenda();
+                                        });
                                       }
                                     }
                                   }
                                 }
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+                               },
+                             );
+                           },
+                         ),
+                       ),
+                     ),
+                   ],
+                 );
+               },
+             ),
+           ),
+         ],
+       ),
+     );
+   }
+ }
 
-class _SesionCard extends StatelessWidget {
-  final AgendaItem sesion;
-  final VoidCallback onMarcarAtendida;
-  final VoidCallback onReprogramar;
-  final bool showActions;
+ class _SesionCard extends StatelessWidget {
+   final AgendaItem sesion;
+   final VoidCallback onMarcarAtendida;
+   final VoidCallback onReprogramar;
+   final bool showActions;
 
-  const _SesionCard({
-    super.key,
-    required this.sesion,
-    required this.onMarcarAtendida,
-    required this.onReprogramar,
-    this.showActions = true,
-  });
+   const _SesionCard({
+     Key? key,
+     required this.sesion,
+     required this.onMarcarAtendida,
+     required this.onReprogramar,
+     this.showActions = true,
+   }) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final tieneDeuda = sesion.saldoPendiente > 0;
+   @override
+   Widget build(BuildContext context) {
+     final theme = Theme.of(context);
+     final colorScheme = theme.colorScheme;
+     final tieneDeuda = sesion.saldoPendiente > 0;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: () {
-          // Aquí podrías navegar al detalle del ticket si lo deseas
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header con hora y estado
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.access_time, size: 16, color: colorScheme.primary),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              sesion.fechaHora != null
-                                  ? DateFormat('HH:mm').format(sesion.fechaHora!)
-                                  : 'Sin hora',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              sesion.fechaHora != null
-                                  ? DateFormat('EEE, d MMM', 'es_ES').format(sesion.fechaHora!)
-                                  : '',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.9),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (tieneDeuda)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.warning_amber, size: 16, color: colorScheme.error),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Debe Bs ${sesion.saldoPendiente.toStringAsFixed(2)}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Sesión ${sesion.numeroSesion}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+     return Card(
+       elevation: 0,
+       margin: const EdgeInsets.only(bottom: 8),
+       shape: RoundedRectangleBorder(
+         borderRadius: BorderRadius.circular(16),
+         side: BorderSide(
+           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+           width: 1,
+         ),
+       ),
+       child: InkWell(
+         onTap: () {
+           // Aquí podrías navegar al detalle del ticket si lo deseas
+         },
+         borderRadius: BorderRadius.circular(16),
+         child: Padding(
+           padding: const EdgeInsets.all(16),
+           child: Column(
+             crossAxisAlignment: CrossAxisAlignment.start,
+             children: [
+               // Header con hora y estado
+               Row(
+                 children: [
+                   Container(
+                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                     decoration: BoxDecoration(
+                       color: colorScheme.primaryContainer,
+                       borderRadius: BorderRadius.circular(8),
+                     ),
+                     child: Row(
+                       mainAxisSize: MainAxisSize.min,
+                       children: [
+                         Icon(Icons.access_time, size: 16, color: colorScheme.primary),
+                         const SizedBox(width: 8),
+                         Column(
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             Text(
+                               sesion.fechaHora != null
+                                   ? DateFormat('HH:mm').format(sesion.fechaHora!)
+                                   : 'Sin hora',
+                               style: theme.textTheme.labelLarge?.copyWith(
+                                 color: colorScheme.primary,
+                                 fontWeight: FontWeight.bold,
+                               ),
+                             ),
+                             const SizedBox(height: 2),
+                             Text(
+                               sesion.fechaHora != null
+                                   ? DateFormat('EEE, d MMM', 'es_ES').format(sesion.fechaHora!)
+                                   : '',
+                               style: theme.textTheme.labelSmall?.copyWith(
+                                 color: colorScheme.onPrimaryContainer.withValues(alpha: 0.9),
+                                 fontSize: 11,
+                               ),
+                             ),
+                           ],
+                         ),
+                       ],
+                     ),
+                   ),
+                   const SizedBox(width: 8),
+                   if (tieneDeuda)
+                     Container(
+                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                       decoration: BoxDecoration(
+                         color: colorScheme.errorContainer,
+                         borderRadius: BorderRadius.circular(8),
+                       ),
+                       child: Row(
+                         mainAxisSize: MainAxisSize.min,
+                         children: [
+                           Icon(Icons.warning_amber, size: 16, color: colorScheme.error),
+                           const SizedBox(width: 4),
+                           Text(
+                             'Debe Bs ${sesion.saldoPendiente.toStringAsFixed(2)}',
+                             style: theme.textTheme.labelSmall?.copyWith(
+                               color: colorScheme.error,
+                               fontWeight: FontWeight.bold,
+                             ),
+                           ),
+                         ],
+                       ),
+                     ),
+                   const Spacer(),
+                   Container(
+                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                     decoration: BoxDecoration(
+                       color: colorScheme.secondaryContainer,
+                       borderRadius: BorderRadius.circular(6),
+                     ),
+                     child: Text(
+                       'Sesión ${sesion.numeroSesion}',
+                       style: theme.textTheme.labelSmall?.copyWith(
+                         color: colorScheme.onSecondaryContainer,
+                         fontWeight: FontWeight.w600,
+                       ),
+                     ),
+                   ),
+                 ],
+               ),
 
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
+               const SizedBox(height: 12),
+               const Divider(height: 1),
+               const SizedBox(height: 12),
 
-              // Cliente
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: colorScheme.primaryContainer,
-                    child: Text(
-                      sesion.nombreCliente.isNotEmpty ? sesion.nombreCliente[0].toUpperCase() : '?',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          sesion.nombreCliente,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          sesion.nombreTratamiento,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+               // Cliente
+               Row(
+                 children: [
+                   CircleAvatar(
+                     radius: 20,
+                     backgroundColor: colorScheme.primaryContainer,
+                     child: Text(
+                       sesion.nombreCliente.isNotEmpty ? sesion.nombreCliente[0].toUpperCase() : '?',
+                       style: theme.textTheme.titleMedium?.copyWith(
+                         color: colorScheme.onPrimaryContainer,
+                         fontWeight: FontWeight.bold,
+                       ),
+                     ),
+                   ),
+                   const SizedBox(width: 12),
+                   Expanded(
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+                         Text(
+                           sesion.nombreCliente,
+                           style: theme.textTheme.titleMedium?.copyWith(
+                             fontWeight: FontWeight.bold,
+                           ),
+                         ),
+                         const SizedBox(height: 2),
+                         Text(
+                           sesion.nombreTratamiento,
+                           style: theme.textTheme.bodyMedium?.copyWith(
+                             color: colorScheme.onSurfaceVariant,
+                           ),
+                         ),
+                       ],
+                     ),
+                   ),
+                 ],
+               ),
 
-              const SizedBox(height: 16),
+               const SizedBox(height: 16),
 
-              // Acciones
-              if (showActions) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onReprogramar,
-                        icon: const Icon(Icons.schedule, size: 18),
-                        label: const Text('Reprogramar'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: onMarcarAtendida,
-                        icon: const Icon(Icons.check_circle, size: 18),
-                        label: const Text('Atendida'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+               // Acciones
+               if (showActions) ...[
+                 Row(
+                   children: [
+                     Expanded(
+                       child: OutlinedButton.icon(
+                         onPressed: onReprogramar,
+                         icon: const Icon(Icons.schedule, size: 18),
+                         label: const Text('Reprogramar'),
+                         style: OutlinedButton.styleFrom(
+                           padding: const EdgeInsets.symmetric(vertical: 12),
+                         ),
+                       ),
+                     ),
+                     const SizedBox(width: 8),
+                     Expanded(
+                       child: FilledButton.icon(
+                         onPressed: onMarcarAtendida,
+                         icon: const Icon(Icons.check_circle, size: 18),
+                         label: const Text('Atendida'),
+                         style: FilledButton.styleFrom(
+                           backgroundColor: Colors.green,
+                           padding: const EdgeInsets.symmetric(vertical: 12),
+                         ),
+                       ),
+                     ),
+                   ],
+                 ),
+               ],
+             ],
+           ),
+         ),
+       ),
+     );
+   }
+ }
