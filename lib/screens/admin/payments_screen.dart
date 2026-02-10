@@ -276,9 +276,8 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                                 // Pill style row
                                 return InkWell(
                                   borderRadius: BorderRadius.circular(999),
-                                  onTap: () async {
-                                    final res = await Navigator.push(context, MaterialPageRoute(builder: (_) => pd.PaymentDetailScreen(cliente: c)));
-                                    if (res == true) await _loadClientsWithDebt();
+                                  onTap: () {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => pd.PaymentDetailScreen(cliente: c)));
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),

@@ -90,4 +90,24 @@ class ClienteRepository {
       rethrow;
     }
   }
+
+  // NUEVO MÉTODO: obtenerHistorialClientes
+  Future<List<dynamic>> obtenerHistorialClientes({int? sucursalId}) async {
+    try {
+      var query = Supabase.instance.client
+          .from('vista_historial_clientes')
+          .select()
+          .gt('total_pagado', 0);
+
+      if (sucursalId != null) {
+        query = query.eq('sucursal_id', sucursalId);
+      }
+
+      final response = await query.order('total_pagado', ascending: false);
+      return response as List<dynamic>;
+    } catch (e) {
+      // En caso de error devolvemos lista vacía
+      return [];
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:app_estetica/repositories/ticket_repository.dart';
+import 'package:intl/intl.dart'; // Asegúrate de tener este import para formatear moneda/fechas
 import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/payment_detail_screen.dart';
@@ -14,12 +14,12 @@ class PaymentsHistoryScreen extends StatefulWidget {
 }
 
 class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
-  late TicketRepository _ticketRepo;
   late ClienteRepository _clienteRepo;
+
   bool _loading = true;
   String? _error;
-  List<dynamic> _clients = []; // all clients with history
-  List<dynamic> _filteredClients = []; // clients after search
+  List<dynamic> _clients = [];
+  List<dynamic> _filteredClients = [];
   SucursalProvider? _sucursalProvider;
 
   final TextEditingController _searchCtrl = TextEditingController();
@@ -45,9 +45,8 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
     }
     setState(() {
       _filteredClients = _clients.where((c) {
-        final nombre = '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.toString().toLowerCase();
-        final doc = (c['documentId'] ?? '').toString().toLowerCase();
-        return nombre.contains(q) || doc.contains(q);
+        final nombre = '${c['nombrecliente'] ?? ''} ${c['apellidocliente'] ?? ''}'.toString().toLowerCase();
+        return nombre.contains(q);
       }).toList();
     });
   }
@@ -57,8 +56,6 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
     super.didChangeDependencies();
     if (_sucursalProvider == null) {
       _sucursalProvider = SucursalInherited.of(context);
-      // Obtener repos inyectados
-      _ticketRepo = Provider.of<TicketRepository>(context, listen: false);
       _clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
       _loadClientsHistory();
     }
@@ -68,289 +65,159 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final sucursalId = _sucursalProvider?.selectedSucursalId;
-      // Usar timeouts para evitar bloqueo indefinido
-      final tickets = await _ticketRepo.getTickets(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
-      final clients = await _clienteRepo.searchClientes(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
 
-      // Map clientId -> totalPaid and flags/counters
-      final Map<int, double> paidMap = {};
-      final Map<int, int> historicoCount = {}; // tickets that had cuota > 0
-      final Map<int, int> currentDebtCount = {}; // tickets with saldo > 0
-
-      for (final t in tickets) {
-        final cid = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
-        if (cid == null) continue;
-        final totalTicket = double.tryParse(t['cuota']?.toString() ?? '0') ?? 0;
-        final saldo = double.tryParse(t['saldoPendiente']?.toString() ?? '0') ?? 0;
-        final paid = (totalTicket - saldo) > 0 ? (totalTicket - saldo) : 0;
-        paidMap[cid] = (paidMap[cid] ?? 0) + paid;
-        if (totalTicket > 0) historicoCount[cid] = (historicoCount[cid] ?? 0) + 1;
-        if (saldo > 0) currentDebtCount[cid] = (currentDebtCount[cid] ?? 0) + 1;
-      }
-
-      final List<dynamic> result = [];
-      for (final c in clients) {
-        final id = c['id'];
-        if ((historicoCount[id] ?? 0) > 0) {
-          final copy = Map<String, dynamic>.from(c);
-          copy['totalPagado'] = paidMap[id] ?? 0;
-          copy['ticketsHistoricosCount'] = historicoCount[id] ?? 0;
-          copy['ticketsConDeudaActualCount'] = currentDebtCount[id] ?? 0;
-          result.add(copy);
-        }
-      }
-
-      // Order desc by totalPagado
-      result.sort((a, b) => (b['totalPagado'] as double).compareTo(a['totalPagado'] as double));
+      // Llamada optimizada a la vista SQL
+      final data = await _clienteRepo.obtenerHistorialClientes(sucursalId: sucursalId);
 
       setState(() {
-        _clients = result;
-        _filteredClients = List<dynamic>.from(result);
+        _clients = data;
+        _filteredClients = List<dynamic>.from(data);
         _loading = false;
       });
     } catch (e) {
-      final msg = e is TimeoutException ? 'Timeout al cargar historial (verifica conexión)' : e.toString();
-      setState(() { _loading = false; _error = msg; });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando historial: $msg')));
-    }
-  }
-
-  Future<void> _showClientPaymentsModal(Map<String, dynamic> client) async {
-    setState(() => _loading = true);
-    try {
-      final sucursalId = _sucursalProvider?.selectedSucursalId;
-
-      // Usar la nueva arquitectura: obtener tickets pendientes del cliente
-      final allTickets = await _ticketRepo.obtenerTicketsPendientes(sucursalId: sucursalId).timeout(const Duration(seconds: 8));
-      final clientId = client['id'];
-
-      // Filtrar tickets del cliente específico
-      final clientTickets = allTickets.where((t) {
-        final cid = t['cliente'] is Map ? t['cliente']['id'] : t['cliente'];
-        return cid == clientId;
-      }).toList();
-
-      // Calcular pagos para el cliente
-      final List<dynamic> pagos = [];
-      for (final t in clientTickets) {
-        try {
-          final ticketId = t['id']?.toString();
-          if (ticketId == null || ticketId.isEmpty) continue;
-          final pagosTicket = await _ticketRepo.obtenerPagosTicket(ticketId);
-          pagos.addAll(pagosTicket);
-        } catch (e) {
-          debugPrint('Error obteniendo pagos para ticket ${t['id']}: ${e.toString()}');
-        }
-      }
-
-      setState(() => _loading = false);
-
-      // Mostrar modal con historial (estilizado)
-      await showDialog(
-        context: context,
-        builder: (context) {
-          final theme = Theme.of(context);
-          return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720, maxHeight: 520),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: Text('${client['nombreCliente'] ?? ''} ${client['apellidoCliente'] ?? ''}', style: theme.textTheme.titleLarge)),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: Icon(Icons.close, color: theme.colorScheme.onSurface.withAlpha(160)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Chip(
-                        avatar: Icon(Icons.receipt_long, size: 18, color: theme.colorScheme.onPrimary),
-                        label: Text('${client['ticketsHistoricosCount'] ?? 0} tickets'),
-                        backgroundColor: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Chip(
-                        avatar: Icon(Icons.account_balance_wallet, size: 18, color: Colors.white),
-                        label: Text('Pagos: ${pagos.length}'),
-                        backgroundColor: theme.colorScheme.secondary,
-                      ),
-                      const Spacer(),
-                    ]),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: pagos.isEmpty
-                          ? Center(child: Text('No hay registros de pago', style: theme.textTheme.bodyLarge))
-                          : ListView.separated(
-                              itemCount: pagos.length,
-                              separatorBuilder: (_, __) => const Divider(height: 8),
-                              itemBuilder: (context, i) {
-                                final p = pagos[i];
-                                final monto = double.tryParse(p['montoPagado']?.toString() ?? '0') ?? 0;
-                                final fecha = p['fechaPago'] ?? p['createdAt'] ?? '';
-                                final ticket = p['ticket'] is Map ? (p['ticket']['documentId'] ?? p['ticket']['id']) : p['ticket'];
-                                return ListTile(
-                                  dense: true,
-                                  leading: CircleAvatar(backgroundColor: theme.colorScheme.primary.withAlpha(30), child: Icon(Icons.monetization_on, color: theme.colorScheme.primary)),
-                                  title: Text('Bs ${monto.toStringAsFixed(2)}', style: theme.textTheme.titleSmall),
-                                  subtitle: Text('Fecha: ${fecha.toString()}\nTicket: ${ticket ?? '-'}', style: theme.textTheme.bodySmall),
-                                );
-                              },
-                            ),
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cerrar'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    } catch (e) {
-      final msg = e is TimeoutException ? 'Timeout al cargar pagos (verifica conexión)' : e.toString();
-      setState(() => _loading = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando pagos del cliente: $msg')));
+      setState(() { _loading = false; _error = e.toString(); });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // Calcular total global
+    final totalHistorico = _clients.fold<double>(0.0, (sum, c) => sum + ((c['total_pagado'] as num?)?.toDouble() ?? 0.0));
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Clientes con historial de deuda')),
+      appBar: AppBar(title: const Text('Historial de Clientes')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : (_error != null)
               ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, size: 56, color: Theme.of(context).colorScheme.error),
-                        const SizedBox(height: 12),
-                        Text('Error al cargar historial', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.error)),
-                        const SizedBox(height: 8),
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(onPressed: _loadClientsHistory, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
-                      ],
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const SizedBox(height: 8),
+                      Text('Error: $_error'),
+                      TextButton(onPressed: _loadClientsHistory, child: const Text('Reintentar'))
+                    ],
                   ),
                 )
               : Padding(
                padding: const EdgeInsets.all(12.0),
                child: Column(
                  children: [
-                  // Search field
+                  // HEADER CARD
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('TOTAL DE CLIENTES', style: theme.textTheme.bodySmall),
+                      Text('${_clients.length}', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Text('TOTAL HISTÓRICO COBRADO', style: theme.textTheme.bodySmall),
+                      Text(
+                        'Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalHistorico)}',
+                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // SEARCH
                   TextField(
                     controller: _searchCtrl,
                     decoration: InputDecoration(
                       hintText: 'Buscar cliente...',
-                      prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurface.withAlpha(140)),
-                      suffixIcon: _searchCtrl.text.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear, color: theme.colorScheme.onSurface.withAlpha(140)),
-                              onPressed: () => _searchCtrl.clear(),
-                            )
-                          : null,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-                  // List
+                  // LISTA
                   Expanded(
                     child: _filteredClients.isEmpty
-                        ? Center(child: Text('No hay clientes con historial', style: theme.textTheme.bodyLarge))
-                        : LayoutBuilder(builder: (context, constraints) {
-                            final screenW = constraints.maxWidth;
-                            final isNarrow = screenW < 420;
-                            return ListView.separated(
-                              itemCount: _filteredClients.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
-                              itemBuilder: (context, i) {
-                                final c = _filteredClients[i];
-                                final nombre = '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim();
-                                final totalPagado = (c['totalPagado'] as double).toStringAsFixed(2);
-                                final historicoCount = c['ticketsHistoricosCount'] ?? 0;
-                                final currentCount = c['ticketsConDeudaActualCount'] ?? 0;
-                                final avatarRadius = isNarrow ? 18.0 : 20.0;
-                                final titleStyle = isNarrow ? theme.textTheme.titleSmall : theme.textTheme.titleMedium;
-                                final subtitleStyle = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withAlpha(160));
+                        ? Center(child: Text('No hay registros', style: theme.textTheme.bodyLarge))
+                        : ListView.separated(
+                            itemCount: _filteredClients.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, i) {
+                              final c = _filteredClients[i];
+                              final nombre = '${c['nombrecliente'] ?? ''} ${c['apellidocliente'] ?? ''}'.trim();
+                              final totalPagado = (c['total_pagado'] as num?)?.toDouble() ?? 0.0;
+                              final tieneDeuda = (((c['tickets_con_deuda'] as int?) ?? 0) > 0);
+                              final ultimaVisitaRaw = c['ultima_visita'];
 
-                                return Card(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  elevation: 0,
+                              String fechaVisita = '-';
+                              if (ultimaVisitaRaw != null) {
+                                fechaVisita = DateFormat('d MMM yyyy', 'es').format(DateTime.parse(ultimaVisitaRaw));
+                              }
+
+                              return Card(
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.withValues(alpha: 0.1))),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    // Navegar al detalle pasando los datos normalizados para PaymentDetailScreen
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentDetailScreen(cliente: {
+                                      'id': c['id'],
+                                      'nombreCliente': c['nombrecliente'],
+                                      'apellidoCliente': c['apellidocliente'],
+                                      // Agrega teléfono si lo necesitas y está en la vista
+                                    })));
+                                  },
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: isNarrow ? 10.0 : 12.0, vertical: isNarrow ? 8.0 : 10.0),
-                                    child: Row(children: [
-                                      CircleAvatar(radius: avatarRadius, backgroundColor: theme.colorScheme.primary.withAlpha(30), child: Icon(Icons.person, color: theme.colorScheme.primary, size: avatarRadius)),
-                                      const SizedBox(width: 12),
-
-                                      // Main info
-                                      Expanded(
-                                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                          Text(nombre, style: titleStyle, overflow: TextOverflow.ellipsis),
-                                          const SizedBox(height: 6),
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 6,
-                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text('Total pagado: Bs $totalPagado', style: subtitleStyle),
-                                              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.primary.withAlpha(20), borderRadius: BorderRadius.circular(8)), child: Text('$historicoCount históricos', style: theme.textTheme.bodySmall)),
-                                              if (currentCount > 0)
-                                                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: theme.colorScheme.error.withAlpha(20), borderRadius: BorderRadius.circular(8)), child: Text('$currentCount con deuda', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error))),
+                                              Text(nombre, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                              const SizedBox(height: 4),
+                                              Text('Última visita: $fechaVisita', style: theme.textTheme.bodySmall),
+                                              const SizedBox(height: 8),
+                                              if (tieneDeuda)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                                  child: const Text('Tiene deuda', style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                )
+                                              else
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                                                  child: const Text('Al día', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ),
                                             ],
                                           ),
-                                        ]),
-                                      ),
-
-                                      // Actions
-                                      const SizedBox(width: 8),
-                                      Column(mainAxisSize: MainAxisSize.min, children: [
-                                        IconButton(
-                                          onPressed: () => _showClientPaymentsModal(c),
-                                          icon: Icon(Icons.receipt_long, color: theme.colorScheme.primary),
-                                          tooltip: 'Ver historial rápido',
                                         ),
-                                        const SizedBox(height: 4),
-                                        IconButton(
-                                          onPressed: () async {
-                                            await Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentDetailScreen(cliente: c)));
-                                            await _loadClientsHistory();
-                                          },
-                                          icon: Icon(Icons.chevron_right, color: theme.colorScheme.onSurface.withAlpha(160)),
-                                          tooltip: 'Abrir detalle',
+                                        Text(
+                                          'Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalPagado)}',
+                                          style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
                                         ),
-                                      ]),
-                                    ]),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.chevron_right, color: Colors.grey),
+                                      ],
+                                    ),
                                   ),
-                                );
-                              },
-                            );
-                          }),
-                  ),
-                ],
+                                ),
+                              );
+                            },
+                           ),
+                   ),
+                  ],
+                ),
               ),
-            ),
-    );
-  }
+     );
+   }
 }
-
