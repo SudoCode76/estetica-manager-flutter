@@ -65,39 +65,45 @@ class ReportChart extends StatelessWidget {
   Widget _buildLineChart(BuildContext context, List<double> payments, double maxY, List<String> xLabels) {
     final spots = List<FlSpot>.generate(payments.length, (i) => FlSpot(i.toDouble(), payments[i]));
 
-    return LineChart(
-      LineChartData(
-        minY: 0,
-        maxY: maxY,
-        gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 4),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 44, interval: maxY / 4)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 36,
-              interval: 1,
-              getTitlesWidget: (value, meta) {
-                final idx = value.toInt();
-                if (idx < 0 || idx >= xLabels.length) return const SizedBox.shrink();
-                final isMonth = xLabels[idx].split('-').length == 2;
-                final label = _shortLabel(xLabels[idx], isMonth);
-                return Padding(padding: const EdgeInsets.only(top: 6), child: Text(label, style: const TextStyle(fontSize: 10)));
-              },
+    // Desactivar interacciones y envolver en IgnorePointer para evitar listeners de puntero
+    return IgnorePointer(
+      ignoring: true,
+      child: LineChart(
+        LineChartData(
+          minY: 0,
+          maxY: maxY,
+          gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 4),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 44, interval: maxY / 4)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 36,
+                interval: 1,
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= xLabels.length) return const SizedBox.shrink();
+                  final isMonth = xLabels[idx].split('-').length == 2;
+                  final label = _shortLabel(xLabels[idx], isMonth);
+                  return Padding(padding: const EdgeInsets.only(top: 6), child: Text(label, style: const TextStyle(fontSize: 10)));
+                },
+              ),
             ),
           ),
+          borderData: FlBorderData(show: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primary.withAlpha(180)]),
+              barWidth: 3,
+              dotData: FlDotData(show: true),
+              belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary.withValues(alpha: 0.12), Colors.transparent])),
+            ),
+          ],
+          // Desactivar touch
+          lineTouchData: LineTouchData(enabled: false),
         ),
-        borderData: FlBorderData(show: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.primary.withAlpha(180)]),
-            barWidth: 3,
-            dotData: FlDotData(show: true),
-            belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [Theme.of(context).colorScheme.primary.withValues(alpha: 0.12), Colors.transparent])),
-          ),
-        ],
       ),
     );
   }
@@ -113,22 +119,26 @@ class ReportChart extends StatelessWidget {
       ], barsSpace: 6));
     }
 
-    return BarChart(
-      BarChartData(
-        maxY: maxY,
-        barGroups: groups,
-        gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 44, interval: maxY / 4)),
-          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 36, interval: 1, getTitlesWidget: (value, meta) {
-            final idx = value.toInt();
-            if (idx < 0 || idx >= xLabels.length) return const SizedBox.shrink();
-            final isMonth = xLabels[idx].split('-').length == 2;
-            final label = _shortLabel(xLabels[idx], isMonth);
-            return Padding(padding: const EdgeInsets.only(top: 6), child: Text(label, style: const TextStyle(fontSize: 10)));
-          })),
+    return IgnorePointer(
+      ignoring: true,
+      child: BarChart(
+        BarChartData(
+          maxY: maxY,
+          barGroups: groups,
+          gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 44, interval: maxY / 4)),
+            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 36, interval: 1, getTitlesWidget: (value, meta) {
+              final idx = value.toInt();
+              if (idx < 0 || idx >= xLabels.length) return const SizedBox.shrink();
+              final isMonth = xLabels[idx].split('-').length == 2;
+              final label = _shortLabel(xLabels[idx], isMonth);
+              return Padding(padding: const EdgeInsets.only(top: 6), child: Text(label, style: const TextStyle(fontSize: 10)));
+            })),
+          ),
+          borderData: FlBorderData(show: false),
+          barTouchData: BarTouchData(enabled: false),
         ),
-        borderData: FlBorderData(show: false),
       ),
     );
   }

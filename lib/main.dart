@@ -8,13 +8,13 @@ import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
-import 'package:app_estetica/providers/report_provider.dart';
 import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/repositories/auth_repository.dart';
 import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/repositories/cliente_repository.dart';
-import 'package:app_estetica/repositories/report_repository.dart';
+import 'package:app_estetica/repositories/reports_repository.dart';
 import 'package:app_estetica/navigation/route_observer.dart';
+import 'package:app_estetica/providers/reports_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_estetica/config/supabase_config.dart';
 
@@ -48,21 +48,22 @@ class _MyAppState extends State<MyApp> {
     final authRepo = AuthRepository();
     final catalogRepo = CatalogRepository();
     final clienteRepo = ClienteRepository();
-    final reportRepo = ReportRepository();
 
     return SucursalInherited(
       provider: _globalSucursalProvider,
       child: MultiProvider(
         providers: [
+          // Hacemos disponible SucursalProvider también vía provider package
+          ChangeNotifierProvider<SucursalProvider>.value(value: _globalSucursalProvider),
           Provider<TicketRepository>.value(value: ticketRepo),
           Provider<AuthRepository>.value(value: authRepo),
           Provider<CatalogRepository>.value(value: catalogRepo),
           Provider<ClienteRepository>.value(value: clienteRepo),
-          Provider<ReportRepository>.value(value: reportRepo),
+          Provider<ReportsRepository>.value(value: ReportsRepository()),
 
           // Providers que dependen de repos
           ChangeNotifierProvider<TicketProvider>(create: (_) => TicketProvider(repo: ticketRepo)),
-          ChangeNotifierProvider<ReportProvider>(create: (_) => ReportProvider(repo: reportRepo)),
+          ChangeNotifierProvider<ReportsProvider>(create: (_) => ReportsProvider()),
         ],
         child: MaterialApp(
           title: 'App Estetica',

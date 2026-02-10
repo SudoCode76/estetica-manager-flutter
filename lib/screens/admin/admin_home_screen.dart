@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:app_estetica/screens/admin/clients_screen.dart';
-import 'package:app_estetica/screens/admin/reporte_ventas_screen.dart';
-import 'package:app_estetica/screens/admin/settings_screen.dart';
 import 'package:app_estetica/screens/admin/tickets_screen.dart';
 import 'package:app_estetica/screens/admin/sesiones_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
@@ -18,6 +16,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'dart:async';
+import 'package:app_estetica/screens/admin/reports_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;
@@ -34,7 +33,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   late CatalogRepository _catalogRepo;
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
-  String? _sucursalesError;
   bool _isInitialized = false; // NUEVO: controla si está listo para mostrar pantallas
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -50,9 +48,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
     TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
     PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
-    ReporteVentasScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
+    // Reportes debe estar en la posición 5 del Drawer
+    ReportsScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
     EmployeesScreen(key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}')),
-    const SettingsScreen(),
   ];
 
   // Pantallas para empleado (solo tickets y clientes) - usando Key para forzar recreación
@@ -229,7 +227,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       setState(() {
         _sucursales = sucursales;
         _isLoadingSucursales = false;
-        _sucursalesError = null;
         // Sólo seleccionar la primera sucursal si no hay selección previa persistida
         if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
           debugPrint('AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}');
@@ -252,7 +249,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         setState(() {
           _sucursales = cached;
           _isLoadingSucursales = false;
-          _sucursalesError = 'Usando datos en caché: servidor lento o inaccesible';
           // Si no hay selección previa, seleccionar la primera del cache
           if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
             _sucursalProvider?.setSucursal(_sucursales.first['id'], _sucursales.first['nombreSucursal']);
@@ -263,7 +259,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         // No hay caché: informar y permitir reintento
         setState(() {
           _isLoadingSucursales = false;
-          _sucursalesError = msg;
         });
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando sucursales: $msg')));
       }
@@ -682,16 +677,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       selected: _selectedIndex == 6,
                       onTap: () {
                         setState(() { _selectedIndex = 6; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings,
-                      label: 'Configuración',
-                      selected: _selectedIndex == 7,
-                      onTap: () {
-                        setState(() { _selectedIndex = 7; });
                         Navigator.pop(context);
                       },
                     ),
