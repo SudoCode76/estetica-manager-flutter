@@ -8,7 +8,7 @@ import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/repositories/auth_repository.dart';
 import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
-import 'package:app_estetica/screens/admin/select_client_screen.dart';
+import 'package:app_estetica/screens/admin/clients/select_client_screen.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';

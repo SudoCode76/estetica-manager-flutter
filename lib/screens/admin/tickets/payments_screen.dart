@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/repositories/ticket_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
-import 'package:app_estetica/screens/admin/payment_detail_screen.dart' as pd;
-import 'package:app_estetica/screens/admin/payments_history_screen.dart';
+import 'package:app_estetica/screens/admin/payments/payment_detail_screen.dart' as pd;
+import 'package:app_estetica/screens/admin/payments/payments_history_screen.dart';
 
 
 

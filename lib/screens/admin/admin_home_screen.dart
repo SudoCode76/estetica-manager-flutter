@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/screens/admin/clients_screen.dart';
-import 'package:app_estetica/screens/admin/tickets_screen.dart';
+import 'package:app_estetica/screens/admin/clients/clients_screen.dart';
+import 'package:app_estetica/screens/admin/tickets/tickets_screen.dart';
 import 'package:app_estetica/screens/admin/sesiones_screen.dart';
 import 'package:app_estetica/screens/admin/treatments_screen.dart';
-import 'package:app_estetica/screens/admin/payments_screen.dart';
+import 'package:app_estetica/screens/admin/tickets/payments_screen.dart';
 import 'package:app_estetica/screens/admin/employees_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
-import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
+import 'package:app_estetica/screens/admin/tickets/new_ticket_screen.dart';
 import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/services/supabase_auth_service.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
@@ -16,7 +16,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'dart:async';
-import 'package:app_estetica/screens/admin/reports_screen.dart';
+import 'package:app_estetica/screens/admin/reports/reports_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;

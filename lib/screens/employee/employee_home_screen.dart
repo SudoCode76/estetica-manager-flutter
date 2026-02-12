@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:app_estetica/screens/admin/tickets_screen.dart';
-import 'package:app_estetica/screens/admin/clients_screen.dart';
-import 'package:app_estetica/screens/admin/new_ticket_screen.dart';
+import 'package:app_estetica/screens/admin/tickets/tickets_screen.dart';
+import 'package:app_estetica/screens/admin/clients/clients_screen.dart';
+import 'package:app_estetica/screens/admin/tickets/new_ticket_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';

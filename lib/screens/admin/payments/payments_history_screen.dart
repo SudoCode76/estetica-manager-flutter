@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // Asegúrate de tener este import para formatear moneda/fechas
 import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
-import 'package:app_estetica/screens/admin/payment_detail_screen.dart';
+import 'package:app_estetica/screens/admin/payments/payment_detail_screen.dart';
 import 'package:provider/provider.dart';
 
 class PaymentsHistoryScreen extends StatefulWidget {

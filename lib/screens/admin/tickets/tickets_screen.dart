@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:app_estetica/screens/admin/ticket_detail_screen.dart';
+import 'package:app_estetica/screens/admin/tickets/ticket_detail_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';

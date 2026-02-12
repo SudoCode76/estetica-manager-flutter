@@ -3,11 +3,10 @@ import 'package:app_estetica/config/responsive.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/providers/reports_provider.dart';
-import 'reports/financial_report.dart';
-import 'reports/clients_report.dart';
-import 'reports/services_report.dart';
-import 'reports/report_period.dart';
-import 'package:flutter/foundation.dart';
+import 'financial_report.dart';
+import 'clients_report.dart';
+import 'services_report.dart';
+import 'report_period.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
