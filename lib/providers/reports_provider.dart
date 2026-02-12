@@ -19,6 +19,7 @@ class ReportsProvider extends ChangeNotifier {
   // Calcula las fechas basado en el enum
   (DateTime, DateTime) _getDates(ReportPeriod period) {
     final now = DateTime.now();
+    // Final del día de hoy
     final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
     DateTime start;
@@ -27,6 +28,7 @@ class ReportsProvider extends ChangeNotifier {
         start = DateTime(now.year, now.month, now.day);
         break;
       case ReportPeriod.week:
+        // Lunes de esta semana
         start = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
         break;
       case ReportPeriod.month:
@@ -47,8 +49,9 @@ class ReportsProvider extends ChangeNotifier {
 
     try {
       final dates = _getDates(period);
-      final start = dates.$1;
-      final end = dates.$2;
+      // Enviamos fechas en UTC (Supabase espera timestamps en UTC)
+      final start = dates.$1.toUtc();
+      final end = dates.$2.toUtc();
 
       debugPrint('ReportsProvider: Cargando datos desde $start hasta $end');
 
@@ -58,6 +61,7 @@ class ReportsProvider extends ChangeNotifier {
         _repo.getServicesReport(sucursalId: sucursalId, start: start, end: end),
       ]);
 
+      // Los repositorios ya devuelven mapas normalizados
       _financialData = results[0] as Map<String, dynamic>? ?? {};
       _clientsData = results[1] as Map<String, dynamic>? ?? {};
       _servicesData = results[2] as Map<String, dynamic>? ?? {};
@@ -69,8 +73,6 @@ class ReportsProvider extends ChangeNotifier {
     } catch (e, stack) {
       debugPrint("ReportsProvider ERROR cargando reportes: $e");
       debugPrint("Stack: $stack");
-
-      // Mantener datos vacíos en caso de error
       _financialData = {};
       _clientsData = {};
       _servicesData = {};
@@ -80,4 +82,3 @@ class ReportsProvider extends ChangeNotifier {
     }
   }
 }
-

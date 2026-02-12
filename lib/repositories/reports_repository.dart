@@ -24,7 +24,53 @@ class ReportsRepository {
         debugPrint('ReportsRepository.getFinancialReport: Response type=${resp.runtimeType}, data=$resp');
       }
 
-      if (resp is Map) return Map<String, dynamic>.from(resp);
+      if (resp is Map) {
+        // Normalizar campos esperados según la función SQL que proporcionaste
+        final Map<String, dynamic> m = Map<String, dynamic>.from(resp);
+
+        // ingresos -> double
+        final ingresos = (m['ingresos'] is num) ? (m['ingresos'] as num).toDouble() : 0.0;
+
+        // chart_data -> List<{label: String, value: double}>
+        final rawChart = (m['chart_data'] is List) ? List.from(m['chart_data'] as List) : <dynamic>[];
+        final chartData = rawChart.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'label': map['label']?.toString() ?? '',
+            'value': (map['value'] is num) ? (map['value'] as num).toDouble() : 0.0,
+          };
+        }).toList();
+
+        // top_tratamientos -> List<{name, count, total_dinero}>
+        final rawTop = (m['top_tratamientos'] is List) ? List.from(m['top_tratamientos'] as List) : <dynamic>[];
+        final topTratamientos = rawTop.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'name': map['name']?.toString() ?? '',
+            'count': (map['count'] is num) ? (map['count'] as num).toInt() : 0,
+            'total_dinero': (map['total_dinero'] is num) ? (map['total_dinero'] as num).toDouble() : 0.0,
+          };
+        }).toList();
+
+        // pendientes_cobro -> List<{name, amount, date}>
+        final rawPend = (m['pendientes_cobro'] is List) ? List.from(m['pendientes_cobro'] as List) : <dynamic>[];
+        final pendientes = rawPend.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'name': map['name']?.toString() ?? '',
+            'amount': (map['amount'] is num) ? (map['amount'] as num).toDouble() : 0.0,
+            'date': map['date']?.toString(),
+          };
+        }).toList();
+
+        return {
+          'ingresos': ingresos,
+          'chart_data': chartData,
+          'top_tratamientos': topTratamientos,
+          'pendientes_cobro': pendientes,
+        };
+      }
+
       return {};
     } catch (e, stack) {
       debugPrint('ReportsRepository.getFinancialReport ERROR: $e');
@@ -53,7 +99,37 @@ class ReportsRepository {
         debugPrint('ReportsRepository.getClientsReport: Response type=${resp.runtimeType}, data=$resp');
       }
 
-      if (resp is Map) return Map<String, dynamic>.from(resp);
+      if (resp is Map) {
+        final Map<String, dynamic> m = Map<String, dynamic>.from(resp);
+        final int atendidos = (m['atendidos'] is num) ? (m['atendidos'] as num).toInt() : 0;
+        final int nuevos = (m['nuevos'] is num) ? (m['nuevos'] as num).toInt() : 0;
+
+        final rawChart = (m['chart_data'] is List) ? List.from(m['chart_data'] as List) : <dynamic>[];
+        final chartData = rawChart.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'label': map['label']?.toString() ?? '',
+            'value': (map['value'] is num) ? (map['value'] as num).toDouble() : 0.0,
+          };
+        }).toList();
+
+        final rawTop = (m['top_clientes'] is List) ? List.from(m['top_clientes'] as List) : <dynamic>[];
+        final topClients = rawTop.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'name': map['name']?.toString() ?? '',
+            'amount': (map['amount'] is num) ? (map['amount'] as num).toDouble() : 0.0,
+          };
+        }).toList();
+
+        return {
+          'atendidos': atendidos,
+          'nuevos': nuevos,
+          'chart_data': chartData,
+          'top_clientes': topClients,
+        };
+      }
+
       return {};
     } catch (e, stack) {
       debugPrint('ReportsRepository.getClientsReport ERROR: $e');
@@ -82,7 +158,47 @@ class ReportsRepository {
         debugPrint('ReportsRepository.getServicesReport: Response type=${resp.runtimeType}, data=$resp');
       }
 
-      if (resp is Map) return Map<String, dynamic>.from(resp);
+      if (resp is Map) {
+        final Map<String, dynamic> m = Map<String, dynamic>.from(resp);
+        final int completados = (m['completados'] is num) ? (m['completados'] as num).toInt() : 0;
+
+        final rawChart = (m['chart_data'] is List) ? List.from(m['chart_data'] as List) : <dynamic>[];
+        final chartData = rawChart.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'label': map['label']?.toString() ?? '',
+            'value': (map['value'] is num) ? (map['value'] as num).toDouble() : 0.0,
+          };
+        }).toList();
+
+        final rawTop = (m['top_servicios'] is List) ? List.from(m['top_servicios'] as List) : <dynamic>[];
+        final topServicios = rawTop.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'name': map['name']?.toString() ?? '',
+            'count': (map['count'] is num) ? (map['count'] as num).toInt() : 0,
+          };
+        }).toList();
+
+        final rawIngresos = (m['ingresos_detalle'] is List) ? List.from(m['ingresos_detalle'] as List) : <dynamic>[];
+        final ingresosDetalle = rawIngresos.map<Map<String, dynamic>>((e) {
+          final map = (e is Map) ? Map<String, dynamic>.from(e) : {};
+          return {
+            'title': map['title']?.toString() ?? '',
+            'subtitle': map['subtitle']?.toString() ?? '',
+            'amount': (map['amount'] is num) ? (map['amount'] as num).toDouble() : 0.0,
+            'date': map['date']?.toString(),
+          };
+        }).toList();
+
+        return {
+          'completados': completados,
+          'chart_data': chartData,
+          'top_servicios': topServicios,
+          'ingresos_detalle': ingresosDetalle,
+        };
+      }
+
       return {};
     } catch (e, stack) {
       debugPrint('ReportsRepository.getServicesReport ERROR: $e');

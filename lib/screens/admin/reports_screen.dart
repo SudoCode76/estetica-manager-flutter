@@ -16,42 +16,32 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
+class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
   ReportPeriod _period = ReportPeriod.month; // Por defecto Mes
-  int _currentTab = 0; // 0=Financiero,1=Clientes,2=Servicios
-  bool _pointerEnabled = false; // Bloquea pointers hasta que la pantalla haya renderizado
+  late TabController _tabController;
+  int _currentTab = 0;
 
-  // Variable para evitar recargas infinitas si el ID no cambia
+  // Variable para evitar recargas innecesarias
   int? _loadedSucursalId;
 
   @override
   void initState() {
     super.initState();
-    // Habilitar punteros después de un par de frames para evitar hit-tests prematuros
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _pointerEnabled = true);
-      });
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) return;
+      setState(() => _currentTab = _tabController.index);
     });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Escuchar cambios en la sucursal (ej: carga inicial o cambio en el menú)
-    SucursalProvider? sucursalProvider;
-    try {
-      sucursalProvider = Provider.of<SucursalProvider>(context, listen: false);
-    } catch (_) {
-      // Si Provider no está disponible (ej: hot-reload sin restart), usamos el InheritedWidget como fallback
-      sucursalProvider = SucursalInherited.of(context);
-    }
-    final currentId = sucursalProvider?.selectedSucursalId;
+    final sucursalProvider = Provider.of<SucursalProvider>(context);
+    final currentId = sucursalProvider.selectedSucursalId;
 
-    // Solo cargar si tenemos ID y es diferente al último cargado (o si nunca cargamos)
     if (currentId != null && currentId != _loadedSucursalId) {
       _loadedSucursalId = currentId;
-      // Usamos addPostFrameCallback para evitar errores de build durante la actualización
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadData(currentId);
       });
@@ -60,6 +50,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -71,38 +62,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   void _loadData(int sucursalId) {
-    debugPrint('ReportsScreen: Cargando datos para sucursal $sucursalId, periodo: $_period');
-    // Llamada segura al provider: si no está disponible por alguna razón usamos el InheritedWidget
-    try {
-      Provider.of<ReportsProvider>(context, listen: false).loadReports(sucursalId, _period);
-    } catch (_) {
-      final repoProvider = Provider.of<ReportsProvider?>(context, listen: false);
-      if (repoProvider != null) {
-        repoProvider.loadReports(sucursalId, _period);
-      } else {
-        // último recurso: nada que hacer, mostramos log
-        debugPrint('ReportsScreen._loadData: ReportsProvider no disponible');
-      }
-    }
-  }
-
-  // Botón para reintentar manual en caso de fallo
-  void _retryLoad() {
-    SucursalProvider? sucursalProvider;
-    try {
-      sucursalProvider = Provider.of<SucursalProvider>(context, listen: false);
-    } catch (_) {
-      sucursalProvider = SucursalInherited.of(context);
-    }
-
-    final sucursalId = sucursalProvider?.selectedSucursalId;
-    if (sucursalId != null) {
-      _loadData(sucursalId);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay sucursal seleccionada')),
-      );
-    }
+    Provider.of<ReportsProvider>(context, listen: false).loadReports(sucursalId, _period);
   }
 
   Widget _buildPeriodChip(ReportPeriod p, String label) {
@@ -130,12 +90,42 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  Widget _buildTabButton(int index, String label) {
+    final selected = _currentTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() => _currentTab = index);
+          _tabController.animateTo(index);
+        },
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF7B61FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(label, style: TextStyle(color: selected ? Colors.white : Colors.grey.shade700, fontWeight: FontWeight.bold)),
+        ),
+      ),
+    );
+  }
+
+  void _retryLoad() {
+    final sucursalId = Provider.of<SucursalProvider>(context, listen: false).selectedSucursalId;
+    if (sucursalId != null) {
+      _loadData(sucursalId);
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay sucursal seleccionada')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isSmallScreen = Responsive.isSmallScreen(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5FA), // Fondo gris muy suave (tipo dashboard)
+      backgroundColor: const Color(0xFFF5F5FA),
       appBar: AppBar(
         title: Text('Reportes', style: TextStyle(fontSize: isSmallScreen ? 18 : 20, fontWeight: FontWeight.bold)),
         centerTitle: true,
@@ -189,13 +179,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
         child: Consumer<ReportsProvider>(
           builder: (context, provider, _) {
-            if (provider.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+            if (provider.isLoading) return const Center(child: CircularProgressIndicator());
 
-            // Verificar si hay datos (chequeamos si al menos el mapa existe,
-            // las funciones RPC siempre devuelven la estructura JSON aunque tenga 0s)
-            // Si financialData tiene keys, significa que la consulta fue exitosa (aunque sean 0s).
             final hasData = provider.financialData.isNotEmpty;
 
             if (!hasData) {
@@ -208,12 +193,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     const Text(
                       'No hay datos disponibles\npara el periodo seleccionado',
                       style: TextStyle(fontSize: 16, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Verifica tu conexión o selecciona\nuna sucursal diferente',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 30),
@@ -232,109 +211,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
               );
             }
 
-            // En web, no renderizamos el contenido hasta que el primer frame complete el layout
-            if (kIsWeb && !_pointerEnabled) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            // En web, usamos una vista simplificada y no interactiva para evitar problemas de hit-test
-            if (kIsWeb) {
-              return _buildSimpleWebReports(provider.financialData, provider.clientsData, provider.servicesData);
-            }
-
-            // Mostrar solo la pestaña activa usando IndexedStack para evitar PageView/Sliver hit-test issues
-            final tabs = [
-              FinancialReport(period: _period, data: provider.financialData),
-              ClientsReport(period: _period, data: provider.clientsData),
-              ServicesReport(period: _period, data: provider.servicesData),
-            ];
-
-            Widget content = IndexedStack(index: _currentTab, children: tabs);
-
-            // En web/desktop: bloquear eventos de puntero hasta que la pantalla termine su primer frame
-            if (kIsWeb) {
-              content = IgnorePointer(ignoring: !_pointerEnabled, child: content);
-            }
-
-            return content;
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                FinancialReport(period: _period, data: provider.financialData),
+                ClientsReport(period: _period, data: provider.clientsData),
+                ServicesReport(period: _period, data: provider.servicesData),
+              ],
+            );
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildTabButton(int index, String label) {
-    final selected = _currentTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          // Bloqueamos punteros mientras el nuevo contenido se construye
-          if (mounted) setState(() => _pointerEnabled = false);
-          // Cambiamos la pestaña
-          setState(() {
-            _currentTab = index;
-          });
-          // Habilitamos punteros en dos frames para dar tiempo a que los hijos completen layout
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() => _pointerEnabled = true);
-            });
-          });
-        },
-        child: Container(
-          height: 37,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFF7B61FF) : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(label, style: TextStyle(color: selected ? Colors.white : Colors.grey.shade700, fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSimpleWebReports(Map<String, dynamic> fin, Map<String, dynamic> clients, Map<String, dynamic> services) {
-    final ingresos = (fin['ingresos'] as num?)?.toDouble() ?? 0.0;
-    final atendidos = (clients['atendidos'] as num?)?.toInt() ?? 0;
-    final completados = (services['completados'] as num?)?.toInt() ?? 0;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context), vertical: 20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Resumen Financiero', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text('Ingresos: Bs ${ingresos.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18)),
-            ]),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Clientes', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text('Atendidos: $atendidos', style: const TextStyle(fontSize: 18)),
-            ]),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Servicios', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text('Completados: $completados', style: const TextStyle(fontSize: 18)),
-            ]),
-          ),
-        ),
-      ]),
     );
   }
 }

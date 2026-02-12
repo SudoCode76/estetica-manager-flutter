@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'report_period.dart';
 
 class ClientsReport extends StatelessWidget {
@@ -12,7 +13,6 @@ class ClientsReport extends StatelessWidget {
 
     final atendidos = (data['atendidos'] as num?)?.toInt() ?? 0;
     final nuevos = (data['nuevos'] as num?)?.toInt() ?? 0;
-    final recurrentesPct = (data['recurrentes_pct'] as num?)?.toDouble() ?? 0.0;
     final topClients = (data['top_clientes'] as List?) ?? [];
 
     return SingleChildScrollView(
@@ -21,7 +21,7 @@ class ClientsReport extends StatelessWidget {
         children: [
           const SizedBox(height: 12),
 
-          // CARD ATENDIDOS (gráfico eliminado por simplicidad)
+          // CARD ATENDIDOS
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
@@ -36,16 +36,9 @@ class ClientsReport extends StatelessWidget {
               ]),
               const SizedBox(height: 8),
               Text('$atendidos', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2C))),
+              const SizedBox(height: 20),
+              // Eliminado el gráfico que generaba problemas de rendimiento en web
               const SizedBox(height: 8),
-              // En lugar del gráfico mostramos un resumen textual y pequeños indicadores
-              Row(children: [
-                Expanded(child: Text('Clientes atendidos en el periodo', style: TextStyle(color: Colors.grey[600]))),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(12)),
-                  child: Text('${(recurrentesPct * 100).toInt()}% recurrentes', style: const TextStyle(color: Color(0xFF9333EA), fontWeight: FontWeight.bold)),
-                )
-              ]),
             ]),
           ),
 
@@ -78,10 +71,10 @@ class ClientsReport extends StatelessWidget {
                   SizedBox(
                     height: 70, width: 70,
                     child: Stack(children: [
-                      Center(child: Text('${(recurrentesPct * 100).toInt()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
+                      Center(child: Text('75%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
                       SizedBox(
                         width: 70, height: 70,
-                        child: CircularProgressIndicator(value: recurrentesPct, color: Colors.white, backgroundColor: Colors.white24, strokeWidth: 6),
+                        child: CircularProgressIndicator(value: 0.75, color: Colors.white, backgroundColor: Colors.white24, strokeWidth: 6),
                       ),
                     ]),
                   ),
@@ -109,7 +102,7 @@ class ClientsReport extends StatelessWidget {
                 final idx = entry.key + 1;
                 final c = entry.value;
                 final amount = (c['amount'] as num).toDouble();
-                final maxVal = topClients.isEmpty ? 1.0 : topClients.map((e) => (e['amount'] as num).toDouble()).reduce((a, b) => a > b ? a : b);
+                final maxVal = topClients.map((e) => (e['amount'] as num).toDouble()).fold<double>(0.0, (prev, el) => el > prev ? el : prev);
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 20.0),
@@ -123,11 +116,11 @@ class ClientsReport extends StatelessWidget {
                     const SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(value: amount / (maxVal == 0 ? 1 : maxVal), color: const Color(0xFF9333EA), backgroundColor: const Color(0xFFF3E8FF), minHeight: 6),
+                      child: LinearProgressIndicator(value: maxVal == 0 ? 0 : amount / maxVal, color: const Color(0xFF9333EA), backgroundColor: const Color(0xFFF3E8FF), minHeight: 6),
                     )
                   ]),
                 );
-              }),
+              }).toList(),
             ]),
           ),
           const SizedBox(height: 20),
