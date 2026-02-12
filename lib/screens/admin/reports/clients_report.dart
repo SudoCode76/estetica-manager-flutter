@@ -10,6 +10,8 @@ class ClientsReport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final surface = Theme.of(context).colorScheme.surface;
 
     final atendidos = (data['atendidos'] as num?)?.toInt() ?? 0;
     final nuevos = (data['nuevos'] as num?)?.toInt() ?? 0;
@@ -34,27 +36,27 @@ class ClientsReport extends StatelessWidget {
           // CARD PRINCIPAL
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 // CAMBIO DE ETIQUETA AQUÍ:
-                Text('CLIENTES CON TICKET', style: TextStyle(color: Colors.grey[600], fontSize: 12, letterSpacing: 0.5, fontWeight: FontWeight.bold)),
+                Text('CLIENTES CON TICKET', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12, letterSpacing: 0.5, fontWeight: FontWeight.bold)),
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF9333EA), size: 20),
+                  decoration: BoxDecoration(color: cs.primary.withAlpha((0.08 * 255).toInt()), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(Icons.confirmation_number_outlined, color: cs.primary, size: 20),
                 )
               ]),
               const SizedBox(height: 4),
               Row(
                 children: [
-                  Text('$atendidos', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2C))),
+                  Text('$atendidos', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: cs.onSurface)),
                   const SizedBox(width: 10),
                   if (atendidos > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: const Color(0xFFE0F2F1), borderRadius: BorderRadius.circular(12)),
-                      child: const Text('+12%', style: TextStyle(color: Color(0xFF00695C), fontWeight: FontWeight.bold, fontSize: 11)),
+                      decoration: BoxDecoration(color: cs.primary.withAlpha((0.08 * 255).toInt()), borderRadius: BorderRadius.circular(12)),
+                      child: Text('+12%', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 11)),
                     )
                 ],
               ),
@@ -64,50 +66,50 @@ class ClientsReport extends StatelessWidget {
               SizedBox(
                 height: 120,
                 child: chartData.isEmpty
-                  ? const Center(child: Text("Sin actividad", style: TextStyle(color: Colors.grey)))
+                  ? Center(child: Text("Sin actividad", style: TextStyle(color: cs.onSurfaceVariant)))
                   : BarChart(BarChartData(
-                      barGroups: List.generate(chartData.length, (i) {
-                        final val = chartData[i]['value'] as double;
-                        return BarChartGroupData(x: i, barRods: [
-                          BarChartRodData(
-                            toY: val,
-                            color: const Color(0xFFD8B4FE), // Violeta suave
-                            width: 18,
-                            borderRadius: BorderRadius.circular(6)
-                          )
-                        ]);
-                      }),
-                      gridData: const FlGridData(show: false),
-                      titlesData: FlTitlesData(
-                        show: true,
-                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            getTitlesWidget: (val, meta) {
-                              final idx = val.toInt();
-                              if (idx >= 0 && idx < chartData.length) {
-                                // Mostrar etiquetas espaciadas si son muchas
-                                if (chartData.length > 7 && idx % 2 != 0) return const SizedBox.shrink();
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(
-                                    chartData[idx]['label'] as String,
-                                    style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                            reservedSize: 20
-                          )
-                        )
-                      ),
-                      borderData: FlBorderData(show: false),
-                      alignment: BarChartAlignment.spaceAround,
-                    )),
+                       barGroups: List.generate(chartData.length, (i) {
+                         final val = chartData[i]['value'] as double;
+                         return BarChartGroupData(x: i, barRods: [
+                           BarChartRodData(
+                             toY: val,
+                            color: cs.primary.withAlpha((0.6 * 255).toInt()),
+                             width: 18,
+                             borderRadius: BorderRadius.circular(6)
+                           )
+                         ]);
+                       }),
+                       gridData: const FlGridData(show: false),
+                       titlesData: FlTitlesData(
+                         show: true,
+                         leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                         bottomTitles: AxisTitles(
+                           sideTitles: SideTitles(
+                             showTitles: true,
+                             getTitlesWidget: (val, meta) {
+                               final idx = val.toInt();
+                               if (idx >= 0 && idx < chartData.length) {
+                                 // Mostrar etiquetas espaciadas si son muchas
+                                 if (chartData.length > 7 && idx % 2 != 0) return const SizedBox.shrink();
+                                 return Padding(
+                                   padding: const EdgeInsets.only(top: 8.0),
+                                   child: Text(
+                                     chartData[idx]['label'] as String,
+                                     style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)
+                                   ),
+                                 );
+                               }
+                               return const SizedBox.shrink();
+                             },
+                             reservedSize: 20
+                           )
+                         )
+                       ),
+                       borderData: FlBorderData(show: false),
+                       alignment: BarChartAlignment.spaceAround,
+                     )),
               )
             ]),
           ),
@@ -119,7 +121,7 @@ class ClientsReport extends StatelessWidget {
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+                decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('NUEVOS', style: TextStyle(color: Colors.grey[600], fontSize: 11, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
@@ -143,7 +145,7 @@ class ClientsReport extends StatelessWidget {
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: const Color(0xFF9333EA), borderRadius: BorderRadius.circular(24)),
+                decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
                 child: Column(children: [
                   const Text('RECURRENTES', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
@@ -169,11 +171,11 @@ class ClientsReport extends StatelessWidget {
           // LISTA TOP CLIENTES
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Top Clientes', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF1E1E2C))),
-                const Text('Ver todo', style: TextStyle(color: Color(0xFF9333EA), fontWeight: FontWeight.bold)),
+                Text('Top Clientes', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface)),
+                Text('Ver todo', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
               ]),
               const SizedBox(height: 24),
               if (topClients.isEmpty) const Center(child: Text("Sin datos", style: TextStyle(color: Colors.grey))),
@@ -181,7 +183,7 @@ class ClientsReport extends StatelessWidget {
                 final idx = entry.key + 1;
                 final c = entry.value;
                 final amount = (c['amount'] as num).toDouble();
-                final maxVal = topClients.map((e) => (e['amount'] as num).toDouble()).fold<double>(0.0, (prev, el) => el > prev ? el : prev);
+                final maxVal = topClients.map((e) => (e['amount'] as num).toDouble()).reduce((a, b) => a > b ? a : b);
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 24.0),
@@ -189,22 +191,22 @@ class ClientsReport extends StatelessWidget {
                     Row(children: [
                       Text(idx.toString().padLeft(2, '0'), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                       const SizedBox(width: 12),
-                      Expanded(child: Text((c['name']?.toString() ?? 'Cliente'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
-                      Text('Bs ${amount.toInt()}', style: const TextStyle(color: Color(0xFF9333EA), fontWeight: FontWeight.bold)),
+                      Expanded(child: Text((c['name']?.toString() ?? 'Cliente'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: cs.onSurface))),
+                      Text('Bs ${amount.toInt()}', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
                     ]),
                     const SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(value: maxVal == 0 ? 0 : amount / maxVal, color: const Color(0xFF9333EA), backgroundColor: const Color(0xFFF3E8FF), minHeight: 6),
+                      child: LinearProgressIndicator(value: amount / (maxVal == 0 ? 1 : maxVal), color: cs.primary, backgroundColor: cs.primary.withAlpha((0.08 * 255).toInt()), minHeight: 6),
                     )
-                  ]),
-                );
-              }).toList(),
-            ]),
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-}
+                   ]),
+                 );
+               }).toList(),
+             ]),
+           ),
+           const SizedBox(height: 20),
+         ],
+       ),
+     );
+   }
+ }

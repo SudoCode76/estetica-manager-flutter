@@ -36,6 +36,9 @@ class FinancialReport extends StatelessWidget {
     // Normalizar chartData a lista de {label, value}
     // (chartData se usa directamente en la UI/Gráfico)
 
+    final cs = Theme.of(context).colorScheme;
+    final surface = cs.surface;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -44,14 +47,14 @@ class FinancialReport extends StatelessWidget {
           // CARD INGRESOS
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Ingresos Totales', style: textTheme.bodyMedium?.copyWith(color: Colors.grey[600])),
+              Text('Ingresos Totales', style: textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 8),
-              Text('Bs ${NumberFormat('#,##0.00', 'es_BO').format(ingresos)}', style: textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, color: const Color(0xFF1E1E2C), fontSize: 32)),
+              Text('Bs ${NumberFormat('#,##0.00', 'es_BO').format(ingresos)}', style: textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface, fontSize: 32)),
               const SizedBox(height: 24),
 
-              Text('Tendencia ($chartLabel)', style: TextStyle(fontSize: 12, color: Colors.grey[400], fontWeight: FontWeight.bold)),
+              Text('Tendencia ($chartLabel)', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
 
               // GRÁFICO
@@ -60,7 +63,7 @@ class FinancialReport extends StatelessWidget {
                 child: chartData.isEmpty
                     ? const Center(child: Text("Sin movimientos", style: TextStyle(color: Colors.grey)))
                     : BarChart(BarChartData(
-                        barGroups: _buildChartGroups(chartData),
+                        barGroups: _buildChartGroups(chartData, cs),
                         gridData: const FlGridData(show: false),
                         titlesData: FlTitlesData(
                           leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -74,7 +77,7 @@ class FinancialReport extends StatelessWidget {
                                 if (chartData.length > 7 && idx % 2 != 0) return const SizedBox.shrink();
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(chartData[idx]['label'].toString(), style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                  child: Text(chartData[idx]['label'].toString(), style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
                                 );
                               }
                               return const SizedBox.shrink();
@@ -93,16 +96,16 @@ class FinancialReport extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: surface,
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.03), blurRadius: 10, offset: const Offset(0, 4))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Tratamientos más vendidos',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2C)),
+                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface),
                 ),
                 const SizedBox(height: 24),
 
@@ -116,7 +119,7 @@ class FinancialReport extends StatelessWidget {
                     final count = (t['count'] as num).toInt();
                     // Calcular máximo para la barra de progreso relativa
                     final maxVal = topTratamientos.map((e) => (e['count'] as num).toDouble()).reduce((a, b) => a > b ? a : b);
-                    return _buildTreatmentRow(t['name'] ?? 'Tratamiento', count, maxVal);
+                    return _buildTreatmentRow(t['name'] ?? 'Tratamiento', count, maxVal, textTheme, cs);
                   }),
               ],
             ),
@@ -128,9 +131,9 @@ class FinancialReport extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: surface,
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.03), blurRadius: 10, offset: const Offset(0, 4))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,22 +141,22 @@ class FinancialReport extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Pendientes de Cobro', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2C))),
+                    Text('Pendientes de Cobro', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface)),
                     TextButton(
                       onPressed: () {}, // Navegar a lista completa si deseas
-                      child: const Text('Ver todos', style: TextStyle(color: Color(0xFF7B61FF), fontWeight: FontWeight.bold)),
+                      child: Text('Ver todos', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
                     )
                   ],
                 ),
                 const SizedBox(height: 8),
 
                 if (pendientes.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text("¡Todo al día! No hay deudas.", style: TextStyle(color: Colors.grey)),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("¡Todo al día! No hay deudas.", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   )
                 else
-                  ...pendientes.map((p) => _buildDebtRow(p)),
+                  ...pendientes.map((p) => _buildDebtRow(context, p)),
               ],
             ),
           ),
@@ -171,7 +174,7 @@ class FinancialReport extends StatelessWidget {
     return max == 0 ? 100 : max * 1.2; // 20% de margen arriba
   }
 
-  List<BarChartGroupData> _buildChartGroups(List data) {
+  List<BarChartGroupData> _buildChartGroups(List data, ColorScheme cs) {
     return List.generate(data.length, (i) {
       final val = (data[i]['value'] as num).toDouble();
       return BarChartGroupData(
@@ -179,13 +182,13 @@ class FinancialReport extends StatelessWidget {
         barRods: [
           BarChartRodData(
             toY: val,
-            color: const Color(0xFF7B61FF), // Morado principal del diseño
-            width: 32, // Barras anchas como en la foto
+            color: cs.primary,
+            width: 32,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
             backDrawRodData: BackgroundBarChartRodData(
               show: true,
-              toY: _calculateMaxY(data), // Fondo gris hasta el tope
-              color: const Color(0xFFF5F5FA) // Gris muy claro de fondo
+              toY: _calculateMaxY(data),
+              color: Colors.grey.shade200,
             ),
           )
         ]
@@ -193,7 +196,7 @@ class FinancialReport extends StatelessWidget {
     });
   }
 
-  Widget _buildTreatmentRow(String name, int count, double max) {
+  Widget _buildTreatmentRow(String name, int count, double max, TextTheme textTheme, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24.0),
       child: Column(
@@ -205,12 +208,12 @@ class FinancialReport extends StatelessWidget {
                 child: Text(
                   name,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E1E2C), fontSize: 15)
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface, fontSize: 15)
                 )
               ),
               Text(
                 '$count sesiones',
-                style: const TextStyle(color: Color(0xFF1E1E2C), fontWeight: FontWeight.bold, fontSize: 14)
+                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold, fontSize: 14)
               ),
             ]
           ),
@@ -219,8 +222,8 @@ class FinancialReport extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: max == 0 ? 0 : count / max,
-              color: const Color(0xFF7B61FF), // Barra progreso morada
-              backgroundColor: const Color(0xFFEEEAFF), // Fondo lila suave
+              color: cs.primary, // Barra progreso según theme
+              backgroundColor: cs.primary.withAlpha((0.12 * 255).toInt()), // Fondo suave
               minHeight: 10,
             ),
           )
@@ -229,7 +232,7 @@ class FinancialReport extends StatelessWidget {
     );
   }
 
-  Widget _buildDebtRow(Map p) {
+  Widget _buildDebtRow(BuildContext context, Map p) {
     final amount = (p['amount'] as num).toDouble();
     String fechaStr = '-';
 
@@ -247,6 +250,9 @@ class FinancialReport extends StatelessWidget {
       } catch (_) {}
     }
 
+    final textTheme = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Row(
@@ -257,18 +263,18 @@ class FinancialReport extends StatelessWidget {
             children: [
               Text(
                 p['name'] ?? 'Cliente',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E1E2C))
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 15, color: cs.onSurface),
               ),
               const SizedBox(height: 4),
               Text(
                 fechaStr,
-                style: TextStyle(color: Colors.grey[500], fontSize: 12)
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               ),
             ]
           ),
           Text(
             'Bs ${NumberFormat('#,##0.00', 'es_BO').format(amount)}',
-            style: const TextStyle(color: Color(0xFFFF5252), fontWeight: FontWeight.bold, fontSize: 16) // Rojo para deuda
+            style: TextStyle(color: cs.error, fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ]
       ),

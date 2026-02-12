@@ -100,10 +100,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         child: Container(
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF7B61FF) : Colors.transparent,
+            color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Text(label, style: TextStyle(color: selected ? Colors.white : Colors.grey.shade700, fontWeight: FontWeight.bold)),
+          child: Text(label, style: TextStyle(color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
         ),
       ),
     );
@@ -120,15 +120,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isSmallScreen = Responsive.isSmallScreen(context);
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Reportes', style: TextStyle(fontSize: isSmallScreen ? 18 : 20, fontWeight: FontWeight.bold)),
+        // Eliminamos el texto 'Reportes' (se solicitó borrar)
+        title: const SizedBox.shrink(),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF5F5FA),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(110),
@@ -156,71 +156,71 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 Container(
                   height: 45,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: cs.surfaceContainerHighest.withAlpha((0.6 * 255).toInt()),
                     borderRadius: BorderRadius.circular(25),
                   ),
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildTabButton(0, 'Financiero'),
-                      _buildTabButton(1, 'Clientes'),
-                      _buildTabButton(2, 'Servicios'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
-        child: Consumer<ReportsProvider>(
-          builder: (context, provider, _) {
-            if (provider.isLoading) return const Center(child: CircularProgressIndicator());
+                   padding: const EdgeInsets.all(4),
+                   child: Row(
+                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                     children: [
+                       _buildTabButton(0, 'Financiero'),
+                       _buildTabButton(1, 'Clientes'),
+                       _buildTabButton(2, 'Servicios'),
+                     ],
+                   ),
+                 ),
+               ],
+             ),
+           ),
+         ),
+       ),
+       body: Padding(
+         padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
+         child: Consumer<ReportsProvider>(
+           builder: (context, provider, _) {
+             if (provider.isLoading) return const Center(child: CircularProgressIndicator());
 
-            final hasData = provider.financialData.isNotEmpty;
+             final hasData = provider.financialData.isNotEmpty;
 
-            if (!hasData) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 80, color: Colors.grey.shade300),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'No hay datos disponibles\npara el periodo seleccionado',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                    FilledButton.icon(
-                      onPressed: _retryLoad,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Reintentar'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF7B61FF),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
+             if (!hasData) {
+               return Center(
+                 child: Column(
+                   mainAxisAlignment: MainAxisAlignment.center,
+                   children: [
+                     Icon(Icons.info_outline_rounded, size: 80, color: cs.onSurface.withAlpha((0.2 * 255).toInt())),
+                     const SizedBox(height: 20),
+                     const Text(
+                       'No hay datos disponibles\npara el periodo seleccionado',
+                       style: TextStyle(fontSize: 16, color: Colors.grey),
+                       textAlign: TextAlign.center,
+                     ),
+                     const SizedBox(height: 30),
+                     FilledButton.icon(
+                       onPressed: _retryLoad,
+                       icon: const Icon(Icons.refresh),
+                       label: const Text('Reintentar'),
+                       style: FilledButton.styleFrom(
+                         backgroundColor: Theme.of(context).colorScheme.primary,
+                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                       ),
+                     ),
+                   ],
+                 ),
+               );
+             }
 
-            return TabBarView(
-              controller: _tabController,
-              children: [
-                FinancialReport(period: _period, data: provider.financialData),
-                ClientsReport(period: _period, data: provider.clientsData),
-                ServicesReport(period: _period, data: provider.servicesData),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
+             return TabBarView(
+               controller: _tabController,
+               children: [
+                 FinancialReport(period: _period, data: provider.financialData),
+                 ClientsReport(period: _period, data: provider.clientsData),
+                 ServicesReport(period: _period, data: provider.servicesData),
+               ],
+             );
+           },
+         ),
+       ),
+     );
+   }
 }

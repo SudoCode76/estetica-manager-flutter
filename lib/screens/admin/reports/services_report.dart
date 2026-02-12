@@ -10,10 +10,11 @@ class ServicesReport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final surface = cs.surface;
+
     final completados = (data['completados'] as num?)?.toInt() ?? 0;
     final chartData = (data['chart_data'] as List?) ?? [];
     final topServicios = (data['top_servicios'] as List?) ?? [];
-    // Se eliminó la variable categorias
     final ingresos = (data['ingresos_detalle'] as List?) ?? [];
 
     return SingleChildScrollView(
@@ -25,16 +26,16 @@ class ServicesReport extends StatelessWidget {
           // HEADER CHART
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('TRATAMIENTOS COMPLETADOS', style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 0.5)),
+              Text('TRATAMIENTOS COMPLETADOS', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12, letterSpacing: 0.5)),
               const SizedBox(height: 8),
-              Text('$completados', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2C))),
+              Text('$completados', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: cs.onSurface)),
               const SizedBox(height: 20),
               SizedBox(
                 height: 120,
                 child: chartData.isEmpty
-                    ? Center(child: Text('Sin datos', style: TextStyle(color: Colors.grey[500])))
+                    ? Center(child: Text('Sin datos', style: TextStyle(color: cs.onSurfaceVariant)))
                     : BarChart(BarChartData(
                     barGroups: List.generate(chartData.length, (i) {
                       // Aseguramos que el valor sea numérico
@@ -42,7 +43,7 @@ class ServicesReport extends StatelessWidget {
                       return BarChartGroupData(x: i, barRods: [
                         BarChartRodData(
                             toY: val,
-                            color: const Color(0xFF9FA8DA),
+                            color: cs.primary.withAlpha((0.6 * 255).toInt()),
                             width: 14,
                             borderRadius: BorderRadius.circular(6)
                         )
@@ -62,11 +63,11 @@ class ServicesReport extends StatelessWidget {
           // TOP TRATAMIENTOS
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Text('Top Tratamientos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const Icon(Icons.more_horiz, color: Colors.grey),
+                Text('Top Tratamientos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: cs.onSurface)),
+                Icon(Icons.more_horiz, color: cs.onSurfaceVariant),
               ]),
               const SizedBox(height: 20),
               if (topServicios.isEmpty) const Text("Sin datos"),
@@ -79,7 +80,7 @@ class ServicesReport extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: Column(children: [
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Flexible(child: Text(s['name'] ?? '', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
+                      Flexible(child: Text(s['name'] ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface))),
                       Text('$count', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
                     ]),
                     const SizedBox(height: 6),
@@ -87,8 +88,8 @@ class ServicesReport extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                           value: maxVal == 0 ? 0 : count / maxVal,
-                          color: const Color(0xFF9FA8DA),
-                          backgroundColor: const Color(0xFFE8EAF6),
+                          color: cs.primary,
+                          backgroundColor: cs.primary.withAlpha((0.08 * 255).toInt()),
                           minHeight: 6
                       ),
                     )
@@ -105,10 +106,10 @@ class ServicesReport extends StatelessWidget {
           // DETALLE INGRESOS
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Text('Detalle de Ingresos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                Text('Detalle de Ingresos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: cs.onSurface)),
                 Text('Ver Todo', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
               ]),
               const SizedBox(height: 20),
@@ -116,7 +117,7 @@ class ServicesReport extends StatelessWidget {
               ...ingresos.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 20.0),
                 child: Row(children: [
-                  CircleAvatar(backgroundColor: const Color(0xFFEDE7F6), radius: 22, child: Icon(Icons.monetization_on_rounded, color: cs.primary, size: 20)),
+                  CircleAvatar(backgroundColor: cs.primary.withAlpha((0.12 * 255).toInt()), radius: 22, child: Icon(Icons.monetization_on_rounded, color: cs.primary, size: 20)),
                   const SizedBox(width: 16),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(item['title'] ?? 'Servicio', style: const TextStyle(fontWeight: FontWeight.bold)),
