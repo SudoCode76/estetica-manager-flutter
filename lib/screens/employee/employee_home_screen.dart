@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
+import 'package:app_estetica/services/supabase_auth_service.dart';
 
 class EmployeeHomeScreen extends StatefulWidget {
   const EmployeeHomeScreen({super.key});
@@ -173,37 +174,20 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   void _logout() {
     final colorScheme = Theme.of(context).colorScheme;
 
-    showDialog(
+    showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext ctx) {
         return AlertDialog(
           icon: Icon(Icons.logout, color: colorScheme.error, size: 32),
           title: const Text('Cerrar Sesión'),
           content: const Text('¿Estás seguro que deseas cerrar sesión?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                // Limpiar sucursal del provider
-                _sucursalProvider?.clearSucursal();
-                // Limpiar SharedPreferences
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('jwt');
-                await prefs.remove('user');
-                await prefs.remove('userType');
-                await prefs.remove('selectedSucursalId');
-                await prefs.remove('selectedSucursalName');
-                if (mounted) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  );
-                }
-              },
+              onPressed: () => Navigator.pop(ctx, true),
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.error,
               ),
@@ -212,7 +196,29 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           ],
         );
       },
-    );
+    ).then((confirmed) async {
+      if (confirmed != true) return;
+      // Acción de cierre de sesión: cerrar sesión en Supabase, limpiar provider y prefs, navegar a login
+      try {
+        await SupabaseAuthService().signOut();
+      } catch (e) {
+        debugPrint('EmployeeHome: Error al ejecutar signOut Supabase: $e');
+      }
+
+      _sucursalProvider?.clearSucursal();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('jwt');
+      await prefs.remove('user');
+      await prefs.remove('userType');
+      await prefs.remove('selectedSucursalId');
+      await prefs.remove('selectedSucursalName');
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    });
   }
 
   @override

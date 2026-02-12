@@ -298,49 +298,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     await _loadSucursales();
   }
 
-  void _logout() {
+  Future<void> _logout() async {
     final colorScheme = Theme.of(context).colorScheme;
 
-    showDialog(
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext ctx) {
         return AlertDialog(
           icon: Icon(Icons.logout, color: colorScheme.error, size: 32),
           title: const Text('Cerrar Sesión'),
           content: const Text('¿Estás seguro que deseas cerrar sesión?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () async {
-                Navigator.pop(context);
-
-                try {
-                  // Cerrar sesión con Supabase (esto limpia SharedPreferences también)
-                  await SupabaseAuthService().signOut();
-
-                  // Limpiar sucursal del provider
-                  _sucursalProvider?.clearSucursal();
-
-                  if (mounted) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    );
-                  }
-                } catch (e) {
-                  debugPrint('Error al cerrar sesión: $e');
-                  // Aún así navegar al login
-                  if (mounted) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    );
-                  }
-                }
-              },
+              onPressed: () => Navigator.pop(ctx, true),
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.error,
               ),
@@ -350,6 +324,32 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         );
       },
     );
+
+    if (confirmed != true) return;
+
+    try {
+      // Cerrar sesión con Supabase (esto limpia SharedPreferences también)
+      await SupabaseAuthService().signOut();
+
+      // Limpiar sucursal del provider
+      _sucursalProvider?.clearSucursal();
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error al cerrar sesión: $e');
+      // Aún sí navegar al login
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    }
   }
 
   @override
