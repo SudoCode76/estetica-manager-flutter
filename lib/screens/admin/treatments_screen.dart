@@ -21,14 +21,12 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   List<dynamic> _tratamientos = [];
 
   bool _loading = true;
-  String? _error;
   bool _saving = false;
   bool _showDisabled = false;
-  int? _selectedCategoriaId;
+  int? _treatmentCategoryFilter;
 
   final TextEditingController _categorySearchCtrl = TextEditingController();
   final TextEditingController _treatmentSearchCtrl = TextEditingController();
-  int? _treatmentCategoryFilter;
 
   @override
   void initState() {
@@ -61,7 +59,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
   }
 
   Future<void> _loadAll() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; });
     try {
       final cats = await _catalogRepo.getCategorias().timeout(const Duration(seconds: 8));
       final trats = await _catalogRepo.getTratamientos().timeout(const Duration(seconds: 8));
@@ -73,7 +71,6 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     } catch (e) {
       final msg = e is TimeoutException ? 'Timeout al cargar catálogos (verifica conexión)' : e.toString();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar datos: $msg')));
-      setState(() { _error = msg; });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -575,13 +572,17 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
                         style: TextStyle(fontSize: isNarrow ? 14 : null),
                       ),
                     ),
-                    ..._categoriasAll.map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(
-                      value: c['id'],
-                      child: Text(
-                        c['nombreCategoria'] ?? '-',
-                        style: TextStyle(fontSize: isNarrow ? 14 : null),
-                      ),
-                    )),
+                    // --- AQUÍ ESTÁ EL CAMBIO ---
+                    // Agregamos .where() para filtrar solo las activas
+                    ..._categoriasAll
+                        .where((c) => c['estadoCategoria'] == true)
+                        .map<DropdownMenuItem<int?>>((c) => DropdownMenuItem<int?>(
+                          value: c['id'],
+                          child: Text(
+                            c['nombreCategoria'] ?? '-',
+                            style: TextStyle(fontSize: isNarrow ? 14 : null),
+                          ),
+                        )),
                   ],
                   onChanged: (v) {
                     setState(() {
