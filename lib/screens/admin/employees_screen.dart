@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../repositories/auth_repository.dart';
 import '../../providers/sucursal_provider.dart';
 
@@ -18,61 +17,49 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   bool _loading = false;
   String? _error;
   String _search = '';
-
-  SucursalProvider? _sucursalProvider;
+  int? _lastLoadedSucursalId; // Para evitar recargas infinitas
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final provider = SucursalInherited.of(context);
-    if (provider != _sucursalProvider) {
-      _sucursalProvider?.removeListener(_onSucursalChanged);
-      _sucursalProvider = provider;
-      _sucursalProvider?.addListener(_onSucursalChanged);
-      _repo = Provider.of<AuthRepository>(context, listen: false);
+  void initState() {
+    super.initState();
+    _repo = Provider.of<AuthRepository>(context, listen: false);
+    // Cargamos inicial
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadEmployees();
-    }
+    });
   }
-
-  @override
-  void dispose() {
-    _sucursalProvider?.removeListener(_onSucursalChanged);
-    super.dispose();
-  }
-
-  void _onSucursalChanged() => _loadEmployees();
 
   Future<void> _loadEmployees() async {
-    setState(() { _loading = true; _error = null; });
-
-    int? sucId = _sucursalProvider?.selectedSucursalId;
-
-    if (sucId == null) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        sucId = prefs.getInt('selectedSucursalId');
-        if (sucId != null && _sucursalProvider != null) {
-          _sucursalProvider!.setSucursal(sucId, prefs.getString('selectedSucursalName') ?? '');
-        }
-      } catch (_) {}
-    }
+    final sucursalProvider = Provider.of<SucursalProvider>(context, listen: false);
+    final sucId = sucursalProvider.selectedSucursalId;
 
     if (sucId == null) {
       setState(() { _employees = []; _loading = false; });
       return;
     }
 
+    setState(() { _loading = true; _error = null; });
+
     try {
-      final users = await _repo.getUsuarios(sucursalId: sucId).timeout(const Duration(seconds: 8));
-      final allowed = {'administrador','admin','empleado','vendedor','gerente'};
-      _employees = users.where((u) {
-        final t = (u['tipoUsuario'] ?? u['tipo_usuario'] ?? '').toString().toLowerCase();
-        if (t.isEmpty) return true;
-        return allowed.contains(t);
-      }).map<Map<String,dynamic>>((u) => Map<String,dynamic>.from(u)).toList();
+      final users = await _repo.getUsuarios(sucursalId: sucId).timeout(const Duration(seconds: 10));
+      final allowed = {'administrador', 'admin', 'empleado', 'vendedor', 'gerente'};
+
+      if (mounted) {
+        setState(() {
+          _employees = users.where((u) {
+            final t = (u['tipoUsuario'] ?? u['tipo_usuario'] ?? '').toString().toLowerCase();
+            if (t.isEmpty) return true;
+            return allowed.contains(t);
+          }).map<Map<String, dynamic>>((u) => Map<String, dynamic>.from(u)).toList();
+          _lastLoadedSucursalId = sucId;
+        });
+      }
     } catch (e) {
-      final msg = e is TimeoutException ? 'Timeout al cargar empleados (verifica conexión)' : e.toString();
-      _error = msg;
+      if (mounted) {
+        setState(() {
+          _error = e is TimeoutException ? 'Tiempo de espera agotado' : e.toString();
+        });
+      }
     } finally {
       if (mounted) setState(() { _loading = false; });
     }
@@ -88,10 +75,25 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     }).toList();
   }
 
-  Future<void> _showEmployeeDialog([Map<String,dynamic>? employee]) async {
+  Future<void> _showEmployeeDialog([Map<String, dynamic>? employee]) async {
+    // CORRECCIÓN: Obtenemos el ID aquí y lo pasamos al diálogo
+    final sucursalProvider = Provider.of<SucursalProvider>(context, listen: false);
+    final sucId = sucursalProvider.selectedSucursalId;
+
+    if (employee == null && sucId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes seleccionar una sucursal primero')),
+      );
+      return;
+    }
+
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => _EmployeeDialog(repo: _repo, employee: employee),
+      builder: (ctx) => _EmployeeDialog(
+        repo: _repo,
+        employee: employee,
+        sucursalId: sucId, // Pasamos el ID explícitamente
+      ),
     );
     if (result == true) await _loadEmployees();
   }
@@ -127,74 +129,84 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Empleados'),
-        backgroundColor: cs.surface,
-        elevation: 0,
-        actions: [
-          IconButton.filledTonal(onPressed: _loadEmployees, icon: const Icon(Icons.refresh_rounded), tooltip: 'Actualizar'),
-          const SizedBox(width: 8),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _showEmployeeDialog(), icon: const Icon(Icons.person_add), label: const Text('Nuevo')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              onChanged: (v) => setState(() => _search = v),
-              decoration: InputDecoration(prefixIcon: Icon(Icons.search, color: cs.primary), hintText: 'Buscar por nombre o email', filled: true, fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            ),
+
+    // Usamos Consumer para escuchar cambios en la sucursal automáticamente
+    return Consumer<SucursalProvider>(
+      builder: (context, sucursalProv, child) {
+        // Si cambió la sucursal y no hemos recargado, recargamos
+        if (sucursalProv.selectedSucursalId != null &&
+            sucursalProv.selectedSucursalId != _lastLoadedSucursalId &&
+            !_loading) {
+             // Pequeño delay para evitar build during build
+             WidgetsBinding.instance.addPostFrameCallback((_) => _loadEmployees());
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Empleados'),
+            backgroundColor: cs.surface,
+            actions: [
+              IconButton.filledTonal(onPressed: _loadEmployees, icon: const Icon(Icons.refresh_rounded)),
+              const SizedBox(width: 8),
+            ],
           ),
-          Expanded(
-            child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(Icons.error_outline, size: 56, color: cs.error),
-                        const SizedBox(height: 12),
-                        Text('Error al cargar empleados', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.error)),
-                        const SizedBox(height: 8),
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(onPressed: _loadEmployees, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
-                      ]),
-                    ),
-                  )
-                : _filtered.isEmpty
-                  ? Center(child: Text('No se encontraron empleados', style: Theme.of(context).textTheme.titleMedium))
-                  : RefreshIndicator(
-                      onRefresh: _loadEmployees,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(12,0,12,88),
-                        itemCount: _filtered.length,
-                        itemBuilder: (ctx,i) {
-                          final e = _filtered[i];
-                          final confirmed = e['confirmed'] ?? false;
-                          final blocked = e['blocked'] ?? false;
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5))),
-                            child: ListTile(
-                              leading: CircleAvatar(backgroundColor: cs.primaryContainer, child: Text((e['username'] ?? 'E').toString()[0].toUpperCase(), style: TextStyle(color: cs.onPrimaryContainer, fontWeight: FontWeight.bold))),
-                              title: Text(e['username'] ?? 'Sin nombre'),
-                              subtitle: Text(e['email'] ?? ''),
-                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                                if (blocked) const Icon(Icons.block, color: Colors.red, size: 16) else if (confirmed) const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                IconButton(icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant), onPressed: () => showModalBottomSheet(context: ctx, builder: (_) => _EmployeeActions(e, onEdit: () => _showEmployeeDialog(e), onDelete: () => _confirmDelete(e)))),
-                              ]),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _showEmployeeDialog(),
+            icon: const Icon(Icons.person_add),
+            label: const Text('Nuevo')
           ),
-        ],
-      ),
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v),
+                  decoration: InputDecoration(prefixIcon: Icon(Icons.search, color: cs.primary), hintText: 'Buscar por nombre o email', filled: true, fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                ),
+              ),
+              Expanded(
+                child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                    ? Center(child: Text('Error: $_error')) // Simplificado para brevedad
+                    : _filtered.isEmpty
+                      ? const Center(child: Text('No hay empleados en esta sucursal'))
+                      : RefreshIndicator(
+                          onRefresh: _loadEmployees,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
+                            itemCount: _filtered.length,
+                            itemBuilder: (ctx, i) {
+                              final e = _filtered[i];
+                              final confirmed = e['confirmed'] ?? false;
+                              final blocked = e['blocked'] ?? false;
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  leading: CircleAvatar(child: Text((e['username'] ?? 'E').toString()[0].toUpperCase())),
+                                  title: Text(e['username'] ?? 'Sin nombre'),
+                                  subtitle: Text(e['email'] ?? ''),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.more_vert),
+                                    onPressed: () => showModalBottomSheet(
+                                      context: ctx,
+                                      builder: (_) => _EmployeeActions(
+                                        e,
+                                        onEdit: () => _showEmployeeDialog(e),
+                                        onDelete: () => _confirmDelete(e)
+                                      )
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -223,7 +235,9 @@ class _EmployeeActions extends StatelessWidget {
 class _EmployeeDialog extends StatefulWidget {
   final AuthRepository repo;
   final Map<String,dynamic>? employee;
-  const _EmployeeDialog({required this.repo, this.employee});
+  final int? sucursalId; // NUEVO PARAMETRO
+
+  const _EmployeeDialog({required this.repo, this.employee, this.sucursalId});
 
   @override
   State<_EmployeeDialog> createState() => _EmployeeDialogState();
@@ -257,17 +271,23 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Validación de seguridad para crear
+    if (widget.employee == null && widget.sucursalId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: No se identificó la sucursal')),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       if (widget.employee != null) {
         final id = widget.employee!['documentId'] ?? widget.employee!['id']?.toString();
         if (id != null) await widget.repo.updateUser(id.toString(), username: _userCtrl.text, email: _emailCtrl.text, tipoUsuario: _role);
       } else {
-        // Obtener sucursal seleccionada desde SharedPreferences (o el provider en pantalla padre)
-        final prefs = await SharedPreferences.getInstance();
-        final sucId = prefs.getInt('selectedSucursalId');
-        if (sucId == null) throw Exception('Selecciona una sucursal antes de crear');
-        await widget.repo.crearUsuarioFunction(email: _emailCtrl.text, password: _passCtrl.text, nombre: _userCtrl.text, sucursalId: sucId, tipoUsuario: _role);
+        // CREAR (Usamos el ID pasado por parámetro)
+        await widget.repo.crearUsuarioFunction(email: _emailCtrl.text, password: _passCtrl.text, nombre: _userCtrl.text, sucursalId: widget.sucursalId!, tipoUsuario: _role);
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -294,7 +314,7 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
             const SizedBox(height: 8),
             if (!isEdit) TextFormField(controller: _passCtrl, decoration: const InputDecoration(labelText: 'Contraseña'), obscureText: true, validator: (v) => v != null && v.length >= 6 ? null : 'Mínimo 6 caracteres'),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(value: _role, items: const [DropdownMenuItem(value: 'empleado', child: Text('Empleado')), DropdownMenuItem(value: 'administrador', child: Text('Administrador'))], onChanged: (v) => setState(() => _role = v ?? 'empleado')),
+            DropdownButtonFormField<String>(initialValue: _role, items: const [DropdownMenuItem(value: 'empleado', child: Text('Empleado')), DropdownMenuItem(value: 'administrador', child: Text('Administrador'))], onChanged: (v) => setState(() => _role = v ?? 'empleado')),
             const SizedBox(height: 12),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')), const SizedBox(width: 8), FilledButton(onPressed: _loading ? null : _save, child: _loading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : Text(isEdit ? 'Guardar' : 'Crear'))])
           ]),

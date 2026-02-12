@@ -100,19 +100,41 @@ class AuthRepository {
 
   // Edge Functions: mantener wrappers que ya usábamos anteriormente
   Future<Map<String, dynamic>> crearUsuarioFunction({required String email, required String password, required String nombre, required int sucursalId, required String tipoUsuario}) async {
+    // 1. Obtener el token de la sesión actual
+    final session = _client.auth.currentSession;
+    final token = session?.accessToken;
+
+    if (token == null) {
+      throw Exception('No hay sesión activa para autorizar la creación');
+    }
+
     final body = {
       'email': email,
       'password': password,
       'nombre': nombre,
       'sucursal_id': sucursalId,
       'tipo_usuario': tipoUsuario,
+      'token_admin': token, // token de la sesión que autoriza la operación
     };
-    final resp = await _client.functions.invoke('crear-usuario', body: body);
-    if (resp.status == 200 || resp.status == 201) {
+
+    try {
+      final resp = await _client.functions.invoke('crear-usuario', body: body);
+
+      // Si la función devolvió datos en formato map, retornarlos
       if (resp.data is Map<String, dynamic>) return resp.data as Map<String, dynamic>;
       return {'result': resp.data};
+    } on FunctionException catch (e) {
+      // Capturar errores específicos de la función (400, 401, 500)
+      String message;
+      if (e.details is Map && (e.details as Map).containsKey('error')) {
+        message = (e.details as Map)['error'].toString();
+      } else {
+        message = e.toString();
+      }
+      throw Exception(message);
+    } catch (e) {
+      rethrow;
     }
-    throw Exception('Error creando usuario via function: status=${resp.status} data=${resp.data}');
   }
 
   Future<Map<String, dynamic>> eliminarUsuarioFunction(String idUsuario) async {
