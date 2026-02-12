@@ -125,15 +125,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        // Eliminamos el texto 'Reportes' (se solicitó borrar)
         title: const SizedBox.shrink(),
         centerTitle: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(110),
+          preferredSize: const Size.fromHeight(86),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -150,31 +149,31 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
                 // Tabs secundarias: Financiero | Clientes | Servicios (custom control)
                 Container(
-                  height: 45,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHighest.withAlpha((0.6 * 255).toInt()),
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(22),
                   ),
-                   padding: const EdgeInsets.all(4),
-                   child: Row(
-                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                     children: [
-                       _buildTabButton(0, 'Financiero'),
-                       _buildTabButton(1, 'Clientes'),
-                       _buildTabButton(2, 'Servicios'),
-                     ],
-                   ),
-                 ),
-               ],
-             ),
-           ),
-         ),
-       ),
-       body: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildTabButton(0, 'Financiero'),
+                      _buildTabButton(1, 'Clientes'),
+                      _buildTabButton(2, 'Servicios'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      body: Padding(
          padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
          child: Consumer<ReportsProvider>(
            builder: (context, provider, _) {

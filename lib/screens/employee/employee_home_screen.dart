@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'package:app_estetica/services/supabase_auth_service.dart';
+import 'package:app_estetica/screens/about_screen.dart';
 
 class EmployeeHomeScreen extends StatefulWidget {
   const EmployeeHomeScreen({super.key});
@@ -444,6 +445,16 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     onTap: () {
                       setState(() { _selectedIndex = 1; });
                       Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.info_outline,
+                    selectedIcon: Icons.info,
+                    label: 'Acerca de',
+                    selected: false,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
                     },
                   ),
                 ],

@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'dart:async';
 import 'package:app_estetica/screens/admin/reports/reports_screen.dart';
+import 'package:app_estetica/screens/about_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;
@@ -638,6 +639,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       Navigator.pop(context);
                     },
                   ),
+                  // Acerca de - colocado justo después de Tickets para máxima visibilidad
+                  _DrawerItem(
+                    icon: Icons.info_outline,
+                    selectedIcon: Icons.info,
+                    label: 'Acerca de',
+                    selected: false,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
+                    },
+                  ),
                   // Las siguientes opciones SOLO para admin
                   if (!widget.isEmployee) ...[
                     _DrawerItem(
@@ -701,6 +713,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                   ],
                 ],
+              ),
+            ),
+            // Acerca de (persistente) — encima de Cerrar Sesión para máxima visibilidad
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: _DrawerItem(
+                icon: Icons.info_outline,
+                selectedIcon: Icons.info,
+                label: 'Acerca de',
+                selected: false,
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
+                },
               ),
             ),
             // Cerrar sesión al final
