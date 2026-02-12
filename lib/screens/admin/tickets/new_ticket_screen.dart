@@ -339,7 +339,10 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
        if (createdId != null) {
          setState(() {
            clienteId = createdId;
-           clienteNombre = '${result['nombreCliente'] ?? ''} ${result['apellidoCliente'] ?? ''}'.trim();
+           // Algunos endpoints devuelven keys en snake_case (nombrecliente), otros en camelCase (nombreCliente)
+           final nombre = (result['nombreCliente'] ?? result['nombrecliente'] ?? '').toString();
+           final apellido = (result['apellidoCliente'] ?? result['apellidocliente'] ?? '').toString();
+           clienteNombre = '$nombre ${apellido}'.trim();
          });
          // Recargar lista de clientes para el dropdown
          await _loadClientsForSucursal();
