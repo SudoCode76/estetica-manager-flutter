@@ -138,13 +138,39 @@ class AuthRepository {
   }
 
   Future<Map<String, dynamic>> eliminarUsuarioFunction(String idUsuario) async {
-    final body = {'id_a_borrar': idUsuario};
-    final resp = await _client.functions.invoke('eliminar-usuario', body: body);
-    if (resp.status == 200 || resp.status == 201) {
-      if (resp.data is Map<String, dynamic>) return resp.data as Map<String, dynamic>;
-      return {'result': resp.data};
+    // 1. Obtener el token de la sesión actual (Admin)
+    final session = _client.auth.currentSession;
+    final token = session?.accessToken;
+
+    if (token == null) {
+      throw Exception('No hay sesión activa para autorizar la eliminación');
     }
-    throw Exception('Error eliminando usuario via function: status=${resp.status} data=${resp.data}');
+
+    final body = {
+      'id_a_borrar': idUsuario,
+      'token_admin': token, // <-- incluir token de admin
+    };
+
+    try {
+      final resp = await _client.functions.invoke('eliminar-usuario', body: body);
+
+      if (resp.data is Map<String, dynamic>) {
+        return resp.data as Map<String, dynamic>;
+      }
+      return {'result': resp.data};
+
+    } on FunctionException catch (e) {
+      // Capturar errores específicos de la función (401, 403, etc)
+      String message;
+      if (e.details is Map && (e.details as Map).containsKey('error')) {
+        message = (e.details as Map)['error'].toString();
+      } else {
+        message = e.toString();
+      }
+      throw Exception(message);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> editarPasswordFunction(String idUsuario, String nuevaPassword) async {
