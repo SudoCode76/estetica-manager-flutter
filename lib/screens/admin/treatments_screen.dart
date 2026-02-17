@@ -327,6 +327,44 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     );
   }
 
+  Future<bool> _confirmToggleTratamiento(Map<String, dynamic> t) async {
+    final bool activo = t['estadoTratamiento'] == true;
+    final String nombre = t['nombreTratamiento'] ?? 'este tratamiento';
+    final String title = activo ? 'Desactivar tratamiento' : 'Reactivar tratamiento';
+    final String message = activo
+        ? '¿Deseas desactivar "$nombre"?'
+        : '¿Deseas volver a activar "$nombre"?';
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(ctx).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
+  }
+
   Future<void> _toggleTratamientoEstado(Map<String, dynamic> t) async {
     final docId = t['documentId'] ?? t['id']?.toString();
     if (docId == null) return;
@@ -370,7 +408,48 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
     );
   }
 
+  Future<bool> _confirmToggleCategoria(Map<String, dynamic> c) async {
+    final bool activa = c['estadoCategoria'] == true;
+    final String nombre = c['nombreCategoria'] ?? 'esta categoría';
+    final String title = activa ? 'Desactivar categoría' : 'Reactivar categoría';
+    final String message = activa
+        ? '¿Deseas desactivar "$nombre"?'
+        : '¿Deseas volver a activar "$nombre"?';
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Theme.of(ctx).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
+  }
+
   Future<void> _toggleCategoriaEstado(Map<String, dynamic> c) async {
+    final confirmed = await _confirmToggleCategoria(c);
+    if (!confirmed) return;
+
     final docId = c['documentId'] ?? c['id']?.toString();
     if (docId == null) return;
     setState(() => _saving = true);
@@ -473,7 +552,14 @@ class _TreatmentsScreenState extends State<TreatmentsScreen> with SingleTickerPr
         ),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showEditTratamientoDialog(t)),
-          IconButton(icon: Icon(activoTrat ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18), onPressed: () => _toggleTratamientoEstado(t)),
+          IconButton(
+            icon: Icon(activoTrat ? Icons.visibility_off_outlined : Icons.restore_outlined, size: 18),
+            onPressed: () async {
+              final confirmed = await _confirmToggleTratamiento(t);
+              if (!confirmed) return;
+              await _toggleTratamientoEstado(t);
+            },
+          ),
         ]),
       ),
     );
