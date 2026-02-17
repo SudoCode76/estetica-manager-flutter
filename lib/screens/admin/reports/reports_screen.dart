@@ -27,7 +27,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) return;
       setState(() => _currentTab = _tabController.index);
@@ -188,7 +188,6 @@ class _ReportsScreenState extends State<ReportsScreen>
                     children: [
                       _buildTabButton(0, 'Financiero'),
                       _buildTabButton(1, 'Clientes'),
-                      _buildTabButton(2, 'Servicios'),
                     ],
                   ),
                 ),
@@ -250,8 +249,6 @@ class _ReportsScreenState extends State<ReportsScreen>
               children: [
                 FinancialReport(period: _period, data: provider.financialData),
                 ClientsReport(period: _period, data: provider.clientsData),
-                // Services report removed
-                const SizedBox.shrink(),
               ],
             );
           },
