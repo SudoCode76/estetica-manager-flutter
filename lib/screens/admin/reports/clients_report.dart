@@ -27,7 +27,10 @@ class ClientsReport extends StatelessWidget {
           final value = (e is Map && e['value'] is num)
               ? (e['value'] as num).toDouble()
               : 0.0;
-          return {'label': label, 'value': value};
+          final translated = (period == ReportPeriod.week)
+              ? _weekdayLabelEs(label)
+              : label;
+          return {'label': translated, 'value': value};
         })
         .toList();
 
@@ -423,4 +426,17 @@ class ClientsReport extends StatelessWidget {
       ),
     );
   }
+}
+
+// Traduce etiquetas de días en inglés a abreviaturas en español (ej: Mon -> Lun)
+String _weekdayLabelEs(String label) {
+  final l = label.toLowerCase();
+  if (l.startsWith('mon') || l == 'monday') return 'Lun';
+  if (l.startsWith('tue') || l == 'tuesday') return 'Mar';
+  if (l.startsWith('wed') || l == 'wednesday') return 'Mié';
+  if (l.startsWith('thu') || l == 'thursday') return 'Jue';
+  if (l.startsWith('fri') || l == 'friday') return 'Vie';
+  if (l.startsWith('sat') || l == 'saturday') return 'Sáb';
+  if (l.startsWith('sun') || l == 'sunday') return 'Dom';
+  return label;
 }
