@@ -15,7 +15,8 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
+class _ReportsScreenState extends State<ReportsScreen>
+    with SingleTickerProviderStateMixin {
   ReportPeriod _period = ReportPeriod.month; // Por defecto Mes
   late TabController _tabController;
   int _currentTab = 0;
@@ -61,7 +62,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   }
 
   void _loadData(int sucursalId) {
-    Provider.of<ReportsProvider>(context, listen: false).loadReports(sucursalId, _period);
+    Provider.of<ReportsProvider>(
+      context,
+      listen: false,
+    ).loadReports(sucursalId, _period);
   }
 
   Widget _buildPeriodChip(ReportPeriod p, String label) {
@@ -74,16 +78,18 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         onSelected: (_) => _setPeriod(p),
         selectedColor: Theme.of(context).colorScheme.primary,
         labelStyle: TextStyle(
-          color: selected ? Theme.of(context).colorScheme.onPrimary : Colors.black87,
-          fontWeight: selected ? FontWeight.bold : FontWeight.normal
+          color: selected
+              ? Theme.of(context).colorScheme.onPrimary
+              : Colors.black87,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
         ),
         backgroundColor: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: selected ? Colors.transparent : Colors.grey.shade300
-          )
+            color: selected ? Colors.transparent : Colors.grey.shade300,
+          ),
         ),
       ),
     );
@@ -100,21 +106,37 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         child: Container(
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Text(label, style: TextStyle(color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ),
     );
   }
 
   void _retryLoad() {
-    final sucursalId = Provider.of<SucursalProvider>(context, listen: false).selectedSucursalId;
+    final sucursalId = Provider.of<SucursalProvider>(
+      context,
+      listen: false,
+    ).selectedSucursalId;
     if (sucursalId != null) {
       _loadData(sucursalId);
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay sucursal seleccionada')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay sucursal seleccionada')),
+        );
     }
   }
 
@@ -155,7 +177,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 Container(
                   height: 40,
                   decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withAlpha((0.6 * 255).toInt()),
+                    color: cs.surfaceContainerHighest.withAlpha(
+                      (0.6 * 255).toInt(),
+                    ),
                     borderRadius: BorderRadius.circular(22),
                   ),
                   padding: const EdgeInsets.all(4),
@@ -174,52 +198,64 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ),
       ),
       body: Padding(
-         padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
-         child: Consumer<ReportsProvider>(
-           builder: (context, provider, _) {
-             if (provider.isLoading) return const Center(child: CircularProgressIndicator());
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.horizontalPadding(context),
+        ),
+        child: Consumer<ReportsProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading)
+              return const Center(child: CircularProgressIndicator());
 
-             final hasData = provider.financialData.isNotEmpty;
+            final hasData = provider.financialData.isNotEmpty;
 
-             if (!hasData) {
-               return Center(
-                 child: Column(
-                   mainAxisAlignment: MainAxisAlignment.center,
-                   children: [
-                     Icon(Icons.info_outline_rounded, size: 80, color: cs.onSurface.withAlpha((0.2 * 255).toInt())),
-                     const SizedBox(height: 20),
-                     const Text(
-                       'No hay datos disponibles\npara el periodo seleccionado',
-                       style: TextStyle(fontSize: 16, color: Colors.grey),
-                       textAlign: TextAlign.center,
-                     ),
-                     const SizedBox(height: 30),
-                     FilledButton.icon(
-                       onPressed: _retryLoad,
-                       icon: const Icon(Icons.refresh),
-                       label: const Text('Reintentar'),
-                       style: FilledButton.styleFrom(
-                         backgroundColor: Theme.of(context).colorScheme.primary,
-                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                       ),
-                     ),
-                   ],
-                 ),
-               );
-             }
+            if (!hasData) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 80,
+                      color: cs.onSurface.withAlpha((0.2 * 255).toInt()),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'No hay datos disponibles\npara el periodo seleccionado',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 30),
+                    FilledButton.icon(
+                      onPressed: _retryLoad,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reintentar'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
 
-             return TabBarView(
-               controller: _tabController,
-               children: [
-                 FinancialReport(period: _period, data: provider.financialData),
-                 ClientsReport(period: _period, data: provider.clientsData),
-                 ServicesReport(period: _period, data: provider.servicesData),
-               ],
-             );
-           },
-         ),
-       ),
-     );
-   }
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                FinancialReport(period: _period, data: provider.financialData),
+                ClientsReport(period: _period, data: provider.clientsData),
+                ServicesReport(period: _period, data: provider.servicesData),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 }

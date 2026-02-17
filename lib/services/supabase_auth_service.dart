@@ -38,7 +38,7 @@ class SupabaseAuthService {
       // Obtener el perfil del usuario desde la tabla profiles
       Map<String, dynamic>? profileResponse;
       Map<String, dynamic>? sucursalData;
-      
+
       try {
         profileResponse = await client
             .from('profiles')
@@ -68,13 +68,25 @@ class SupabaseAuthService {
       final userMap = {
         'id': user.id,
         'email': user.email,
-        'username': user.userMetadata?['username'] ?? profileResponse?['username'] ?? email,
-        'tipoUsuario': user.userMetadata?['tipo_usuario'] ?? profileResponse?['tipo_usuario'] ?? 'empleado',
-        'sucursal': sucursalData != null ? {
-          'id': sucursalData['id'],
-          'nombreSucursal': sucursalData['nombreSucursal'] ?? sucursalData['nombresucursal'],
-        } : null,
-        'sucursalId': user.userMetadata?['sucursal_id'] ?? profileResponse?['sucursal_id'],
+        'username':
+            user.userMetadata?['username'] ??
+            profileResponse?['username'] ??
+            email,
+        'tipoUsuario':
+            user.userMetadata?['tipo_usuario'] ??
+            profileResponse?['tipo_usuario'] ??
+            'empleado',
+        'sucursal': sucursalData != null
+            ? {
+                'id': sucursalData['id'],
+                'nombreSucursal':
+                    sucursalData['nombreSucursal'] ??
+                    sucursalData['nombresucursal'],
+              }
+            : null,
+        'sucursalId':
+            user.userMetadata?['sucursal_id'] ??
+            profileResponse?['sucursal_id'],
         'confirmed': user.emailConfirmedAt != null,
         'blocked': false,
         'createdAt': user.createdAt,
@@ -139,10 +151,10 @@ class SupabaseAuthService {
 
       // Actualizar el perfil en la tabla profiles si es necesario
       if (sucursalId != null || tipoUsuario != 'empleado') {
-        await client.from('profiles').update({
-          'tipo_usuario': tipoUsuario,
-          'sucursal_id': sucursalId,
-        }).eq('id', user.id);
+        await client
+            .from('profiles')
+            .update({'tipo_usuario': tipoUsuario, 'sucursal_id': sucursalId})
+            .eq('id', user.id);
       }
 
       return {
@@ -168,7 +180,7 @@ class SupabaseAuthService {
   Future<void> signOut() async {
     try {
       await client.auth.signOut();
-      
+
       // Limpiar SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('jwt');
@@ -176,7 +188,7 @@ class SupabaseAuthService {
       await prefs.remove('userType');
       await prefs.remove('selectedSucursalId');
       await prefs.remove('selectedSucursalName');
-      
+
       debugPrint('=== Sesión cerrada exitosamente ===');
     } catch (e) {
       debugPrint('=== ERROR AL CERRAR SESIÓN: ${e.toString()} ===');
@@ -253,8 +265,11 @@ class SupabaseAuthService {
       return {
         'id': user.id,
         'email': user.email,
-        'username': profileResponse['username'] ?? user.userMetadata?['username'],
-        'tipoUsuario': profileResponse['tipo_usuario'] ?? user.userMetadata?['tipo_usuario'],
+        'username':
+            profileResponse['username'] ?? user.userMetadata?['username'],
+        'tipoUsuario':
+            profileResponse['tipo_usuario'] ??
+            user.userMetadata?['tipo_usuario'],
         'sucursal': sucursalData,
         'sucursalId': profileResponse['sucursal_id'],
       };
@@ -272,7 +287,9 @@ class SupabaseAuthService {
     final sessionObj = loginResult['session'];
     String? refreshToken;
     try {
-      if (sessionObj != null && sessionObj is Map && sessionObj['refresh_token'] != null) {
+      if (sessionObj != null &&
+          sessionObj is Map &&
+          sessionObj['refresh_token'] != null) {
         refreshToken = sessionObj['refresh_token'];
       } else if (loginResult['refreshToken'] != null) {
         refreshToken = loginResult['refreshToken'];
@@ -285,18 +302,25 @@ class SupabaseAuthService {
       await prefs.setString('refreshToken', refreshToken);
     }
     await prefs.setString('userType', user['tipoUsuario'] ?? '');
-    
+
     // Guardar datos de sucursal si están disponibles
     if (user['sucursalId'] != null) {
       await prefs.setInt('selectedSucursalId', user['sucursalId']);
     }
-    if (user['sucursal'] != null && user['sucursal']['nombreSucursal'] != null) {
-      await prefs.setString('selectedSucursalName', user['sucursal']['nombreSucursal']);
+    if (user['sucursal'] != null &&
+        user['sucursal']['nombreSucursal'] != null) {
+      await prefs.setString(
+        'selectedSucursalName',
+        user['sucursal']['nombreSucursal'],
+      );
     }
-    
+
     // Si el usuario es administrador, guardar su JWT también como adminToken para usar en las Functions.
     try {
-      if (jwt != null && jwt.toString().isNotEmpty && (user['tipoUsuario']?.toString().toLowerCase() ?? '') == 'administrador') {
+      if (jwt != null &&
+          jwt.toString().isNotEmpty &&
+          (user['tipoUsuario']?.toString().toLowerCase() ?? '') ==
+              'administrador') {
         // Importar ApiService aquí para evitar circularidad en top-level
         // Nota: este guardado es para facilitar las llamadas a las Edge Functions desde la app.
         try {
@@ -306,9 +330,13 @@ class SupabaseAuthService {
           if (refreshToken != null && refreshToken.isNotEmpty) {
             await prefs2.setString('adminRefreshToken', refreshToken);
           }
-          debugPrint('saveSessionToPrefs: admin token saved in prefs because user is administrador');
+          debugPrint(
+            'saveSessionToPrefs: admin token saved in prefs because user is administrador',
+          );
         } catch (e) {
-          debugPrint('saveSessionToPrefs: could not save admin token in prefs: ${e.toString()}');
+          debugPrint(
+            'saveSessionToPrefs: could not save admin token in prefs: ${e.toString()}',
+          );
         }
       }
     } catch (_) {}

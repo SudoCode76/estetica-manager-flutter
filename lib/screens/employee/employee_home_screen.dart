@@ -29,7 +29,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   // NO crear las pantallas aquí, se crearán dinámicamente en build
   List<Widget> _getScreens() {
     return [
-      TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
+      TicketsScreen(
+        key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}'),
+      ),
       const ClientsScreen(key: ValueKey('clients_screen')),
     ];
   }
@@ -54,12 +56,16 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               final attrs = Map<String, dynamic>.from(d['attributes']);
               attrs['id'] = d['id'] ?? attrs['id'];
               // Normalizar nombre
-              final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+              final nombre =
+                  attrs['nombreSucursal'] ??
+                  attrs['nombre'] ??
+                  attrs['nombre_sucursal'];
               return {'id': attrs['id'], 'nombreSucursal': nombre};
             }
             // Si ya vino plano con id + campos
             final id = d['id'] ?? d['ID'];
-            final nombre = d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
+            final nombre =
+                d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
             if (id != null) return {'id': id, 'nombreSucursal': nombre};
           }
         }
@@ -68,14 +74,20 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
         if (sucursalObj.containsKey('attributes')) {
           final attrs = Map<String, dynamic>.from(sucursalObj['attributes']);
           final id = sucursalObj['id'] ?? attrs['id'];
-          final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+          final nombre =
+              attrs['nombreSucursal'] ??
+              attrs['nombre'] ??
+              attrs['nombre_sucursal'];
           if (id != null) return {'id': id, 'nombreSucursal': nombre};
         }
 
         // Caso ya normalizado por ApiService._normalizeItems: { id: x, nombreSucursal: '...' }
         if (sucursalObj.containsKey('id')) {
           final id = sucursalObj['id'];
-          final nombre = sucursalObj['nombreSucursal'] ?? sucursalObj['nombre'] ?? sucursalObj['nombre_sucursal'];
+          final nombre =
+              sucursalObj['nombreSucursal'] ??
+              sucursalObj['nombre'] ??
+              sucursalObj['nombre_sucursal'];
           return {'id': id, 'nombreSucursal': nombre};
         }
       }
@@ -103,24 +115,32 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
         // Establecer la sucursal aquí después de cargar los datos
         final extracted = _extractSucursal(user['sucursal']);
         if (extracted == null) {
-          debugPrint('EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada');
+          debugPrint(
+            'EmployeeHome: ⚠️ ADVERTENCIA: El empleado no tiene sucursal asignada',
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Tu usuario no tiene sucursal asignada. Contacta al administrador.'),
+                content: Text(
+                  'Tu usuario no tiene sucursal asignada. Contacta al administrador.',
+                ),
                 backgroundColor: Colors.orange,
                 duration: Duration(seconds: 5),
               ),
             );
           }
         } else {
-          debugPrint('EmployeeHome: Sucursal del empleado (extraida): $extracted');
+          debugPrint(
+            'EmployeeHome: Sucursal del empleado (extraida): $extracted',
+          );
           // Establecer la sucursal inmediatamente después de cargar los datos
           _setupEmployeeSucursal(extracted);
         }
       }
     } catch (e) {
-      debugPrint('EmployeeHome: ❌ Error cargando datos del usuario: ${e.toString()}');
+      debugPrint(
+        'EmployeeHome: ❌ Error cargando datos del usuario: ${e.toString()}',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -140,12 +160,16 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     final sucursalId = sucursal['id'];
     final sucursalNombre = sucursal['nombreSucursal'] ?? 'Sin nombre';
 
-    debugPrint('EmployeeHome: _setupEmployeeSucursal - id=$sucursalId, nombre=$sucursalNombre');
+    debugPrint(
+      'EmployeeHome: _setupEmployeeSucursal - id=$sucursalId, nombre=$sucursalNombre',
+    );
 
     // Obtener el provider del contexto
     final provider = SucursalInherited.of(context);
     if (provider != null) {
-      debugPrint('EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre');
+      debugPrint(
+        'EmployeeHome: ✓✓✓ Estableciendo sucursal del empleado: $sucursalId - $sucursalNombre',
+      );
       provider.setSucursal(sucursalId, sucursalNombre);
       _sucursalProvider = provider;
     } else {
@@ -189,9 +213,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
               child: const Text('Cerrar Sesión'),
             ),
           ],
@@ -236,7 +258,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     }
 
     final username = _userData?['username'] ?? 'Empleado';
-    final sucursalNombre = _userData?['sucursal']?['nombreSucursal'] ?? 'Sin sucursal asignada';
+    final sucursalNombre =
+        _userData?['sucursal']?['nombreSucursal'] ?? 'Sin sucursal asignada';
     final hasSucursal = _userData?['sucursal'] != null;
 
     // Mostrar pantalla de advertencia si no tiene sucursal
@@ -281,7 +304,10 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   label: const Text('Cerrar Sesión'),
                   style: FilledButton.styleFrom(
                     backgroundColor: colorScheme.error,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                   ),
                 ),
               ],
@@ -338,10 +364,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primary,
-                    colorScheme.primaryContainer,
-                  ],
+                  colors: [colorScheme.primary, colorScheme.primaryContainer],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -376,7 +399,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                             Text(
                               'Empleado',
                               style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                                color: colorScheme.onPrimary.withValues(
+                                  alpha: 0.8,
+                                ),
                               ),
                             ),
                           ],
@@ -389,7 +414,10 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   const SizedBox(height: 12),
                   // Selector de sucursal BLOQUEADO para empleados
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.surface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
@@ -399,7 +427,11 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
+                        Icon(
+                          Icons.location_on,
+                          color: colorScheme.onPrimary,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -433,7 +465,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     label: 'Tickets',
                     selected: _selectedIndex == 0,
                     onTap: () {
-                      setState(() { _selectedIndex = 0; });
+                      setState(() {
+                        _selectedIndex = 0;
+                      });
                       Navigator.pop(context);
                     },
                   ),
@@ -443,7 +477,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     label: 'Clientes',
                     selected: _selectedIndex == 1,
                     onTap: () {
-                      setState(() { _selectedIndex = 1; });
+                      setState(() {
+                        _selectedIndex = 1;
+                      });
                       Navigator.pop(context);
                     },
                   ),
@@ -454,7 +490,10 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     selected: false,
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AboutScreen()),
+                      );
                     },
                   ),
                 ],
@@ -493,7 +532,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => NewTicketScreen(
-                      key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
+                      key: ValueKey(
+                        'new_ticket_${DateTime.now().millisecondsSinceEpoch}',
+                      ),
                       currentUserId: userIdStr,
                     ),
                   ),
@@ -501,7 +542,10 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 if (result == true) {
                   // Usar el provider para refrescar la lista con los mismos filtros
                   try {
-                    await Provider.of<TicketProvider>(context, listen: false).fetchCurrent();
+                    await Provider.of<TicketProvider>(
+                      context,
+                      listen: false,
+                    ).fetchCurrent();
                   } catch (e) {
                     setState(() {});
                   }
@@ -512,31 +556,36 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               backgroundColor: Theme.of(context).colorScheme.primary,
             )
           : _selectedIndex == 1
-            ? FloatingActionButton.extended(
-                onPressed: () async {
-                  if (_sucursalProvider?.selectedSucursalId == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('No hay sucursal asignada. Contacte al administrador.'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: Colors.red,
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                if (_sucursalProvider?.selectedSucursalId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'No hay sucursal asignada. Contacte al administrador.',
                       ),
-                    );
-                    return;
-                  }
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
 
-                  final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+                final result = await CreateClientDialog.show(
+                  context,
+                  _sucursalProvider!.selectedSucursalId!,
+                );
 
-                  if (result != null) {
-                    // Refrescar clientes - simplemente rebuild todo
-                    setState(() {});
-                  }
-                },
-                icon: const Icon(Icons.person_add),
-                label: const Text('Nuevo Cliente'),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-              )
-            : null,
+                if (result != null) {
+                  // Refrescar clientes - simplemente rebuild todo
+                  setState(() {});
+                }
+              },
+              icon: const Icon(Icons.person_add),
+              label: const Text('Nuevo Cliente'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            )
+          : null,
     );
   }
 }
@@ -565,9 +614,7 @@ class _DrawerItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Container(
         decoration: BoxDecoration(
-          color: selected
-              ? colorScheme.primaryContainer
-              : Colors.transparent,
+          color: selected ? colorScheme.primaryContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: ListTile(
@@ -591,7 +638,10 @@ class _DrawerItem extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
         ),
       ),
     );

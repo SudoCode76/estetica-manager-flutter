@@ -34,7 +34,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   late CatalogRepository _catalogRepo;
   List<dynamic> _sucursales = [];
   bool _isLoadingSucursales = true;
-  bool _isInitialized = false; // NUEVO: controla si está listo para mostrar pantallas
+  bool _isInitialized =
+      false; // NUEVO: controla si está listo para mostrar pantallas
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Datos del usuario empleado
@@ -44,24 +45,45 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   // Pantallas para admin (todas) - usando Key para forzar recreación cuando cambia sucursal
   List<Widget> get _adminScreens => [
-        TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
-        SesionesScreen(key: ValueKey('sesiones_${_sucursalProvider?.selectedSucursalId}')),
-        ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
-        TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
-        PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
-        // Reportes debe estar en la posición 5 del Drawer
-        ReportsScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
-        EmployeesScreen(key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}')),
-      ];
+    TicketsScreen(
+      key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    SesionesScreen(
+      key: ValueKey('sesiones_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    ClientsScreen(
+      key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    TreatmentsScreen(
+      key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    PaymentsScreen(
+      key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    // Reportes debe estar en la posición 5 del Drawer
+    ReportsScreen(
+      key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    EmployeesScreen(
+      key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+  ];
 
   // Pantallas para empleado (solo tickets y clientes) - usando Key para forzar recreación
   List<Widget> get _employeeScreens => [
-        TicketsScreen(key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}')),
-        SesionesScreen(key: ValueKey('emp_sesiones_${_sucursalProvider?.selectedSucursalId}')),
-        ClientsScreen(key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}')),
-      ];
+    TicketsScreen(
+      key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    SesionesScreen(
+      key: ValueKey('emp_sesiones_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+    ClientsScreen(
+      key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}'),
+    ),
+  ];
 
-  List<Widget> get _screens => widget.isEmployee ? _employeeScreens : _adminScreens;
+  List<Widget> get _screens =>
+      widget.isEmployee ? _employeeScreens : _adminScreens;
 
   @override
   void initState() {
@@ -80,23 +102,33 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             if (d.containsKey('attributes')) {
               final attrs = Map<String, dynamic>.from(d['attributes']);
               attrs['id'] = d['id'] ?? attrs['id'];
-              final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+              final nombre =
+                  attrs['nombreSucursal'] ??
+                  attrs['nombre'] ??
+                  attrs['nombre_sucursal'];
               return {'id': attrs['id'], 'nombreSucursal': nombre};
             }
             final id = d['id'] ?? d['ID'];
-            final nombre = d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
+            final nombre =
+                d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
             if (id != null) return {'id': id, 'nombreSucursal': nombre};
           }
         }
         if (sucursalObj.containsKey('attributes')) {
           final attrs = Map<String, dynamic>.from(sucursalObj['attributes']);
           final id = sucursalObj['id'] ?? attrs['id'];
-          final nombre = attrs['nombreSucursal'] ?? attrs['nombre'] ?? attrs['nombre_sucursal'];
+          final nombre =
+              attrs['nombreSucursal'] ??
+              attrs['nombre'] ??
+              attrs['nombre_sucursal'];
           if (id != null) return {'id': id, 'nombreSucursal': nombre};
         }
         if (sucursalObj.containsKey('id')) {
           final id = sucursalObj['id'];
-          final nombre = sucursalObj['nombreSucursal'] ?? sucursalObj['nombre'] ?? sucursalObj['nombre_sucursal'];
+          final nombre =
+              sucursalObj['nombreSucursal'] ??
+              sucursalObj['nombre'] ??
+              sucursalObj['nombre_sucursal'];
           return {'id': id, 'nombreSucursal': nombre};
         }
       }
@@ -120,9 +152,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           if (extracted != null) {
             _employeeSucursalId = extracted['id'];
             _employeeSucursalName = extracted['nombreSucursal'] ?? 'Sin nombre';
-            debugPrint('AdminHomeScreen: Sucursal del empleado (extraida): $_employeeSucursalId - $_employeeSucursalName');
+            debugPrint(
+              'AdminHomeScreen: Sucursal del empleado (extraida): $_employeeSucursalId - $_employeeSucursalName',
+            );
           } else {
-            debugPrint('AdminHomeScreen: Warning: user.sucursal exists but could not extract');
+            debugPrint(
+              'AdminHomeScreen: Warning: user.sucursal exists but could not extract',
+            );
           }
         }
         return user;
@@ -140,8 +176,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _sucursalProvider = SucursalInherited.of(context);
       // Obtener repositorios inyectados
       _catalogRepo = Provider.of<CatalogRepository>(context, listen: false);
-      debugPrint('AdminHomeScreen: Got provider from context: $_sucursalProvider');
-      debugPrint('AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint(
+        'AdminHomeScreen: Got provider from context: $_sucursalProvider',
+      );
+      debugPrint(
+        'AdminHomeScreen: Provider has sucursalId: ${_sucursalProvider?.selectedSucursalId}',
+      );
       debugPrint('AdminHomeScreen: isEmployee: ${widget.isEmployee}');
 
       // Inicializar según el tipo de usuario
@@ -150,7 +190,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _initializeForUserType() async {
-    debugPrint('AdminHomeScreen: _initializeForUserType started, isEmployee=${widget.isEmployee}');
+    debugPrint(
+      'AdminHomeScreen: _initializeForUserType started, isEmployee=${widget.isEmployee}',
+    );
 
     // Cargar datos del usuario siempre (necesario tanto para admin como employee)
     debugPrint('AdminHomeScreen: Cargando datos del usuario (común)');
@@ -172,7 +214,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       await _setupEmployeeSucursal();
 
       // Verificar que se estableció correctamente
-      debugPrint('AdminHomeScreen: Sucursal después de setup: ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint(
+        'AdminHomeScreen: Sucursal después de setup: ${_sucursalProvider?.selectedSucursalId}',
+      );
     } else {
       // Para admin: cargar todas las sucursales
       await _loadSucursales();
@@ -196,12 +240,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
 
     if (_employeeSucursalId != null && _employeeSucursalName != null) {
-      debugPrint('AdminHomeScreen: ✓ Estableciendo sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName');
-      _sucursalProvider?.setSucursal(_employeeSucursalId!, _employeeSucursalName!);
+      debugPrint(
+        'AdminHomeScreen: ✓ Estableciendo sucursal del empleado: $_employeeSucursalId - $_employeeSucursalName',
+      );
+      _sucursalProvider?.setSucursal(
+        _employeeSucursalId!,
+        _employeeSucursalName!,
+      );
 
       // Crear lista de sucursales con solo la del empleado (para mostrar en el drawer)
       _sucursales = [
-        {'id': _employeeSucursalId, 'nombreSucursal': _employeeSucursalName}
+        {'id': _employeeSucursalId, 'nombreSucursal': _employeeSucursalName},
       ];
       _isLoadingSucursales = false;
 
@@ -209,7 +258,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       await Future.delayed(const Duration(milliseconds: 100));
 
       // Verificar que la sucursal se estableció correctamente
-      debugPrint('AdminHomeScreen: Sucursal en provider después de setup: ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint(
+        'AdminHomeScreen: Sucursal en provider después de setup: ${_sucursalProvider?.selectedSucursalId}',
+      );
     } else {
       debugPrint('AdminHomeScreen: ⚠️ Empleado sin sucursal asignada');
       _isLoadingSucursales = false;
@@ -218,10 +269,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Future<void> _loadSucursales() async {
     debugPrint('AdminHomeScreen: _loadSucursales started');
-    debugPrint('AdminHomeScreen: Provider selectedSucursalId ANTES de cargar = ${_sucursalProvider?.selectedSucursalId}');
+    debugPrint(
+      'AdminHomeScreen: Provider selectedSucursalId ANTES de cargar = ${_sucursalProvider?.selectedSucursalId}',
+    );
     try {
       // Intentar obtener con timeout para evitar bloqueos
-      final sucursales = await _catalogRepo.getSucursales().timeout(const Duration(seconds: 8));
+      final sucursales = await _catalogRepo.getSucursales().timeout(
+        const Duration(seconds: 8),
+      );
       debugPrint('AdminHomeScreen: Loaded ${sucursales.length} sucursales');
       // Guardar cache local de sucursales para fallback si el servidor está lento
       await _saveSucursalesCache(sucursales);
@@ -229,39 +284,64 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         _sucursales = sucursales;
         _isLoadingSucursales = false;
         // Sólo seleccionar la primera sucursal si no hay selección previa persistida
-        if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
-          debugPrint('AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}');
+        if (_sucursales.isNotEmpty &&
+            _sucursalProvider?.selectedSucursalId == null) {
+          debugPrint(
+            'AdminHomeScreen: Setting default sucursal: ${_sucursales.first['id']} - ${_sucursales.first['nombreSucursal']}',
+          );
           _sucursalProvider?.setSucursal(
             _sucursales.first['id'],
             _sucursales.first['nombreSucursal'],
           );
         } else {
-          debugPrint('AdminHomeScreen: Sucursal ya establecida: ${_sucursalProvider?.selectedSucursalId} - ${_sucursalProvider?.selectedSucursalName}');
+          debugPrint(
+            'AdminHomeScreen: Sucursal ya establecida: ${_sucursalProvider?.selectedSucursalId} - ${_sucursalProvider?.selectedSucursalName}',
+          );
         }
       });
-      debugPrint('AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}');
+      debugPrint(
+        'AdminHomeScreen: Provider selectedSucursalId DESPUES de cargar = ${_sucursalProvider?.selectedSucursalId}',
+      );
     } catch (e) {
       debugPrint('AdminHomeScreen: Error loading sucursales: $e');
-      final msg = e is TimeoutException ? 'Timeout al cargar sucursales (verifica conexión)' : e.toString();
+      final msg = e is TimeoutException
+          ? 'Timeout al cargar sucursales (verifica conexión)'
+          : e.toString();
       // Intentar cargar desde caché local
       final cached = await _loadSucursalesCache();
       if (cached != null && cached.isNotEmpty) {
-        debugPrint('AdminHomeScreen: Using cached sucursales (${cached.length}) as fallback');
+        debugPrint(
+          'AdminHomeScreen: Using cached sucursales (${cached.length}) as fallback',
+        );
         setState(() {
           _sucursales = cached;
           _isLoadingSucursales = false;
           // Si no hay selección previa, seleccionar la primera del cache
-          if (_sucursales.isNotEmpty && _sucursalProvider?.selectedSucursalId == null) {
-            _sucursalProvider?.setSucursal(_sucursales.first['id'], _sucursales.first['nombreSucursal']);
+          if (_sucursales.isNotEmpty &&
+              _sucursalProvider?.selectedSucursalId == null) {
+            _sucursalProvider?.setSucursal(
+              _sucursales.first['id'],
+              _sucursales.first['nombreSucursal'],
+            );
           }
         });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usando datos en caché: servidor lento o inaccesible')));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Usando datos en caché: servidor lento o inaccesible',
+              ),
+            ),
+          );
       } else {
         // No hay caché: informar y permitir reintento
         setState(() {
           _isLoadingSucursales = false;
         });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando sucursales: $msg')));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error cargando sucursales: $msg')),
+          );
       }
     }
   }
@@ -272,7 +352,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final s = jsonEncode(sucursales);
       await prefs.setString('cachedSucursales', s);
-      debugPrint('AdminHomeScreen: Saved ${sucursales.length} sucursales to cache');
+      debugPrint(
+        'AdminHomeScreen: Saved ${sucursales.length} sucursales to cache',
+      );
     } catch (e) {
       debugPrint('AdminHomeScreen: Error saving sucursales cache: $e');
     }
@@ -316,9 +398,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
               child: const Text('Cerrar Sesión'),
             ),
           ],
@@ -398,17 +478,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Text(
                   'Sin Sucursal Asignada',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.error,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.error,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Tu cuenta de empleado no tiene una sucursal asignada. Por favor, contacta al administrador para que te asigne una sucursal.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
@@ -418,7 +498,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   label: const Text('Cerrar Sesión'),
                   style: FilledButton.styleFrom(
                     backgroundColor: colorScheme.error,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                   ),
                 ),
               ],
@@ -430,10 +513,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
     final username = _employeeData != null
         ? (_employeeData?['username'] ??
-            (_employeeData?['email'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador')))
+              (_employeeData?['email'] ??
+                  (widget.isEmployee ? 'Empleado' : 'Administrador')))
         : (widget.isEmployee ? 'Empleado' : 'Administrador');
     final rolLabel = _employeeData != null
-        ? (_employeeData?['tipoUsuario'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador'))
+        ? (_employeeData?['tipoUsuario'] ??
+              (widget.isEmployee ? 'Empleado' : 'Administrador'))
         : (widget.isEmployee ? 'Empleado' : 'Administrador');
 
     return Scaffold(
@@ -481,11 +566,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.menu),
-                          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                          onPressed: () =>
+                              _scaffoldKey.currentState?.openDrawer(),
                           style: IconButton.styleFrom(
-                            minimumSize: Size(isCompact ? 36 : 40, isCompact ? 36 : 40),
-                            fixedSize: Size(isCompact ? 36 : 40, isCompact ? 36 : 40),
-                            backgroundColor: colorScheme.surfaceContainerHighest,
+                            minimumSize: Size(
+                              isCompact ? 36 : 40,
+                              isCompact ? 36 : 40,
+                            ),
+                            fixedSize: Size(
+                              isCompact ? 36 : 40,
+                              isCompact ? 36 : 40,
+                            ),
+                            backgroundColor:
+                                colorScheme.surfaceContainerHighest,
                             padding: EdgeInsets.zero,
                           ),
                         ),
@@ -501,9 +594,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             'App Estética',
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: isVerySmall ? 16 : (isCompact ? 18 : null),
+                                  fontSize: isVerySmall
+                                      ? 16
+                                      : (isCompact ? 18 : null),
                                 ),
                           ),
                         ),
@@ -533,7 +629,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       String? userIdStr;
                       if (userJson != null && userJson.isNotEmpty) {
                         try {
-                          final Map<String, dynamic> userMap = jsonDecode(userJson);
+                          final Map<String, dynamic> userMap = jsonDecode(
+                            userJson,
+                          );
                           userIdStr = userMap['id']?.toString();
                         } catch (_) {
                           userIdStr = null;
@@ -543,7 +641,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => NewTicketScreen(
-                            key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
+                            key: ValueKey(
+                              'new_ticket_${DateTime.now().millisecondsSinceEpoch}',
+                            ),
                             currentUserId: userIdStr,
                           ),
                         ),
@@ -551,7 +651,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       if (result == true) {
                         // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
                         try {
-                          await Provider.of<TicketProvider>(context, listen: false).fetchCurrent();
+                          await Provider.of<TicketProvider>(
+                            context,
+                            listen: false,
+                          ).fetchCurrent();
                         } catch (e) {
                           setState(() {});
                         }
@@ -570,7 +673,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     String? userIdStr;
                     if (userJson != null && userJson.isNotEmpty) {
                       try {
-                        final Map<String, dynamic> userMap = jsonDecode(userJson);
+                        final Map<String, dynamic> userMap = jsonDecode(
+                          userJson,
+                        );
                         userIdStr = userMap['id']?.toString();
                       } catch (_) {
                         userIdStr = null;
@@ -580,7 +685,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => NewTicketScreen(
-                          key: ValueKey('new_ticket_${DateTime.now().millisecondsSinceEpoch}'),
+                          key: ValueKey(
+                            'new_ticket_${DateTime.now().millisecondsSinceEpoch}',
+                          ),
                           currentUserId: userIdStr,
                         ),
                       ),
@@ -588,7 +695,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     if (result == true) {
                       // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
                       try {
-                        await Provider.of<TicketProvider>(context, listen: false).fetchCurrent();
+                        await Provider.of<TicketProvider>(
+                          context,
+                          listen: false,
+                        ).fetchCurrent();
                       } catch (e) {
                         setState(() {});
                       }
@@ -600,65 +710,74 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 );
               },
             )
-          : _selectedIndex == 2 // <-- Cambiado: mostrar el FAB de 'Nuevo Cliente' solo cuando la pestaña seleccionada sea la de Clientes (index 2)
-              ? Builder(
-                  builder: (context) {
-                    final screenWidth = MediaQuery.of(context).size.width;
-                    final isCompact = screenWidth < 360;
+          : _selectedIndex ==
+                2 // <-- Cambiado: mostrar el FAB de 'Nuevo Cliente' solo cuando la pestaña seleccionada sea la de Clientes (index 2)
+          ? Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.of(context).size.width;
+                final isCompact = screenWidth < 360;
 
-                    if (isCompact) {
-                      return FloatingActionButton(
-                        onPressed: () async {
-                          if (_sucursalProvider?.selectedSucursalId == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                            return;
-                          }
+                if (isCompact) {
+                  return FloatingActionButton(
+                    onPressed: () async {
+                      if (_sucursalProvider?.selectedSucursalId == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Selecciona una sucursal en el menú lateral antes de continuar',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
 
-                          final result =
-                              await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
-
-                          if (result != null) {
-                            // refrescar clientes - rebuild forzado
-                            setState(() {});
-                          }
-                        },
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        child: const Icon(Icons.person_add),
+                      final result = await CreateClientDialog.show(
+                        context,
+                        _sucursalProvider!.selectedSucursalId!,
                       );
+
+                      if (result != null) {
+                        // refrescar clientes - rebuild forzado
+                        setState(() {});
+                      }
+                    },
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    child: const Icon(Icons.person_add),
+                  );
+                }
+
+                return FloatingActionButton.extended(
+                  onPressed: () async {
+                    if (_sucursalProvider?.selectedSucursalId == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Selecciona una sucursal en el menú lateral antes de continuar',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
                     }
 
-                    return FloatingActionButton.extended(
-                      onPressed: () async {
-                        if (_sucursalProvider?.selectedSucursalId == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final result =
-                            await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
-
-                        if (result != null) {
-                          // refrescar clientes - rebuild forzado
-                          setState(() {});
-                        }
-                      },
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('Nuevo Cliente'),
-                      backgroundColor: Theme.of(context).colorScheme.primary,
+                    final result = await CreateClientDialog.show(
+                      context,
+                      _sucursalProvider!.selectedSucursalId!,
                     );
+
+                    if (result != null) {
+                      // refrescar clientes - rebuild forzado
+                      setState(() {});
+                    }
                   },
-                )
-              : null,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Nuevo Cliente'),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                );
+              },
+            )
+          : null,
     );
   }
 }

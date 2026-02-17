@@ -31,15 +31,46 @@ class AgendaItem {
         if (clienteObj is List && clienteObj.isNotEmpty) {
           final c0 = clienteObj.first;
           if (c0 is Map) {
-            nombre = (c0['nombrecliente'] ?? c0['nombreCliente'] ?? c0['nombre'] ?? '').toString();
-            apellido = (c0['apellidocliente'] ?? c0['apellidoCliente'] ?? c0['apellido'] ?? '').toString();
+            nombre =
+                (c0['nombrecliente'] ??
+                        c0['nombreCliente'] ??
+                        c0['nombre'] ??
+                        '')
+                    .toString();
+            apellido =
+                (c0['apellidocliente'] ??
+                        c0['apellidoCliente'] ??
+                        c0['apellido'] ??
+                        '')
+                    .toString();
           }
         } else if (clienteObj is Map) {
-          nombre = (clienteObj['nombrecliente'] ?? clienteObj['nombreCliente'] ?? clienteObj['nombre'] ?? '').toString();
-          apellido = (clienteObj['apellidocliente'] ?? clienteObj['apellidoCliente'] ?? clienteObj['apellido'] ?? '').toString();
+          nombre =
+              (clienteObj['nombrecliente'] ??
+                      clienteObj['nombreCliente'] ??
+                      clienteObj['nombre'] ??
+                      '')
+                  .toString();
+          apellido =
+              (clienteObj['apellidocliente'] ??
+                      clienteObj['apellidoCliente'] ??
+                      clienteObj['apellido'] ??
+                      '')
+                  .toString();
         } else {
-          nombre = (j['nombrecliente'] ?? j['nombre_cliente'] ?? j['nombreCliente'] ?? j['nombre'] ?? '').toString();
-          apellido = (j['apellidocliente'] ?? j['apellidoCliente'] ?? j['apellido'] ?? '').toString();
+          nombre =
+              (j['nombrecliente'] ??
+                      j['nombre_cliente'] ??
+                      j['nombreCliente'] ??
+                      j['nombre'] ??
+                      '')
+                  .toString();
+          apellido =
+              (j['apellidocliente'] ??
+                      j['apellidoCliente'] ??
+                      j['apellido'] ??
+                      '')
+                  .toString();
         }
 
         final full = ('$nombre $apellido').trim();
@@ -61,7 +92,10 @@ class AgendaItem {
           if (sesiones is List && sesiones.isNotEmpty) {
             final s0 = sesiones.first;
             if (s0 is Map) {
-              tratObj = s0['tratamiento'] ?? s0['tratamiento_id'] ?? s0['tratamiento_id'];
+              tratObj =
+                  s0['tratamiento'] ??
+                  s0['tratamiento_id'] ??
+                  s0['tratamiento_id'];
             }
           } else if (sesiones is Map) {
             tratObj = sesiones['tratamiento'] ?? sesiones['tratamiento_id'];
@@ -72,14 +106,30 @@ class AgendaItem {
         if (tratObj is List && tratObj.isNotEmpty) {
           final t0 = tratObj.first;
           if (t0 is Map) {
-            nombreTrat = (t0['nombretratamiento'] ?? t0['nombreTratamiento'] ?? t0['nombre'] ?? '').toString();
+            nombreTrat =
+                (t0['nombretratamiento'] ??
+                        t0['nombreTratamiento'] ??
+                        t0['nombre'] ??
+                        '')
+                    .toString();
           }
         } else if (tratObj is Map) {
-          nombreTrat = (tratObj['nombretratamiento'] ?? tratObj['nombreTratamiento'] ?? tratObj['nombre'] ?? '').toString();
+          nombreTrat =
+              (tratObj['nombretratamiento'] ??
+                      tratObj['nombreTratamiento'] ??
+                      tratObj['nombre'] ??
+                      '')
+                  .toString();
         }
 
         if (nombreTrat.isEmpty) {
-          nombreTrat = (j['nombretratamiento'] ?? j['nombre_tratamiento'] ?? j['nombreTratamiento'] ?? j['nombre_trat'] ?? '').toString();
+          nombreTrat =
+              (j['nombretratamiento'] ??
+                      j['nombre_tratamiento'] ??
+                      j['nombreTratamiento'] ??
+                      j['nombre_trat'] ??
+                      '')
+                  .toString();
         }
 
         return nombreTrat.isNotEmpty ? nombreTrat : 'Sin tratamiento';

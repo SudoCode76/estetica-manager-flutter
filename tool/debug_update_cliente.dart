@@ -7,13 +7,13 @@ Future<void> main() async {
   final documentId = 'zbjwkty367jiivyb6h1x2886';
   final url = Uri.parse('$base/clientes/$documentId');
   final body = jsonEncode({
-    'data': {
-      'nombreCliente': 'Nuevo Nombre de Prueba desde script'
-    }
+    'data': {'nombreCliente': 'Nuevo Nombre de Prueba desde script'},
   });
 
   try {
-    final resp = await http.put(url, headers: {'Content-Type': 'application/json'}, body: body).timeout(const Duration(seconds: 8));
+    final resp = await http
+        .put(url, headers: {'Content-Type': 'application/json'}, body: body)
+        .timeout(const Duration(seconds: 8));
     if (kDebugMode) debugPrint('Status: ${resp.statusCode}');
     if (kDebugMode) debugPrint('Body: ${resp.body}');
   } catch (e) {

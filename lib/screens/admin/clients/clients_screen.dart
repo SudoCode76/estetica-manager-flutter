@@ -51,7 +51,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
     super.didChangeDependencies();
     debugPrint('ClientsScreen: didChangeDependencies called');
     final provider = SucursalInherited.of(context);
-    debugPrint('ClientsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}');
+    debugPrint(
+      'ClientsScreen: Provider = $provider, selectedSucursalId = ${provider?.selectedSucursalId}',
+    );
     if (provider != _sucursalProvider) {
       debugPrint('ClientsScreen: Provider changed, removing old listener');
       _sucursalProvider?.removeListener(_onSucursalChanged);
@@ -77,26 +79,33 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
   Future<void> fetchClients() async {
     debugPrint('ClientsScreen: fetchClients() called');
-    debugPrint('ClientsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}');
+    debugPrint(
+      'ClientsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}',
+    );
 
     if (_sucursalProvider?.selectedSucursalId == null) {
       debugPrint('ClientsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
       setState(() {
         isLoading = false;
-        errorMsg = 'No hay sucursal seleccionada. Por favor, contacte al administrador.';
+        errorMsg =
+            'No hay sucursal seleccionada. Por favor, contacte al administrador.';
         clients = [];
         filteredClients = [];
       });
       return;
     }
 
-    debugPrint('ClientsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}');
+    debugPrint(
+      'ClientsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}',
+    );
     setState(() {
       isLoading = true;
       errorMsg = null;
     });
     try {
-      debugPrint('ClientsScreen: Llamando api.getClientes con sucursalId=${_sucursalProvider!.selectedSucursalId}');
+      debugPrint(
+        'ClientsScreen: Llamando api.getClientes con sucursalId=${_sucursalProvider!.selectedSucursalId}',
+      );
       final repo = Provider.of<ClienteRepository>(context, listen: false);
       final data = await repo.searchClientes(
         sucursalId: _sucursalProvider!.selectedSucursalId,
@@ -126,14 +135,19 @@ class _ClientsScreenState extends State<ClientsScreen> {
     if (_sucursalProvider?.selectedSucursalId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+          content: Text(
+            'Selecciona una sucursal en el menú lateral antes de continuar',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+    final result = await CreateClientDialog.show(
+      context,
+      _sucursalProvider!.selectedSucursalId!,
+    );
 
     if (result != null) {
       // Recargar lista
@@ -172,9 +186,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
             child: const Text('Eliminar'),
           ),
         ],
@@ -209,17 +221,28 @@ class _ClientsScreenState extends State<ClientsScreen> {
         }
 
         // Preferir documentId (string) si existe; si no, usar id convertido a string
-        final String docIdForDelete = cliente['documentId']?.toString() ?? cliente['id']?.toString() ?? '';
+        final String docIdForDelete =
+            cliente['documentId']?.toString() ??
+            cliente['id']?.toString() ??
+            '';
         if (docIdForDelete.isEmpty) {
           if (mounted) Navigator.pop(context); // Cerrar loading
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('ID del cliente no disponible, no se puede eliminar.'), backgroundColor: colorScheme.error),
+              SnackBar(
+                content: Text(
+                  'ID del cliente no disponible, no se puede eliminar.',
+                ),
+                backgroundColor: colorScheme.error,
+              ),
             );
           }
           return;
         }
-        final clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
+        final clienteRepo = Provider.of<ClienteRepository>(
+          context,
+          listen: false,
+        );
         await clienteRepo.deleteCliente(docIdForDelete);
 
         if (mounted) Navigator.pop(context); // Cerrar loading
@@ -236,7 +259,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
               ),
               backgroundColor: colorScheme.primary,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
         }
@@ -257,7 +282,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
               ),
               backgroundColor: colorScheme.error,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
         }
@@ -277,7 +304,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
         children: [
           // Barra de búsqueda y acciones
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: Responsive.horizontalPadding(context)),
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.horizontalPadding(context),
+            ),
             child: Column(
               children: [
                 // Búsqueda y botones en diseño adaptativo
@@ -293,7 +322,10 @@ class _ClientsScreenState extends State<ClientsScreen> {
                     trailing: [
                       if (_searchController.text.isNotEmpty)
                         IconButton(
-                          icon: Icon(Icons.clear, size: isSmallScreen ? 20 : 24),
+                          icon: Icon(
+                            Icons.clear,
+                            size: isSmallScreen ? 20 : 24,
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             search = '';
@@ -312,20 +344,31 @@ class _ClientsScreenState extends State<ClientsScreen> {
                         child: FilledButton.icon(
                           onPressed: fetchClients,
                           icon: Icon(Icons.refresh, size: 18),
-                          label: Text('Actualizar', style: TextStyle(fontSize: 13)),
+                          label: Text(
+                            'Actualizar',
+                            style: TextStyle(fontSize: 13),
+                          ),
                           style: FilledButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                           ),
                         ),
                       ),
                       SizedBox(width: 8),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: _isEmployee ? null : _showCreateClientDialog,
+                          onPressed: _isEmployee
+                              ? null
+                              : _showCreateClientDialog,
                           icon: Icon(Icons.person_add, size: 18),
                           label: Text('Nuevo', style: TextStyle(fontSize: 13)),
                           style: FilledButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                           ),
                         ),
                       ),
@@ -338,7 +381,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       Expanded(
                         child: SearchBar(
                           controller: _searchController,
-                          hintText: isMobile ? 'Buscar...' : 'Buscar por nombre, apellido o teléfono',
+                          hintText: isMobile
+                              ? 'Buscar...'
+                              : 'Buscar por nombre, apellido o teléfono',
                           leading: const Icon(Icons.search),
                           trailing: [
                             if (_searchController.text.isNotEmpty)
@@ -363,7 +408,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                         label: Text(isMobile ? '' : 'Actualizar'),
                         style: FilledButton.styleFrom(
                           minimumSize: Size(isMobile ? 56 : 120, 56),
-                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 16 : 20,
+                          ),
                         ),
                       ),
                       if (!_isEmployee) ...[
@@ -374,7 +421,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                           label: Text(isMobile ? '' : 'Nuevo'),
                           style: FilledButton.styleFrom(
                             minimumSize: Size(isMobile ? 56 : 120, 56),
-                            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 16 : 20,
+                            ),
                           ),
                         ),
                       ],
@@ -395,181 +444,247 @@ class _ClientsScreenState extends State<ClientsScreen> {
                     ),
                   )
                 : errorMsg != null
-                    ? Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.error_outline,
-                                size: isSmallScreen ? 48 : 64,
-                                color: colorScheme.error
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(
+                        Responsive.horizontalPadding(context),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: isSmallScreen ? 48 : 64,
+                            color: colorScheme.error,
+                          ),
+                          SizedBox(height: Responsive.spacing(context, 16)),
+                          Text(
+                            errorMsg!,
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.bodyMedium
+                                        : textTheme.bodyLarge)
+                                    ?.copyWith(color: colorScheme.error),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : filteredClients.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(
+                        Responsive.horizontalPadding(context),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.person_search_rounded,
+                            size: isSmallScreen ? 48 : 64,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          SizedBox(height: Responsive.spacing(context, 16)),
+                          Text(
+                            search.isEmpty
+                                ? 'No hay clientes en esta sucursal'
+                                : 'No se encontraron clientes',
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.bodyMedium
+                                        : textTheme.bodyLarge)
+                                    ?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: Responsive.spacing(context, 8)),
+                          Text(
+                            search.isEmpty
+                                ? 'Registra el primer cliente'
+                                : 'Intenta con otro término de búsqueda',
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.bodySmall
+                                        : textTheme.bodyMedium)
+                                    ?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.horizontalPadding(context),
+                      vertical: Responsive.verticalPadding(context),
+                    ),
+                    itemCount: filteredClients.length,
+                    itemBuilder: (context, i) {
+                      final c = filteredClients[i];
+                      final nombre =
+                          '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'
+                              .trim();
+                      final telefono =
+                          c['telefono']?.toString() ?? 'Sin teléfono';
+                      final avatarSize = isSmallScreen ? 48.0 : 56.0;
+                      final fontSize = isSmallScreen ? 18.0 : 20.0;
+
+                      return Card(
+                        margin: EdgeInsets.only(
+                          bottom: Responsive.spacing(context, 12),
+                        ),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            isSmallScreen ? 12 : 16,
+                          ),
+                        ),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12 : 16,
+                            vertical: isSmallScreen ? 8 : 12,
+                          ),
+                          leading: Container(
+                            width: avatarSize,
+                            height: avatarSize,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primaryContainer,
+                                  colorScheme.secondaryContainer,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                              SizedBox(height: Responsive.spacing(context, 16)),
-                              Text(
-                                errorMsg!,
-                                style: (isSmallScreen ? textTheme.bodyMedium : textTheme.bodyLarge)?.copyWith(
-                                  color: colorScheme.error
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10 : 12,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                nombre.isNotEmpty
+                                    ? nombre[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  fontSize: fontSize,
+                                  color: colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            nombre,
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.titleSmall
+                                        : textTheme.titleMedium)
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Row(
+                            children: [
+                              Icon(
+                                Icons.phone,
+                                size: isSmallScreen ? 12 : 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              SizedBox(width: Responsive.spacing(context, 4)),
+                              Flexible(
+                                child: Text(
+                                  telefono,
+                                  style:
+                                      (isSmallScreen
+                                              ? textTheme.bodySmall
+                                              : textTheme.bodyMedium)
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      )
-                    : filteredClients.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.person_search_rounded,
-                                    size: isSmallScreen ? 48 : 64,
+                          trailing: _isEmployee
+                              ? null // No mostrar menú para empleados
+                              : PopupMenuButton(
+                                  icon: Icon(
+                                    Icons.more_vert,
                                     color: colorScheme.onSurfaceVariant,
+                                    size: isSmallScreen ? 20 : 24,
                                   ),
-                                  SizedBox(height: Responsive.spacing(context, 16)),
-                                  Text(
-                                    search.isEmpty
-                                        ? 'No hay clientes en esta sucursal'
-                                      : 'No se encontraron clientes',
-                                  style: (isSmallScreen ? textTheme.bodyMedium : textTheme.bodyLarge)?.copyWith(
-                                    color: colorScheme.onSurfaceVariant
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: Responsive.spacing(context, 8)),
-                                Text(
-                                  search.isEmpty
-                                      ? 'Registra el primer cliente'
-                                      : 'Intenta con otro término de búsqueda',
-                                  style: (isSmallScreen ? textTheme.bodySmall : textTheme.bodyMedium)?.copyWith(
-                                    color: colorScheme.onSurfaceVariant
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                        : ListView.builder(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Responsive.horizontalPadding(context),
-                              vertical: Responsive.verticalPadding(context),
-                            ),
-                            itemCount: filteredClients.length,
-                            itemBuilder: (context, i) {
-                              final c = filteredClients[i];
-                              final nombre = '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim();
-                              final telefono = c['telefono']?.toString() ?? 'Sin teléfono';
-                              final avatarSize = isSmallScreen ? 48.0 : 56.0;
-                              final fontSize = isSmallScreen ? 18.0 : 20.0;
-
-                              return Card(
-                                margin: EdgeInsets.only(bottom: Responsive.spacing(context, 12)),
-                                elevation: 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
-                                ),
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: isSmallScreen ? 12 : 16,
-                                    vertical: isSmallScreen ? 8 : 12,
-                                  ),
-                                  leading: Container(
-                                    width: avatarSize,
-                                    height: avatarSize,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          colorScheme.primaryContainer,
-                                          colorScheme.secondaryContainer,
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      onTap: () {
+                                        Future.delayed(
+                                          Duration.zero,
+                                          () => _showEditClientDialog(c),
+                                        );
+                                      },
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.edit,
+                                            size: isSmallScreen ? 18 : 20,
+                                            color: colorScheme.primary,
+                                          ),
+                                          SizedBox(
+                                            width: Responsive.spacing(
+                                              context,
+                                              12,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Editar',
+                                            style: TextStyle(
+                                              fontSize: isSmallScreen ? 13 : 14,
+                                            ),
+                                          ),
                                         ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
-                                        style: TextStyle(
-                                          fontSize: fontSize,
-                                          color: colorScheme.onPrimaryContainer,
-                                          fontWeight: FontWeight.bold,
-                                        ),
                                       ),
                                     ),
-                                  ),
-                                  title: Text(
-                                    nombre,
-                                    style: (isSmallScreen ? textTheme.titleSmall : textTheme.titleMedium)?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.phone,
-                                        size: isSmallScreen ? 12 : 14,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      SizedBox(width: Responsive.spacing(context, 4)),
-                                      Flexible(
-                                        child: Text(
-                                          telefono,
-                                          style: (isSmallScreen ? textTheme.bodySmall : textTheme.bodyMedium)?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                        ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  trailing: _isEmployee
-                                      ? null // No mostrar menú para empleados
-                                      : PopupMenuButton(
-                                          icon: Icon(
-                                            Icons.more_vert,
-                                            color: colorScheme.onSurfaceVariant,
-                                            size: isSmallScreen ? 20 : 24,
+                                    PopupMenuItem(
+                                      onTap: () {
+                                        Future.delayed(
+                                          Duration.zero,
+                                          () => _deleteClient(c),
+                                        );
+                                      },
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.delete,
+                                            size: isSmallScreen ? 18 : 20,
+                                            color: colorScheme.error,
                                           ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                          SizedBox(
+                                            width: Responsive.spacing(
+                                              context,
+                                              12,
+                                            ),
                                           ),
-                                          itemBuilder: (context) => [
-                                            PopupMenuItem(
-                                              onTap: () {
-                                                Future.delayed(Duration.zero, () => _showEditClientDialog(c));
-                                              },
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.edit, size: isSmallScreen ? 18 : 20, color: colorScheme.primary),
-                                                  SizedBox(width: Responsive.spacing(context, 12)),
-                                                  Text('Editar', style: TextStyle(fontSize: isSmallScreen ? 13 : 14)),
-                                                ],
-                                              ),
+                                          Text(
+                                            'Eliminar',
+                                            style: TextStyle(
+                                              fontSize: isSmallScreen ? 13 : 14,
                                             ),
-                                            PopupMenuItem(
-                                              onTap: () {
-                                                Future.delayed(Duration.zero, () => _deleteClient(c));
-                                              },
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.delete, size: isSmallScreen ? 18 : 20, color: colorScheme.error),
-                                                  SizedBox(width: Responsive.spacing(context, 12)),
-                                                  Text('Eliminar', style: TextStyle(fontSize: isSmallScreen ? 13 : 14)),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
-                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -582,10 +697,7 @@ class _EditClientDialog extends StatefulWidget {
   final Map<String, dynamic> cliente;
   final int sucursalId;
 
-  const _EditClientDialog({
-    required this.cliente,
-    required this.sucursalId,
-  });
+  const _EditClientDialog({required this.cliente, required this.sucursalId});
 
   @override
   State<_EditClientDialog> createState() => _EditClientDialogState();
@@ -600,9 +712,15 @@ class _EditClientDialogState extends State<_EditClientDialog> {
   @override
   void initState() {
     super.initState();
-    _nombreController = TextEditingController(text: widget.cliente['nombreCliente'] ?? '');
-    _apellidoController = TextEditingController(text: widget.cliente['apellidoCliente'] ?? '');
-    _telefonoController = TextEditingController(text: widget.cliente['telefono']?.toString() ?? '');
+    _nombreController = TextEditingController(
+      text: widget.cliente['nombreCliente'] ?? '',
+    );
+    _apellidoController = TextEditingController(
+      text: widget.cliente['apellidoCliente'] ?? '',
+    );
+    _telefonoController = TextEditingController(
+      text: widget.cliente['telefono']?.toString() ?? '',
+    );
   }
 
   @override
@@ -652,17 +770,28 @@ class _EditClientDialogState extends State<_EditClientDialog> {
       };
 
       // Preferir documentId (string) si existe; si no, usar id convertido a string
-      final String docIdForUpdate = widget.cliente['documentId']?.toString() ?? widget.cliente['id']?.toString() ?? '';
+      final String docIdForUpdate =
+          widget.cliente['documentId']?.toString() ??
+          widget.cliente['id']?.toString() ??
+          '';
       if (docIdForUpdate.isEmpty) {
         if (mounted) Navigator.pop(context); // Cerrar loading
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('ID del cliente no disponible, no se puede actualizar.'), backgroundColor: colorScheme.error),
+            SnackBar(
+              content: Text(
+                'ID del cliente no disponible, no se puede actualizar.',
+              ),
+              backgroundColor: colorScheme.error,
+            ),
           );
         }
         return;
       }
-      final clienteRepo = Provider.of<ClienteRepository>(context, listen: false);
+      final clienteRepo = Provider.of<ClienteRepository>(
+        context,
+        listen: false,
+      );
       await clienteRepo.updateCliente(docIdForUpdate, actualizado);
 
       // Cerrar loading
@@ -683,7 +812,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
             ),
             backgroundColor: colorScheme.primary,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -703,7 +834,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
             ),
             backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -786,7 +919,8 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                             Text(
                               'Actualizar información del cliente',
                               style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                                color: colorScheme.onPrimaryContainer
+                                    .withValues(alpha: 0.8),
                               ),
                             ),
                           ],
@@ -815,7 +949,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               margin: const EdgeInsets.all(8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                color: colorScheme.primaryContainer.withValues(
+                                  alpha: 0.5,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -828,10 +964,16 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            fillColor: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'El nombre es requerido' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'El nombre es requerido'
+                              : null,
                           textCapitalization: TextCapitalization.words,
                         ),
                         const SizedBox(height: 16),
@@ -846,7 +988,8 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               margin: const EdgeInsets.all(8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                                color: colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -859,8 +1002,12 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            fillColor: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
                           textCapitalization: TextCapitalization.words,
                         ),
@@ -876,7 +1023,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               margin: const EdgeInsets.all(8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+                                color: colorScheme.tertiaryContainer.withValues(
+                                  alpha: 0.5,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -889,8 +1038,12 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            fillColor: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
                           keyboardType: TextInputType.phone,
                         ),
@@ -903,7 +1056,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                 ),
                                 child: const Text('Cancelar'),
                               ),
@@ -913,7 +1068,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               child: FilledButton(
                                 onPressed: _editarCliente,
                                 style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                 ),
                                 child: const Text('Guardar'),
                               ),

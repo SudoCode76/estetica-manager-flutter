@@ -4,7 +4,8 @@
 /// para facilitar el cambio entre desarrollo y producción.
 class ApiConfig {
   // URL de producción (Strapi desplegado)
-  static const String productionUrl = 'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
+  static const String productionUrl =
+      'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
 
   // URL de desarrollo local
   static const String localUrl = 'http://localhost:1337/api';
@@ -27,4 +28,3 @@ class ApiConfig {
   /// Configuración de logging
   static const bool enableDebugLogs = true;
 }
-

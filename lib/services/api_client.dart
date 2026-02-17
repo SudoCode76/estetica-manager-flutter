@@ -10,8 +10,11 @@ class ApiClient {
   ApiClient._();
 
   static String? debugBaseUrl;
-  static const String _productionUrl = 'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
-  String get baseUrl => (debugBaseUrl != null && debugBaseUrl!.isNotEmpty) ? debugBaseUrl! : _productionUrl;
+  static const String _productionUrl =
+      'https://fantastic-agreement-b2f3f76198.strapiapp.com/api';
+  String get baseUrl => (debugBaseUrl != null && debugBaseUrl!.isNotEmpty)
+      ? debugBaseUrl!
+      : _productionUrl;
 
   Future<Map<String, String>> getHeaders() async {
     String jwt = '';
@@ -30,31 +33,53 @@ class ApiClient {
       'apikey': SupabaseConfig.supabaseAnonKey,
     };
     final hasJwt = jwt.isNotEmpty;
-    headers['Authorization'] = hasJwt ? 'Bearer $jwt' : 'Bearer ${SupabaseConfig.supabaseAnonKey}';
+    headers['Authorization'] = hasJwt
+        ? 'Bearer $jwt'
+        : 'Bearer ${SupabaseConfig.supabaseAnonKey}';
     return headers;
   }
 
-  Future<http.Response> getWithTimeout(Uri uri, Map<String, String> headers, {int seconds = 8}) async {
+  Future<http.Response> getWithTimeout(
+    Uri uri,
+    Map<String, String> headers, {
+    int seconds = 8,
+  }) async {
     try {
-      final resp = await http.get(uri, headers: headers).timeout(Duration(seconds: seconds));
+      final resp = await http
+          .get(uri, headers: headers)
+          .timeout(Duration(seconds: seconds));
       return resp;
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<http.Response> postWithTimeout(Uri uri, Map<String, String> headers, Object? body, {int seconds = 8}) async {
+  Future<http.Response> postWithTimeout(
+    Uri uri,
+    Map<String, String> headers,
+    Object? body, {
+    int seconds = 8,
+  }) async {
     try {
-      final resp = await http.post(uri, headers: headers, body: body).timeout(Duration(seconds: seconds));
+      final resp = await http
+          .post(uri, headers: headers, body: body)
+          .timeout(Duration(seconds: seconds));
       return resp;
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<http.Response> patchWithTimeout(Uri uri, Map<String, String> headers, Object? body, {int seconds = 8}) async {
+  Future<http.Response> patchWithTimeout(
+    Uri uri,
+    Map<String, String> headers,
+    Object? body, {
+    int seconds = 8,
+  }) async {
     try {
-      final resp = await http.patch(uri, headers: headers, body: body).timeout(Duration(seconds: seconds));
+      final resp = await http
+          .patch(uri, headers: headers, body: body)
+          .timeout(Duration(seconds: seconds));
       return resp;
     } catch (e) {
       rethrow;
@@ -68,14 +93,18 @@ class ApiClient {
         final attrs = Map<String, dynamic>.from(item['attributes']);
         attrs['id'] = item['id'];
         item.forEach((k, v) {
-          if (k != 'attributes' && k != 'id' && !attrs.containsKey(k)) attrs[k] = v;
+          if (k != 'attributes' && k != 'id' && !attrs.containsKey(k))
+            attrs[k] = v;
         });
         attrs.forEach((key, value) {
           if (value is Map && value.containsKey('data')) {
             final relationData = value['data'];
-            if (relationData == null) attrs[key] = null;
-            else if (relationData is Map) attrs[key] = normalizeItems([relationData]).first;
-            else if (relationData is List) attrs[key] = normalizeItems(relationData);
+            if (relationData == null)
+              attrs[key] = null;
+            else if (relationData is Map)
+              attrs[key] = normalizeItems([relationData]).first;
+            else if (relationData is List)
+              attrs[key] = normalizeItems(relationData);
           }
         });
         return attrs;
@@ -98,10 +127,11 @@ class ApiClient {
       if (newItem['tratamiento'] == null) {
         newItem['tratamiento'] = {
           'nombretratamiento': newItem['nombretratamiento'] ?? '',
-          'precio': newItem['precio']
+          'precio': newItem['precio'],
         };
       }
-      if (newItem['estado_sesion_enum'] == null && newItem['estado_sesion'] != null) {
+      if (newItem['estado_sesion_enum'] == null &&
+          newItem['estado_sesion'] != null) {
         newItem['estado_sesion_enum'] = newItem['estado_sesion'];
       }
       return newItem;

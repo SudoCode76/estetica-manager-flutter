@@ -47,47 +47,100 @@ class FinancialReport extends StatelessWidget {
           // CARD INGRESOS
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(24)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Ingresos Totales', style: textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-              const SizedBox(height: 8),
-              Text('Bs ${NumberFormat('#,##0.00', 'es_BO').format(ingresos)}', style: textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface, fontSize: 32)),
-              const SizedBox(height: 24),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ingresos Totales',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Bs ${NumberFormat('#,##0.00', 'es_BO').format(ingresos)}',
+                  style: textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: cs.onSurface,
+                    fontSize: 32,
+                  ),
+                ),
+                const SizedBox(height: 24),
 
-              Text('Tendencia ($chartLabel)', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
+                Text(
+                  'Tendencia ($chartLabel)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
 
-              // GRÁFICO
-              SizedBox(
-                height: 180,
-                child: chartData.isEmpty
-                    ? const Center(child: Text("Sin movimientos", style: TextStyle(color: Colors.grey)))
-                    : BarChart(BarChartData(
-                        barGroups: _buildChartGroups(chartData, cs),
-                        gridData: const FlGridData(show: false),
-                        titlesData: FlTitlesData(
-                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: true, getTitlesWidget: (val, meta) {
-                              final idx = val.toInt();
-                              if (idx >= 0 && idx < chartData.length) {
-                                // Mostrar solo algunas etiquetas para que no se amontonen
-                                if (chartData.length > 7 && idx % 2 != 0) return const SizedBox.shrink();
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Text(chartData[idx]['label'].toString(), style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            }),
+                // GRÁFICO
+                SizedBox(
+                  height: 180,
+                  child: chartData.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "Sin movimientos",
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : BarChart(
+                          BarChartData(
+                            barGroups: _buildChartGroups(chartData, cs),
+                            gridData: const FlGridData(show: false),
+                            titlesData: FlTitlesData(
+                              leftTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (val, meta) {
+                                    final idx = val.toInt();
+                                    if (idx >= 0 && idx < chartData.length) {
+                                      // Mostrar solo algunas etiquetas para que no se amontonen
+                                      if (chartData.length > 7 && idx % 2 != 0)
+                                        return const SizedBox.shrink();
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 8.0,
+                                        ),
+                                        child: Text(
+                                          chartData[idx]['label'].toString(),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+                              ),
+                            ),
+                            borderData: FlBorderData(show: false),
                           ),
                         ),
-                        borderData: FlBorderData(show: false),
-                      )),
-              ),
-            ]),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 20),
@@ -98,28 +151,50 @@ class FinancialReport extends StatelessWidget {
             decoration: BoxDecoration(
               color: surface,
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.03), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [
+                BoxShadow(
+                  color: const Color.fromRGBO(0, 0, 0, 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Tratamientos más vendidos',
-                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface),
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 24),
 
                 if (topTratamientos.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(child: Text("No se registraron ventas", style: TextStyle(color: Colors.grey))),
+                    child: Center(
+                      child: Text(
+                        "No se registraron ventas",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   )
                 else
                   ...topTratamientos.map((t) {
                     final count = (t['count'] as num).toInt();
                     // Calcular máximo para la barra de progreso relativa
-                    final maxVal = topTratamientos.map((e) => (e['count'] as num).toDouble()).reduce((a, b) => a > b ? a : b);
-                    return _buildTreatmentRow(t['name'] ?? 'Tratamiento', count, maxVal, textTheme, cs);
+                    final maxVal = topTratamientos
+                        .map((e) => (e['count'] as num).toDouble())
+                        .reduce((a, b) => a > b ? a : b);
+                    return _buildTreatmentRow(
+                      t['name'] ?? 'Tratamiento',
+                      count,
+                      maxVal,
+                      textTheme,
+                      cs,
+                    );
                   }),
               ],
             ),
@@ -133,7 +208,13 @@ class FinancialReport extends StatelessWidget {
             decoration: BoxDecoration(
               color: surface,
               borderRadius: BorderRadius.circular(24),
-              boxShadow: [BoxShadow(color: const Color.fromRGBO(0,0,0,0.03), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [
+                BoxShadow(
+                  color: const Color.fromRGBO(0, 0, 0, 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,11 +222,23 @@ class FinancialReport extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Pendientes de Cobro', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface)),
+                    Text(
+                      'Pendientes de Cobro',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurface,
+                      ),
+                    ),
                     TextButton(
                       onPressed: () {}, // Navegar a lista completa si deseas
-                      child: Text('Ver todos', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
-                    )
+                      child: Text(
+                        'Ver todos',
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -153,7 +246,12 @@ class FinancialReport extends StatelessWidget {
                 if (pendientes.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: Text("¡Todo al día! No hay deudas.", style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    child: Text(
+                      "¡Todo al día! No hay deudas.",
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   )
                 else
                   ...pendientes.map((p) => _buildDebtRow(context, p)),
@@ -170,7 +268,9 @@ class FinancialReport extends StatelessWidget {
 
   double _calculateMaxY(List data) {
     if (data.isEmpty) return 100;
-    final max = data.map((e) => (e['value'] as num).toDouble()).reduce((a, b) => a > b ? a : b);
+    final max = data
+        .map((e) => (e['value'] as num).toDouble())
+        .reduce((a, b) => a > b ? a : b);
     return max == 0 ? 100 : max * 1.2; // 20% de margen arriba
   }
 
@@ -190,13 +290,19 @@ class FinancialReport extends StatelessWidget {
               toY: _calculateMaxY(data),
               color: Colors.grey.shade200,
             ),
-          )
-        ]
+          ),
+        ],
       );
     });
   }
 
-  Widget _buildTreatmentRow(String name, int count, double max, TextTheme textTheme, ColorScheme cs) {
+  Widget _buildTreatmentRow(
+    String name,
+    int count,
+    double max,
+    TextTheme textTheme,
+    ColorScheme cs,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 24.0),
       child: Column(
@@ -208,14 +314,22 @@ class FinancialReport extends StatelessWidget {
                 child: Text(
                   name,
                   overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface, fontSize: 15)
-                )
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                    fontSize: 15,
+                  ),
+                ),
               ),
               Text(
                 '$count sesiones',
-                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.bold, fontSize: 14)
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
-            ]
+            ],
           ),
           const SizedBox(height: 10),
           ClipRRect(
@@ -223,11 +337,13 @@ class FinancialReport extends StatelessWidget {
             child: LinearProgressIndicator(
               value: max == 0 ? 0 : count / max,
               color: cs.primary, // Barra progreso según theme
-              backgroundColor: cs.primary.withAlpha((0.12 * 255).toInt()), // Fondo suave
+              backgroundColor: cs.primary.withAlpha(
+                (0.12 * 255).toInt(),
+              ), // Fondo suave
               minHeight: 10,
             ),
-          )
-        ]
+          ),
+        ],
       ),
     );
   }
@@ -243,10 +359,14 @@ class FinancialReport extends StatelessWidget {
         final now = DateTime.now();
         final diff = now.difference(dt).inDays;
 
-        if (diff == 0) fechaStr = 'Hoy';
-        else if (diff == 1) fechaStr = 'Ayer';
-        else if (diff < 7) fechaStr = 'Hace $diff días';
-        else fechaStr = DateFormat('dd MMM', 'es').format(dt);
+        if (diff == 0)
+          fechaStr = 'Hoy';
+        else if (diff == 1)
+          fechaStr = 'Ayer';
+        else if (diff < 7)
+          fechaStr = 'Hace $diff días';
+        else
+          fechaStr = DateFormat('dd MMM', 'es').format(dt);
       } catch (_) {}
     }
 
@@ -263,20 +383,28 @@ class FinancialReport extends StatelessWidget {
             children: [
               Text(
                 p['name'] ?? 'Cliente',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 15, color: cs.onSurface),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: cs.onSurface,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 fechaStr,
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
               ),
-            ]
+            ],
           ),
           Text(
             'Bs ${NumberFormat('#,##0.00', 'es_BO').format(amount)}',
-            style: TextStyle(color: cs.error, fontWeight: FontWeight.bold, fontSize: 16),
+            style: TextStyle(
+              color: cs.error,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
           ),
-        ]
+        ],
       ),
     );
   }

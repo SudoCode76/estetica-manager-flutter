@@ -35,7 +35,11 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<dynamic>> fetchTickets({int? sucursalId, bool? estadoTicket, bool forceRefresh = false}) async {
+  Future<List<dynamic>> fetchTickets({
+    int? sucursalId,
+    bool? estadoTicket,
+    bool forceRefresh = false,
+  }) async {
     // Si forceRefresh es true, resetear el estado primero
     if (forceRefresh) {
       _fetchInProgress = false;
@@ -69,7 +73,9 @@ class TicketProvider extends ChangeNotifier {
         return _tickets;
       }
 
-      debugPrint('TicketProvider: Fetching tickets del día for sucursalId=$sucursalId');
+      debugPrint(
+        'TicketProvider: Fetching tickets del día for sucursalId=$sucursalId',
+      );
 
       // Usar getTicketsDelDia del repositorio para obtener tickets creados hoy
       final data = await _repo.getTicketsDelDia(
@@ -127,7 +133,11 @@ class TicketProvider extends ChangeNotifier {
   // ------------------ NUEVA ARQUITECTURA ------------------
 
   /// Obtener agenda diaria (sesiones programadas para una fecha)
-  Future<List<dynamic>> fetchAgenda(DateTime fecha, {int? sucursalId, String? estadoSesion}) async {
+  Future<List<dynamic>> fetchAgenda(
+    DateTime fecha, {
+    int? sucursalId,
+    String? estadoSesion,
+  }) async {
     _lastFechaAgenda = fecha;
     _isLoadingAgenda = true;
     _error = null;
@@ -142,8 +152,14 @@ class TicketProvider extends ChangeNotifier {
         return _agenda;
       }
 
-      debugPrint('TicketProvider: Fetching agenda for fecha=$fecha, sucursalId=$sucursalId, estado=$estadoSesion');
-      final data = await _repo.obtenerAgenda(fecha, sucursalId: sucursalId, estadoSesion: estadoSesion);
+      debugPrint(
+        'TicketProvider: Fetching agenda for fecha=$fecha, sucursalId=$sucursalId, estado=$estadoSesion',
+      );
+      final data = await _repo.obtenerAgenda(
+        fecha,
+        sucursalId: sucursalId,
+        estadoSesion: estadoSesion,
+      );
       _agenda = data;
       _error = null;
       debugPrint('TicketProvider: Fetched ${_agenda.length} agenda items');
@@ -294,7 +310,11 @@ class TicketProvider extends ChangeNotifier {
       _lastRangeStart = start;
       _lastRangeEnd = end;
 
-      final data = await _repo.getTicketsByRange(start: start, end: end, sucursalId: sucursalId);
+      final data = await _repo.getTicketsByRange(
+        start: start,
+        end: end,
+        sucursalId: sucursalId,
+      );
       _tickets = data;
       _error = null;
       return _tickets;
@@ -310,8 +330,15 @@ class TicketProvider extends ChangeNotifier {
 
   /// Re-ejecuta el último fetch de historial si existe
   Future<List<dynamic>> refreshLastRange() async {
-    if (_lastRangeStart == null || _lastRangeEnd == null || _lastSucursalId == null) return _tickets;
-    return fetchTicketsByRange(start: _lastRangeStart!, end: _lastRangeEnd!, sucursalId: _lastSucursalId!);
+    if (_lastRangeStart == null ||
+        _lastRangeEnd == null ||
+        _lastSucursalId == null)
+      return _tickets;
+    return fetchTicketsByRange(
+      start: _lastRangeStart!,
+      end: _lastRangeEnd!,
+      sucursalId: _lastSucursalId!,
+    );
   }
 
   /// Obtener agenda por rango de fechas
@@ -328,7 +355,9 @@ class TicketProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('TicketProvider: Fetching agenda por rango $start - $end for sucursal $sucursalId, estado=$estadoSesion');
+      debugPrint(
+        'TicketProvider: Fetching agenda por rango $start - $end for sucursal $sucursalId, estado=$estadoSesion',
+      );
       final data = await _repo.obtenerAgendaPorRango(
         fechaInicio: start,
         fechaFin: end,
@@ -337,7 +366,9 @@ class TicketProvider extends ChangeNotifier {
       );
       _agenda = data;
       _error = null;
-      debugPrint('TicketProvider: Fetched ${_agenda.length} agenda items (rango)');
+      debugPrint(
+        'TicketProvider: Fetched ${_agenda.length} agenda items (rango)',
+      );
       return _agenda;
     } catch (e) {
       _error = e.toString();
@@ -360,7 +391,13 @@ class TicketProvider extends ChangeNotifier {
     int pageSize = 50,
   }) async {
     try {
-      final resp = await _repo.searchSessions(query: query, sucursalId: sucursalId, page: page, pageSize: pageSize, estadoSesion: estadoSesion);
+      final resp = await _repo.searchSessions(
+        query: query,
+        sucursalId: sucursalId,
+        page: page,
+        pageSize: pageSize,
+        estadoSesion: estadoSesion,
+      );
       final items = resp['items'] as List<dynamic>? ?? [];
       return items;
     } catch (e) {
@@ -378,7 +415,12 @@ class TicketProvider extends ChangeNotifier {
     int pageSize = 50,
   }) async {
     try {
-      final result = await _repo.searchTickets(query: query, sucursalId: sucursalId, page: page, pageSize: pageSize);
+      final result = await _repo.searchTickets(
+        query: query,
+        sucursalId: sucursalId,
+        page: page,
+        pageSize: pageSize,
+      );
       return {'items': result['items'] ?? result, 'meta': result['meta'] ?? {}};
     } catch (e) {
       debugPrint('TicketProvider.searchTickets error: ${e.toString()}');
@@ -392,13 +434,19 @@ class TicketProvider extends ChangeNotifier {
       final success = await _repo.eliminarTicket(id);
       if (success) {
         try {
-          _tickets.removeWhere((t) => (t['id']?.toString() ?? t['documentId']?.toString()) == id.toString());
+          _tickets.removeWhere(
+            (t) =>
+                (t['id']?.toString() ?? t['documentId']?.toString()) ==
+                id.toString(),
+          );
         } catch (_) {}
         // También eliminar de la agenda local por si apareció allí
         try {
           _agenda.removeWhere((a) {
             try {
-              final sid = (a is Map) ? (a['ticket_id']?.toString() ?? a['ticket']?.toString()) : null;
+              final sid = (a is Map)
+                  ? (a['ticket_id']?.toString() ?? a['ticket']?.toString())
+                  : null;
               return sid != null && sid == id.toString();
             } catch (_) {
               return false;

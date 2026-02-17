@@ -68,7 +68,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
     if (!mounted) return;
 
     try {
-      final ticketProvider = Provider.of<TicketProvider>(context, listen: false);
+      final ticketProvider = Provider.of<TicketProvider>(
+        context,
+        listen: false,
+      );
       // Cargar tickets del día actual
       await ticketProvider.fetchTickets(
         sucursalId: _sucursalProvider?.selectedSucursalId,
@@ -119,7 +122,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
       // Quick local match on already-loaded provider tickets
       try {
-        final providerTickets = Provider.of<TicketProvider>(context, listen: false).tickets;
+        final providerTickets = Provider.of<TicketProvider>(
+          context,
+          listen: false,
+        ).tickets;
         if (providerTickets.isNotEmpty && search.trim().isNotEmpty) {
           final term = _normalize(search);
           final localMatches = providerTickets.where((t) {
@@ -127,12 +133,34 @@ class _TicketsScreenState extends State<TicketsScreen> {
             String nombre = '';
             String apellido = '';
             if (clienteObj is Map) {
-              nombre = (clienteObj['nombrecliente'] ?? clienteObj['nombreCliente'] ?? clienteObj['nombre'] ?? '').toString();
-              apellido = (clienteObj['apellidocliente'] ?? clienteObj['apellidoCliente'] ?? clienteObj['apellido'] ?? '').toString();
-            } else if (clienteObj is List && clienteObj.isNotEmpty && clienteObj.first is Map) {
+              nombre =
+                  (clienteObj['nombrecliente'] ??
+                          clienteObj['nombreCliente'] ??
+                          clienteObj['nombre'] ??
+                          '')
+                      .toString();
+              apellido =
+                  (clienteObj['apellidocliente'] ??
+                          clienteObj['apellidoCliente'] ??
+                          clienteObj['apellido'] ??
+                          '')
+                      .toString();
+            } else if (clienteObj is List &&
+                clienteObj.isNotEmpty &&
+                clienteObj.first is Map) {
               final c0 = clienteObj.first;
-              nombre = (c0['nombrecliente'] ?? c0['nombreCliente'] ?? c0['nombre'] ?? '').toString();
-              apellido = (c0['apellidocliente'] ?? c0['apellidoCliente'] ?? c0['apellido'] ?? '').toString();
+              nombre =
+                  (c0['nombrecliente'] ??
+                          c0['nombreCliente'] ??
+                          c0['nombre'] ??
+                          '')
+                      .toString();
+              apellido =
+                  (c0['apellidocliente'] ??
+                          c0['apellidoCliente'] ??
+                          c0['apellido'] ??
+                          '')
+                      .toString();
             }
             final combined = _normalize('$nombre $apellido');
             return combined.contains(term);
@@ -149,7 +177,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
       // Server-side search (paginated)
       try {
         if (_sucursalProvider?.selectedSucursalId == null) return;
-        final resp = await Provider.of<TicketProvider>(context, listen: false).searchTickets(query: search.trim(), sucursalId: _sucursalProvider!.selectedSucursalId!, page: 1, pageSize: 50);
+        final resp = await Provider.of<TicketProvider>(context, listen: false)
+            .searchTickets(
+              query: search.trim(),
+              sucursalId: _sucursalProvider!.selectedSucursalId!,
+              page: 1,
+              pageSize: 50,
+            );
         final items = resp['items'] as List<dynamic>? ?? [];
         setState(() {
           _searchResults = items;
@@ -163,13 +197,34 @@ class _TicketsScreenState extends State<TicketsScreen> {
   String _normalize(String s) {
     var str = s.toLowerCase();
     const accents = {
-      'á':'a','à':'a','ä':'a','â':'a','ã':'a',
-      'é':'e','è':'e','ë':'e','ê':'e',
-      'í':'i','ì':'i','ï':'i','î':'i',
-      'ó':'o','ò':'o','ö':'o','ô':'o','õ':'o',
-      'ú':'u','ù':'u','ü':'u','û':'u','ñ':'n','ç':'c'
+      'á': 'a',
+      'à': 'a',
+      'ä': 'a',
+      'â': 'a',
+      'ã': 'a',
+      'é': 'e',
+      'è': 'e',
+      'ë': 'e',
+      'ê': 'e',
+      'í': 'i',
+      'ì': 'i',
+      'ï': 'i',
+      'î': 'i',
+      'ó': 'o',
+      'ò': 'o',
+      'ö': 'o',
+      'ô': 'o',
+      'õ': 'o',
+      'ú': 'u',
+      'ù': 'u',
+      'ü': 'u',
+      'û': 'u',
+      'ñ': 'n',
+      'ç': 'c',
     };
-    accents.forEach((k,v) { str = str.replaceAll(k, v); });
+    accents.forEach((k, v) {
+      str = str.replaceAll(k, v);
+    });
     str = str.replaceAll(RegExp(r"[^a-z0-9\s]"), ' ');
     return str.replaceAll(RegExp(r"\s+"), ' ').trim();
   }
@@ -188,7 +243,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
       dateFilteredTickets = source.where((t) {
         if (t['created_at'] == null) return false;
         final ticketDate = DateTime.parse(t['created_at']);
-        return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) && ticketDate.isBefore(tomorrow);
+        return ticketDate.isAfter(today.subtract(const Duration(seconds: 1))) &&
+            ticketDate.isBefore(tomorrow);
       }).toList();
     }
 
@@ -209,15 +265,36 @@ class _TicketsScreenState extends State<TicketsScreen> {
         if (clienteObj is List && clienteObj.isNotEmpty) {
           final c0 = clienteObj.first;
           if (c0 is Map) {
-            nombre = (c0['nombrecliente'] ?? c0['nombreCliente'] ?? c0['nombre'] ?? '').toString();
-            apellido = (c0['apellidocliente'] ?? c0['apellidoCliente'] ?? c0['apellido'] ?? '').toString();
+            nombre =
+                (c0['nombrecliente'] ??
+                        c0['nombreCliente'] ??
+                        c0['nombre'] ??
+                        '')
+                    .toString();
+            apellido =
+                (c0['apellidocliente'] ??
+                        c0['apellidoCliente'] ??
+                        c0['apellido'] ??
+                        '')
+                    .toString();
             telefono = (c0['telefono'] ?? c0['phone'] ?? '').toString();
             email = (c0['email'] ?? '').toString();
           }
         } else if (clienteObj is Map) {
-          nombre = (clienteObj['nombrecliente'] ?? clienteObj['nombreCliente'] ?? clienteObj['nombre'] ?? '').toString();
-          apellido = (clienteObj['apellidocliente'] ?? clienteObj['apellidoCliente'] ?? clienteObj['apellido'] ?? '').toString();
-          telefono = (clienteObj['telefono'] ?? clienteObj['phone'] ?? '').toString();
+          nombre =
+              (clienteObj['nombrecliente'] ??
+                      clienteObj['nombreCliente'] ??
+                      clienteObj['nombre'] ??
+                      '')
+                  .toString();
+          apellido =
+              (clienteObj['apellidocliente'] ??
+                      clienteObj['apellidoCliente'] ??
+                      clienteObj['apellido'] ??
+                      '')
+                  .toString();
+          telefono = (clienteObj['telefono'] ?? clienteObj['phone'] ?? '')
+              .toString();
           email = (clienteObj['email'] ?? '').toString();
         }
 
@@ -227,20 +304,38 @@ class _TicketsScreenState extends State<TicketsScreen> {
         final eNorm = _normalize(email);
 
         // revisar tratamientos en sesiones o en 'tratamientos'
-        final sesiones = (t['sesiones'] as List<dynamic>?) ?? (t['tratamientos'] as List<dynamic>?) ?? [];
+        final sesiones =
+            (t['sesiones'] as List<dynamic>?) ??
+            (t['tratamientos'] as List<dynamic>?) ??
+            [];
         final tratamientosMatch = sesiones.any((s) {
           try {
-            final trat = s is Map ? (s['tratamiento'] ?? s['tratamiento_id'] ?? s) : s;
+            final trat = s is Map
+                ? (s['tratamiento'] ?? s['tratamiento_id'] ?? s)
+                : s;
             String nombreTrat = '';
-            if (trat is Map) nombreTrat = (trat['nombretratamiento'] ?? trat['nombreTratamiento'] ?? trat['nombre'] ?? '').toString();
-            else if (s is Map) nombreTrat = (s['nombreTratamiento'] ?? s['nombre'] ?? '').toString();
+            if (trat is Map)
+              nombreTrat =
+                  (trat['nombretratamiento'] ??
+                          trat['nombreTratamiento'] ??
+                          trat['nombre'] ??
+                          '')
+                      .toString();
+            else if (s is Map)
+              nombreTrat = (s['nombreTratamiento'] ?? s['nombre'] ?? '')
+                  .toString();
             return _normalize(nombreTrat).contains(term);
           } catch (e) {
             return false;
           }
         });
 
-        if (nNorm.contains(term) || aNorm.contains(term) || tNorm.contains(term) || eNorm.contains(term) || tratamientosMatch) return true;
+        if (nNorm.contains(term) ||
+            aNorm.contains(term) ||
+            tNorm.contains(term) ||
+            eNorm.contains(term) ||
+            tratamientosMatch)
+          return true;
         final clienteFull = _normalize('$nombre $apellido');
         if (clienteFull.contains(term)) return true;
         return false;
@@ -249,8 +344,12 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
     // Ordenar
     filtered.sort((a, b) {
-      final dateA = a['created_at'] != null ? DateTime.parse(a['created_at']) : DateTime.now(); // ✅
-      final dateB = b['created_at'] != null ? DateTime.parse(b['created_at']) : DateTime.now(); // ✅
+      final dateA = a['created_at'] != null
+          ? DateTime.parse(a['created_at'])
+          : DateTime.now(); // ✅
+      final dateB = b['created_at'] != null
+          ? DateTime.parse(b['created_at'])
+          : DateTime.now(); // ✅
       return sortAscending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
     });
 
@@ -272,7 +371,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
       context: context,
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 1),
-      initialDateRange: _rangeStart != null && _rangeEnd != null ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!) : null,
+      initialDateRange: _rangeStart != null && _rangeEnd != null
+          ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!)
+          : null,
     );
 
     if (picked == null) return;
@@ -299,7 +400,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
         return;
       }
 
-      await Provider.of<TicketProvider>(context, listen: false).fetchTicketsByRange(
+      await Provider.of<TicketProvider>(
+        context,
+        listen: false,
+      ).fetchTicketsByRange(
         start: _rangeStart!,
         end: _rangeEnd!,
         sucursalId: _sucursalProvider!.selectedSucursalId!,
@@ -316,7 +420,6 @@ class _TicketsScreenState extends State<TicketsScreen> {
     _debounce?.cancel();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -369,8 +472,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
                           sortAscending = !sortAscending;
                         });
                       },
-                      icon: Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
-                      tooltip: sortAscending ? 'Ordenar: Más antiguo primero' : 'Ordenar: Más nuevo primero',
+                      icon: Icon(
+                        sortAscending
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                      ),
+                      tooltip: sortAscending
+                          ? 'Ordenar: Más antiguo primero'
+                          : 'Ordenar: Más nuevo primero',
                       style: IconButton.styleFrom(
                         minimumSize: const Size(56, 56),
                         padding: const EdgeInsets.all(16),
@@ -386,45 +495,45 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         padding: const EdgeInsets.all(16),
                       ),
                     ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              // Controles de Historial
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _selectDateRange,
-                      child: Text(_rangeStart == null || _rangeEnd == null
-                          ? 'Seleccionar rango'
-                          : '${DateFormat('dd/MM/yyyy').format(_rangeStart!)} - ${DateFormat('dd/MM/yyyy').format(_rangeEnd!)}'),
+                // Controles de Historial
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _selectDateRange,
+                        child: Text(
+                          _rangeStart == null || _rangeEnd == null
+                              ? 'Seleccionar rango'
+                              : '${DateFormat('dd/MM/yyyy').format(_rangeStart!)} - ${DateFormat('dd/MM/yyyy').format(_rangeEnd!)}',
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: _onShowTodayPressed,
-                    child: const Text('Hoy'),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _onShowTodayPressed,
+                      child: const Text('Hoy'),
+                    ),
+                  ],
+                ),
 
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
-        ),
 
-        // Lista de tickets
-        Expanded(
+          // Lista de tickets
+          Expanded(
             child: isLoading
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(
-                          color: colorScheme.primary,
-                        ),
+                        CircularProgressIndicator(color: colorScheme.primary),
                         const SizedBox(height: 16),
                         Text(
                           'Cargando tickets...',
@@ -436,292 +545,413 @@ class _TicketsScreenState extends State<TicketsScreen> {
                     ),
                   )
                 : providerError != null
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error al cargar tickets',
-                                style: textTheme.titleMedium?.copyWith(
-                                  color: colorScheme.error,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                providerError,
-                                style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 24),
-                              FilledButton.icon(
-                                onPressed: () {
-                                  // Forzar recarga
-                                  Provider.of<TicketProvider>(context, listen: false).clearError();
-                                  _onRefreshPressed();
-                                },
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Reintentar'),
-                              ),
-                            ],
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: colorScheme.error,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error al cargar tickets',
+                            style: textTheme.titleMedium?.copyWith(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            providerError,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: () {
+                              // Forzar recarga
+                              Provider.of<TicketProvider>(
+                                context,
+                                listen: false,
+                              ).clearError();
+                              _onRefreshPressed();
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Reintentar'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : filteredTickets.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_busy,
+                          size: 64,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _showHistoryMode
+                              ? 'No hay tickets en ese rango'
+                              : 'No hay tickets para hoy',
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                      )
-                    : filteredTickets.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.event_busy,
-                                  size: 64,
-                                  color: colorScheme.onSurfaceVariant,
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    itemCount: filteredTickets.length,
+                    itemBuilder: (context, i) {
+                      final t = filteredTickets[i];
+                      final idStr =
+                          (t['id'] ?? t['documentId'])?.toString() ?? '';
+                      final fechaDateTime = t['created_at'] != null
+                          ? DateTime.parse(t['created_at'])
+                          : null;
+                      final hora = fechaDateTime != null
+                          ? DateFormat('HH:mm').format(fechaDateTime)
+                          : '-';
+                      final fecha = fechaDateTime != null
+                          ? DateFormat('dd/MM/yyyy').format(fechaDateTime)
+                          : '-';
+                      final clienteObj = t['cliente'];
+                      String cliente = '-';
+                      if (clienteObj != null) {
+                        cliente =
+                            '${clienteObj['nombrecliente'] ?? ''} ${clienteObj['apellidocliente'] ?? ''}'
+                                .trim();
+                        if (cliente.isEmpty) cliente = '-';
+                      }
+
+                      final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+                      final List<String> nombresTratamientos = [];
+
+                      for (var s in sesiones) {
+                        if (s['tratamiento'] != null) {
+                          nombresTratamientos.add(
+                            s['tratamiento']['nombretratamiento'] ?? '',
+                          );
+                        }
+                      }
+
+                      final tratamientoTexto = nombresTratamientos.isEmpty
+                          ? 'Sin tratamientos'
+                          : nombresTratamientos.length == 1
+                          ? nombresTratamientos.first
+                          : '${nombresTratamientos.length} tratamientos';
+
+                      final saldoPendiente =
+                          (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+                      final tieneSaldo = saldoPendiente > 0;
+                      // final estadoTicket = t['estadoTicket'] == true; // variable no usada, eliminada
+
+                      return Dismissible(
+                        key: Key(
+                          idStr.isNotEmpty
+                              ? idStr
+                              : DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
+                        ),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        confirmDismiss: (direction) async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Eliminar Ticket'),
+                              content: const Text(
+                                '¿Estás seguro? Se borrarán también las sesiones y pagos asociados.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancelar'),
                                 ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _showHistoryMode ? 'No hay tickets en ese rango' : 'No hay tickets para hoy',
-                                  style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Eliminar'),
                                 ),
                               ],
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            itemCount: filteredTickets.length,
-                            itemBuilder: (context, i) {
-                              final t = filteredTickets[i];
-                              final idStr = (t['id'] ?? t['documentId'])?.toString() ?? '';
-                              final fechaDateTime = t['created_at'] != null ? DateTime.parse(t['created_at']) : null;                              final hora = fechaDateTime != null ? DateFormat('HH:mm').format(fechaDateTime) : '-';
-                              final fecha = fechaDateTime != null ? DateFormat('dd/MM/yyyy').format(fechaDateTime) : '-';
-                              final clienteObj = t['cliente'];
-                              String cliente = '-';
-                              if (clienteObj != null) {
-                                cliente = '${clienteObj['nombrecliente'] ?? ''} ${clienteObj['apellidocliente'] ?? ''}'.trim();
-                                if (cliente.isEmpty) cliente = '-';
-                              }
+                          );
 
-                              final sesiones = t['sesiones'] as List<dynamic>? ?? [];
-                              final List<String> nombresTratamientos = [];
-
-                              for (var s in sesiones) {
-                                if (s['tratamiento'] != null) {
-                                  nombresTratamientos.add(s['tratamiento']['nombretratamiento'] ?? '');
-                                }
-                              }
-
-                              final tratamientoTexto = nombresTratamientos.isEmpty
-                                  ? 'Sin tratamientos'
-                                  : nombresTratamientos.length == 1
-                                  ? nombresTratamientos.first
-                                  : '${nombresTratamientos.length} tratamientos';
-
-                              final saldoPendiente = (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;                              final tieneSaldo = saldoPendiente > 0;
-                              // final estadoTicket = t['estadoTicket'] == true; // variable no usada, eliminada
-
-                              return Dismissible(
-                                key: Key(idStr.isNotEmpty ? idStr : DateTime.now().millisecondsSinceEpoch.toString()),
-                                direction: DismissDirection.endToStart,
-                                background: Container(
-                                  color: Colors.red,
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.only(right: 20),
-                                  child: const Icon(Icons.delete, color: Colors.white),
-                                ),
-                                confirmDismiss: (direction) async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text('Eliminar Ticket'),
-                                      content: const Text('¿Estás seguro? Se borrarán también las sesiones y pagos asociados.'),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                                        FilledButton(
-                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                          onPressed: () => Navigator.pop(ctx, true),
-                                          child: const Text('Eliminar'),
-                                        ),
-                                      ],
+                          if (confirm == true) {
+                            // Mostrar indicador de carga en el item
+                            if (idStr.isNotEmpty) {
+                              setState(() {
+                                _deletingIds.add(idStr);
+                              });
+                            }
+                            try {
+                              final id = t['id'] ?? t['documentId'];
+                              final success = await Provider.of<TicketProvider>(
+                                context,
+                                listen: false,
+                              ).deleteTicket(id);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      success
+                                          ? 'Ticket eliminado correctamente'
+                                          : 'Error al eliminar ticket',
                                     ),
-                                  );
+                                    backgroundColor: success
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted)
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error al eliminar: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                            } finally {
+                              if (idStr.isNotEmpty) {
+                                setState(() {
+                                  _deletingIds.remove(idStr);
+                                });
+                              }
+                            }
+                          }
 
-                                  if (confirm == true) {
-                                    // Mostrar indicador de carga en el item
-                                    if (idStr.isNotEmpty) {
-                                      setState(() { _deletingIds.add(idStr); });
-                                    }
-                                    try {
-                                      final id = t['id'] ?? t['documentId'];
-                                      final success = await Provider.of<TicketProvider>(context, listen: false).deleteTicket(id);
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(success ? 'Ticket eliminado correctamente' : 'Error al eliminar ticket'),
-                                            backgroundColor: success ? Colors.green : Colors.red,
+                          // Devolvemos false para que Dismissible no quite el widget; la lista será actualizada por el Provider
+                          return false;
+                        },
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.surface
+                                        .withValues(alpha: 0.65),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.06,
+                                        ),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                    border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withValues(alpha: 0.08),
+                                    ),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                TicketDetailScreen(ticket: t),
                                           ),
                                         );
-                                      }
-                                    } catch (e) {
-                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: Colors.red));
-                                    } finally {
-                                      if (idStr.isNotEmpty) {
-                                        setState(() { _deletingIds.remove(idStr); });
-                                      }
-                                    }
-                                  }
-
-                                  // Devolvemos false para que Dismissible no quite el widget; la lista será actualizada por el Provider
-                                  return false;
-                                },
-                                child: Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                        child: Container(
-                                          margin: const EdgeInsets.only(bottom: 12),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.65),
-                                            borderRadius: BorderRadius.circular(12),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withValues(alpha: 0.06),
-                                                blurRadius: 20,
-                                                offset: const Offset(0, 6),
-                                              ),
-                                            ],
-                                            border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
-                                          ),
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: InkWell(
-                                              onTap: () async {
-                                                await Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) => TicketDetailScreen(ticket: t),
-                                                  ),
-                                                );
-                                                _reloadTicketsForCurrentFilters();
-                                              },
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(16),
-                                                child: Row(
-                                                  children: [
-                                                    CircleAvatar(
-                                                      radius: 28,
-                                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                                      child: Text(
-                                                        cliente.isNotEmpty ? cliente[0].toUpperCase() : '?',
-                                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
+                                        _reloadTicketsForCurrentFilters();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 28,
+                                              backgroundColor: Theme.of(
+                                                context,
+                                              ).colorScheme.primaryContainer,
+                                              child: Text(
+                                                cliente.isNotEmpty
+                                                    ? cliente[0].toUpperCase()
+                                                    : '?',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleLarge
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onPrimaryContainer,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                     ),
-                                                    const SizedBox(width: 16),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    cliente,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .titleMedium
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    tratamientoTexto,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .bodyMedium
+                                                        ?.copyWith(
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).colorScheme.primary,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.access_time,
+                                                        size: 16,
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '$fecha - $hora',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onSurfaceVariant,
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  if (tieneSaldo) ...[
+                                                    const SizedBox(height: 8),
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .errorContainer,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
                                                         children: [
-                                                          Text(
-                                                            cliente,
-                                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
+                                                          Icon(
+                                                            Icons.warning_amber,
+                                                            size: 14,
+                                                            color: Theme.of(context)
+                                                                .colorScheme
+                                                                .onErrorContainer,
                                                           ),
-                                                          const SizedBox(height: 4),
-                                                          Text(
-                                                            tratamientoTexto,
-                                                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                              color: Theme.of(context).colorScheme.primary,
-                                                            ),
+                                                          const SizedBox(
+                                                            width: 4,
                                                           ),
-                                                          const SizedBox(height: 8),
-                                                          Row(
-                                                            children: [
-                                                              Icon(
-                                                                Icons.access_time,
-                                                                size: 16,
-                                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                              ),
-                                                              const SizedBox(width: 4),
-                                                              Text(
-                                                                '$fecha - $hora',
-                                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                          Text(
+                                                            'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                                            style: Theme.of(context)
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).colorScheme.onErrorContainer,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
                                                                 ),
-                                                              ),
-                                                            ],
                                                           ),
-                                                          if (tieneSaldo) ...[
-                                                            const SizedBox(height: 8),
-                                                            Container(
-                                                              padding: const EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 4,
-                                                              ),
-                                                              decoration: BoxDecoration(
-                                                                color: Theme.of(context).colorScheme.errorContainer,
-                                                                borderRadius: BorderRadius.circular(6),
-                                                              ),
-                                                              child: Row(
-                                                                mainAxisSize: MainAxisSize.min,
-                                                                children: [
-                                                                  Icon(
-                                                                    Icons.warning_amber,
-                                                                    size: 14,
-                                                                    color: Theme.of(context).colorScheme.onErrorContainer,
-                                                                  ),
-                                                                  const SizedBox(width: 4),
-                                                                  Text(
-                                                                    'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
-                                                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                                      color: Theme.of(context).colorScheme.onErrorContainer,
-                                                                      fontWeight: FontWeight.bold,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          ],
                                                         ],
                                                       ),
                                                     ),
                                                   ],
-                                                ),
+                                                ],
                                               ),
                                             ),
-                                          ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                    if (_deletingIds.contains(idStr) && idStr.isNotEmpty)
-                                      Positioned.fill(
-                                        child: Container(
-                                          margin: const EdgeInsets.only(bottom: 12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(0.35),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: const Center(
-                                            child: SizedBox(width: 36, height: 36, child: CircularProgressIndicator(strokeWidth: 3)),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                  ),
                                 ),
-                               ); // ✅ SOLO UNO (aquí estaba el extra)
-                             },
-                           ),
+                              ),
+                            ),
+                            if (_deletingIds.contains(idStr) &&
+                                idStr.isNotEmpty)
+                              Positioned.fill(
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.35),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Center(
+                                    child: SizedBox(
+                                      width: 36,
+                                      height: 36,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ); // ✅ SOLO UNO (aquí estaba el extra)
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
-
 }

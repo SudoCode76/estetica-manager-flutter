@@ -57,7 +57,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     try {
       final cliente = widget.ticket['cliente'] as Map<String, dynamic>?;
       final sesiones = widget.ticket['sesiones'] as List<dynamic>?;
-      final hasPhone = cliente != null && (cliente['telefono'] != null && cliente['telefono'].toString().trim().isNotEmpty);
+      final hasPhone =
+          cliente != null &&
+          (cliente['telefono'] != null &&
+              cliente['telefono'].toString().trim().isNotEmpty);
       final hasSesiones = sesiones != null && sesiones.isNotEmpty;
 
       // Si falta telefono o sesiones, cargar detalle completo desde la API
@@ -67,7 +70,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           _detailError = null;
         });
 
-        final id = widget.ticket['id']?.toString() ?? widget.ticket['documentId']?.toString();
+        final id =
+            widget.ticket['id']?.toString() ??
+            widget.ticket['documentId']?.toString();
         if (id != null) {
           try {
             final repo = Provider.of<TicketRepository>(context, listen: false);
@@ -82,7 +87,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             setState(() {
               _detailError = e.toString();
             });
-            if (kDebugMode) debugPrint('Error cargando detalle completo del ticket: $e');
+            if (kDebugMode)
+              debugPrint('Error cargando detalle completo del ticket: $e');
           }
         }
 
@@ -101,7 +107,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          icon: const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.red),
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            size: 48,
+            color: Colors.red,
+          ),
           title: const Text('¿Eliminar ticket?'),
           content: const Text(
             'Esta acción no se puede deshacer. ¿Está seguro de que desea eliminar este ticket?',
@@ -114,9 +124,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
               child: const Text('Eliminar'),
             ),
           ],
@@ -132,7 +140,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     try {
       final documentId = widget.ticket['documentId'] ?? widget.ticket['id'];
-      final success = await Provider.of<TicketProvider>(context, listen: false).deleteTicket(documentId);
+      final success = await Provider.of<TicketProvider>(
+        context,
+        listen: false,
+      ).deleteTicket(documentId);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -268,19 +279,30 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     // Preferir el detalle completo si está disponible
     final ticket = _detailedTicket ?? widget.ticket;
     final cliente = ticket['cliente'];
-    final telefonoRaw = (cliente != null) ? (cliente['telefono']?.toString() ?? cliente['phone']?.toString()) : null;
-    String digits = telefonoRaw != null ? telefonoRaw.replaceAll(RegExp(r'[^0-9]'), '') : '';
+    final telefonoRaw = (cliente != null)
+        ? (cliente['telefono']?.toString() ?? cliente['phone']?.toString())
+        : null;
+    String digits = telefonoRaw != null
+        ? telefonoRaw.replaceAll(RegExp(r'[^0-9]'), '')
+        : '';
     if (digits.isEmpty) {
       // Forzar carga del detalle si no lo hemos cargado aún
       await _loadDetailedTicketIfNeeded();
 
       final ticket2 = _detailedTicket ?? widget.ticket;
       final cliente2 = ticket2['cliente'];
-      final telefonoRaw2 = (cliente2 != null) ? (cliente2['telefono']?.toString() ?? cliente2['phone']?.toString()) : null;
-      digits = telefonoRaw2 != null ? telefonoRaw2.replaceAll(RegExp(r'[^0-9]'), '') : '';
+      final telefonoRaw2 = (cliente2 != null)
+          ? (cliente2['telefono']?.toString() ?? cliente2['phone']?.toString())
+          : null;
+      digits = telefonoRaw2 != null
+          ? telefonoRaw2.replaceAll(RegExp(r'[^0-9]'), '')
+          : '';
 
       if (digits.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El cliente no tiene teléfono')));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('El cliente no tiene teléfono')),
+          );
         return;
       }
     }
@@ -318,7 +340,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       final encoded = Uri.encodeComponent(message);
       final waUrl = Uri.parse('https://wa.me/$digits?text=$encoded');
       if (!await launchUrl(waUrl, mode: LaunchMode.externalApplication)) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir WhatsApp')));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo abrir WhatsApp')),
+          );
       }
       return;
     }
@@ -327,33 +352,61 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     try {
       final ticketForPdf = _detailedTicket ?? widget.ticket;
       final pdfBytes = await ShareService.buildTicketPdf(ticketForPdf);
-      final nameBase = (ticketForPdf['documentId'] ?? ticketForPdf['id'] ?? DateTime.now().millisecondsSinceEpoch.toString()).toString();
+      final nameBase =
+          (ticketForPdf['documentId'] ??
+                  ticketForPdf['id'] ??
+                  DateTime.now().millisecondsSinceEpoch.toString())
+              .toString();
       // Intentar escribir archivo temporal. En web esto dispara la descarga y lanza UnsupportedError.
-      dynamic file; // usar dynamic porque dart:io File no está disponible en web
+      dynamic
+      file; // usar dynamic porque dart:io File no está disponible en web
       try {
-        file = await ShareService.writeTempFile(pdfBytes, '${ShareService.sanitizeFileName(nameBase)}_ticket.pdf');
+        file = await ShareService.writeTempFile(
+          pdfBytes,
+          '${ShareService.sanitizeFileName(nameBase)}_ticket.pdf',
+        );
       } on UnsupportedError catch (_) {
         // En web, writeTempFile ejecutó la descarga directa; informar al usuario y salir.
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Se abrió la descarga del PDF en el navegador')));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Se abrió la descarga del PDF en el navegador'),
+            ),
+          );
         return;
       }
 
       // Intentar enviar directo a WhatsApp nativo; si falla, abrir share sheet
-      final sent = await ShareService.shareFileToWhatsAppNative(file, caption: message, package: appChoice, phone: digits);
+      final sent = await ShareService.shareFileToWhatsAppNative(
+        file,
+        caption: message,
+        package: appChoice,
+        phone: digits,
+      );
       if (!sent) {
         // Fallback: abrir share sheet con el archivo y el texto
         try {
           await ShareService.shareFile(file, text: message);
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Se abrió el selector para compartir el PDF')));
+          if (mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Se abrió el selector para compartir el PDF'),
+              ),
+            );
         } catch (e) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo compartir el PDF: $e')));
+          if (mounted)
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No se pudo compartir el PDF: $e')),
+            );
         }
       }
     } catch (e) {
       // Mostrar detalle del error y sugerir usar el texto en su lugar
       if (kDebugMode) debugPrint('Error generando o compartiendo PDF: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error preparando archivo: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error preparando archivo: $e')));
       }
     }
   }
@@ -365,9 +418,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     // Esperar a que la localización esté lista
     if (!localeReady) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Preferir el ticket detallado si está cargado
@@ -396,7 +447,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     final montoTotal = (ticketData['monto_total'] as num?)?.toDouble() ?? 0.0;
     final montoPagado = (ticketData['monto_pagado'] as num?)?.toDouble() ?? 0.0;
-    final saldoPendiente = (ticketData['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+    final saldoPendiente =
+        (ticketData['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
     final estadoPago = ticketData['estado_pago'] ?? '-';
 
     return Scaffold(
@@ -440,7 +492,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         children: [
                           const Icon(Icons.info_outline, color: Colors.orange),
                           const SizedBox(width: 8),
-                          Expanded(child: Text('Error cargando detalle: ${_detailError}', style: textTheme.bodySmall)),
+                          Expanded(
+                            child: Text(
+                              'Error cargando detalle: ${_detailError}',
+                              style: textTheme.bodySmall,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -458,10 +515,15 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         ? '${cliente['nombrecliente'] ?? ''} ${cliente['apellidocliente'] ?? ''}'
                         : '-',
                   ),
-                  if (cliente != null && ((cliente['telefono'] != null && cliente['telefono'].toString().isNotEmpty) || (cliente['phone'] != null && cliente['phone'].toString().isNotEmpty)))
+                  if (cliente != null &&
+                      ((cliente['telefono'] != null &&
+                              cliente['telefono'].toString().isNotEmpty) ||
+                          (cliente['phone'] != null &&
+                              cliente['phone'].toString().isNotEmpty)))
                     _DetailRow(
                       label: 'Teléfono',
-                      value: (cliente['telefono'] ?? cliente['phone']).toString(),
+                      value: (cliente['telefono'] ?? cliente['phone'])
+                          .toString(),
                     ),
                 ],
               ),
@@ -489,11 +551,17 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
                       final numSesion = s['numero_sesion'] ?? 0;
 
-                      final estadoRaw = s['estado_sesion'] ?? s['estado_sesion'] ?? 'agendada';
-                      final estadoStr = estadoRaw.toString().toLowerCase(); // Normalizamos a minúscula
+                      final estadoRaw =
+                          s['estado_sesion'] ??
+                          s['estado_sesion'] ??
+                          'agendada';
+                      final estadoStr = estadoRaw
+                          .toString()
+                          .toLowerCase(); // Normalizamos a minúscula
 
                       // Verificamos si está realizada (aceptamos 'realizada', 'completada', etc.)
-                      final isRealizada = estadoStr == 'realizada' || estadoStr == 'completada';
+                      final isRealizada =
+                          estadoStr == 'realizada' || estadoStr == 'completada';
 
                       // 3. Extraer Fecha y Hora
                       final fechaRaw = s['fecha_hora_inicio'];
@@ -503,17 +571,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         // Parseamos la fecha ISO de Supabase
                         final dt = DateTime.parse(fechaRaw.toString());
                         // Formato amigable: "25/01/2026 • 14:30"
-                        fechaFormateada = DateFormat('dd/MM/yyyy • HH:mm', 'es').format(dt);
+                        fechaFormateada = DateFormat(
+                          'dd/MM/yyyy • HH:mm',
+                          'es',
+                        ).format(dt);
                       }
 
                       return Container(
-                        margin: EdgeInsets.only(bottom: index < sesionesOrdenadas.length - 1 ? 12 : 0),
+                        margin: EdgeInsets.only(
+                          bottom: index < sesionesOrdenadas.length - 1 ? 12 : 0,
+                        ),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           // Fondo verde suave si está realizada, gris si no
                           color: isRealizada
                               ? Colors.green.withValues(alpha: 0.05)
-                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              : colorScheme.surfaceContainerHighest.withValues(
+                                  alpha: 0.3,
+                                ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isRealizada
@@ -529,9 +604,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 16,
-                                  backgroundColor: isRealizada ? Colors.green : colorScheme.primary,
+                                  backgroundColor: isRealizada
+                                      ? Colors.green
+                                      : colorScheme.primary,
                                   child: Icon(
-                                    isRealizada ? Icons.check : Icons.access_time,
+                                    isRealizada
+                                        ? Icons.check
+                                        : Icons.access_time,
                                     size: 16,
                                     color: Colors.white,
                                   ),
@@ -540,9 +619,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                 Text(
                                   '#$numSesion',
                                   style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurfaceVariant
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -556,18 +635,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                 children: [
                                   Text(
                                     nombreTratamiento,
-                                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                    style: textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      Icon(Icons.event, size: 14, color: colorScheme.primary),
+                                      Icon(
+                                        Icons.event,
+                                        size: 14,
+                                        color: colorScheme.primary,
+                                      ),
                                       const SizedBox(width: 4),
                                       Text(
                                         fechaFormateada,
                                         style: textTheme.bodyMedium?.copyWith(
-                                            color: colorScheme.onSurface,
-                                            fontWeight: FontWeight.w500
+                                          color: colorScheme.onSurface,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -575,17 +660,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                   const SizedBox(height: 6),
                                   // Badge de Estado
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isRealizada ? Colors.green : Colors.orange,
+                                      color: isRealizada
+                                          ? Colors.green
+                                          : Colors.orange,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       isRealizada ? 'REALIZADA' : 'PENDIENTE',
                                       style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
@@ -599,7 +689,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-
 
               // Información de pago
               _SectionCard(
@@ -621,7 +710,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: estadoPago == 'pagado'
                           ? colorScheme.primaryContainer
@@ -640,16 +732,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                               ? colorScheme.onPrimaryContainer
                               : colorScheme.onErrorContainer,
                         ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Estado: $estadoPago',
-                        style: textTheme.titleSmall?.copyWith(
-                          color: estadoPago == 'pagado'
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onErrorContainer,
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(width: 8),
+                        Text(
+                          'Estado: $estadoPago',
+                          style: textTheme.titleSmall?.copyWith(
+                            color: estadoPago == 'pagado'
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
                       ],
                     ),
                   ),
@@ -663,7 +755,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 child: _loadingDetail
                     ? FilledButton.icon(
                         onPressed: null,
-                        icon: const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                        icon: const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                         label: const Text('Cargando...'),
                       )
                     : FilledButton.icon(
@@ -671,7 +767,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         icon: const Icon(Icons.send, color: Colors.white),
                         label: const Text('Enviar por WhatsApp'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366), // Verde de WhatsApp
+                          backgroundColor: const Color(
+                            0xFF25D366,
+                          ), // Verde de WhatsApp
                           padding: const EdgeInsets.all(16),
                         ),
                       ),
@@ -735,11 +833,7 @@ class _DetailRow extends StatelessWidget {
   final String value;
   final Color? valueColor;
 
-  const _DetailRow({
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
+  const _DetailRow({required this.label, required this.value, this.valueColor});
 
   @override
   Widget build(BuildContext context) {
@@ -775,7 +869,3 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
-
-
-
-

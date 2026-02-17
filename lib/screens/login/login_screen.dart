@@ -10,7 +10,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = SupabaseAuthService();
@@ -28,13 +29,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
     _slideController.forward();
   }
 
@@ -79,7 +77,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       if (!mounted) return;
 
       // Navegar según el tipo de usuario
-      if (userType == 'admin' || userType == 'administrador' || userType == 'gerente') {
+      if (userType == 'admin' ||
+          userType == 'administrador' ||
+          userType == 'gerente') {
         debugPrint('=== Navegando a AdminHomeScreen ===');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
@@ -87,10 +87,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       } else if (userType == 'empleado' || userType == 'vendedor') {
         debugPrint('=== Navegando a AdminHomeScreen (modo empleado) ===');
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const AdminHomeScreen(isEmployee: true)),
+          MaterialPageRoute(
+            builder: (context) => const AdminHomeScreen(isEmployee: true),
+          ),
         );
       } else {
-        debugPrint('=== Tipo de usuario desconocido: $userType, usando modo administrador ===');
+        debugPrint(
+          '=== Tipo de usuario desconocido: $userType, usando modo administrador ===',
+        );
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
         );
@@ -104,8 +108,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             e.toString().contains('invalid')) {
           _errorMessage = 'Email o contraseña incorrectos.';
         } else if (e.toString().contains('NetworkException') ||
-                   e.toString().contains('SocketException') ||
-                   e.toString().contains('Connection')) {
+            e.toString().contains('SocketException') ||
+            e.toString().contains('Connection')) {
           _errorMessage = 'Error de conexión. Verifique su internet.';
         } else if (e.toString().contains('timeout')) {
           _errorMessage = 'Tiempo de espera agotado. Intente nuevamente.';
@@ -117,7 +121,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           } else {
             _errorMessage = 'Error: $errorMsg';
           }
-          debugPrint('=== Error específico mostrado al usuario: $_errorMessage ===');
+          debugPrint(
+            '=== Error específico mostrado al usuario: $_errorMessage ===',
+          );
         }
         _isLoading = false;
       });
@@ -137,7 +143,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     final titleSpacing = isSmallScreen ? 24.0 : 48.0;
     final cardPadding = isSmallScreen ? 20.0 : 32.0;
     final cardBorderRadius = isSmallScreen ? 20.0 : 28.0;
-    final maxCardWidth = screenWidth < 360 ? screenWidth - 32 : (screenWidth < 600 ? screenWidth - 48 : 450.0);
+    final maxCardWidth = screenWidth < 360
+        ? screenWidth - 32
+        : (screenWidth < 600 ? screenWidth - 48 : 450.0);
 
     return Scaffold(
       body: Container(
@@ -193,18 +201,24 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     // Título
                     Text(
                       'Bienvenido',
-                      style: (isSmallScreen ? textTheme.headlineMedium : textTheme.displaySmall)?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style:
+                          (isSmallScreen
+                                  ? textTheme.headlineMedium
+                                  : textTheme.displaySmall)
+                              ?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                              ),
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: isSmallScreen ? 4 : 8),
                     Text(
                       'Inicia sesión para continuar',
-                      style: (isSmallScreen ? textTheme.bodyMedium : textTheme.bodyLarge)?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style:
+                          (isSmallScreen
+                                  ? textTheme.bodyMedium
+                                  : textTheme.bodyLarge)
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: titleSpacing),
@@ -227,11 +241,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
-                                style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                ),
                                 decoration: InputDecoration(
                                   labelText: 'Email',
                                   hintText: 'nombre@ejemplo.com',
-                                  prefixIcon: Icon(Icons.email_outlined, size: isSmallScreen ? 20 : 24),
+                                  prefixIcon: Icon(
+                                    Icons.email_outlined,
+                                    size: isSmallScreen ? 20 : 24,
+                                  ),
                                   contentPadding: EdgeInsets.symmetric(
                                     horizontal: isSmallScreen ? 12 : 16,
                                     vertical: isSmallScreen ? 12 : 16,
@@ -256,7 +275,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 decoration: InputDecoration(
                                   labelText: 'Contraseña',
                                   hintText: 'Ingrese su contraseña',
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                  prefixIcon: const Icon(
+                                    Icons.lock_outline_rounded,
+                                  ),
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       _obscurePassword
@@ -285,7 +306,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               if (_errorMessage != null) ...[
                                 SizedBox(height: isSmallScreen ? 16 : 24),
                                 Container(
-                                  padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
+                                  padding: EdgeInsets.all(
+                                    isSmallScreen ? 12 : 16,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: colorScheme.errorContainer,
                                     borderRadius: BorderRadius.circular(12),
@@ -301,9 +324,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       Expanded(
                                         child: Text(
                                           _errorMessage!,
-                                          style: (isSmallScreen ? textTheme.bodySmall : textTheme.bodyMedium)?.copyWith(
-                                            color: colorScheme.onErrorContainer,
-                                          ),
+                                          style:
+                                              (isSmallScreen
+                                                      ? textTheme.bodySmall
+                                                      : textTheme.bodyMedium)
+                                                  ?.copyWith(
+                                                    color: colorScheme
+                                                        .onErrorContainer,
+                                                  ),
                                         ),
                                       ),
                                     ],
@@ -317,7 +345,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               FilledButton(
                                 onPressed: _isLoading ? null : _login,
                                 style: FilledButton.styleFrom(
-                                  minimumSize: Size(double.infinity, Responsive.buttonHeight(context)),
+                                  minimumSize: Size(
+                                    double.infinity,
+                                    Responsive.buttonHeight(context),
+                                  ),
                                   padding: Responsive.buttonPadding(context),
                                 ),
                                 child: _isLoading
@@ -330,16 +361,24 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                         ),
                                       )
                                     : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
                                             'Iniciar Sesión',
-                                            style: (isSmallScreen ? textTheme.labelMedium : textTheme.labelLarge)?.copyWith(
-                                              color: colorScheme.onPrimary,
-                                            ),
+                                            style:
+                                                (isSmallScreen
+                                                        ? textTheme.labelMedium
+                                                        : textTheme.labelLarge)
+                                                    ?.copyWith(
+                                                      color:
+                                                          colorScheme.onPrimary,
+                                                    ),
                                           ),
-                                          SizedBox(width: isSmallScreen ? 6 : 8),
+                                          SizedBox(
+                                            width: isSmallScreen ? 6 : 8,
+                                          ),
                                           Icon(
                                             Icons.arrow_forward_rounded,
                                             color: colorScheme.onPrimary,
@@ -359,9 +398,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     // Footer
                     Text(
                       '© 2026 App Estética',
-                      style: (isSmallScreen ? textTheme.labelSmall : textTheme.bodySmall)?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style:
+                          (isSmallScreen
+                                  ? textTheme.labelSmall
+                                  : textTheme.bodySmall)
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -374,4 +415,3 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     );
   }
 }
-

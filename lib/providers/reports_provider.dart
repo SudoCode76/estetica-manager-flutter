@@ -29,7 +29,11 @@ class ReportsProvider extends ChangeNotifier {
         break;
       case ReportPeriod.week:
         // Lunes de esta semana
-        start = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+        start = DateTime(
+          now.year,
+          now.month,
+          now.day,
+        ).subtract(Duration(days: now.weekday - 1));
         break;
       case ReportPeriod.month:
         start = DateTime(now.year, now.month, 1);
@@ -42,7 +46,9 @@ class ReportsProvider extends ChangeNotifier {
   }
 
   Future<void> loadReports(int sucursalId, ReportPeriod period) async {
-    debugPrint('ReportsProvider.loadReports: sucursalId=$sucursalId, period=$period');
+    debugPrint(
+      'ReportsProvider.loadReports: sucursalId=$sucursalId, period=$period',
+    );
 
     _isLoading = true;
     notifyListeners();
@@ -56,7 +62,11 @@ class ReportsProvider extends ChangeNotifier {
       debugPrint('ReportsProvider: Cargando datos desde $start hasta $end');
 
       final results = await Future.wait([
-        _repo.getFinancialReport(sucursalId: sucursalId, start: start, end: end),
+        _repo.getFinancialReport(
+          sucursalId: sucursalId,
+          start: start,
+          end: end,
+        ),
         _repo.getClientsReport(sucursalId: sucursalId, start: start, end: end),
         _repo.getServicesReport(sucursalId: sucursalId, start: start, end: end),
       ]);

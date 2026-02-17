@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SucursalProvider extends ChangeNotifier {
   int? _selectedSucursalId;
   String? _selectedSucursalName;
-  bool _wasSetManually = false; // Flag para evitar que _loadFromPrefs sobrescriba
+  bool _wasSetManually =
+      false; // Flag para evitar que _loadFromPrefs sobrescriba
 
   int? get selectedSucursalId => _selectedSucursalId;
   String? get selectedSucursalName => _selectedSucursalName;
@@ -36,8 +37,13 @@ class SucursalProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (_selectedSucursalId != null) {
       await prefs.setInt('selectedSucursalId', _selectedSucursalId!);
-      await prefs.setString('selectedSucursalName', _selectedSucursalName ?? '');
-      debugPrint('SucursalProvider: Saved to prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
+      await prefs.setString(
+        'selectedSucursalName',
+        _selectedSucursalName ?? '',
+      );
+      debugPrint(
+        'SucursalProvider: Saved to prefs - id=$_selectedSucursalId, name=$_selectedSucursalName',
+      );
     } else {
       await prefs.remove('selectedSucursalId');
       await prefs.remove('selectedSucursalName');
@@ -49,7 +55,9 @@ class SucursalProvider extends ChangeNotifier {
     debugPrint('SucursalProvider: _loadFromPrefs started');
     // No sobrescribir si ya fue establecido manualmente
     if (_wasSetManually) {
-      debugPrint('SucursalProvider: Skipping _loadFromPrefs - value was set manually');
+      debugPrint(
+        'SucursalProvider: Skipping _loadFromPrefs - value was set manually',
+      );
       return;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -61,9 +69,13 @@ class SucursalProvider extends ChangeNotifier {
       _selectedSucursalId = id;
       _selectedSucursalName = name;
       notifyListeners();
-      debugPrint('SucursalProvider: Set from prefs - id=$_selectedSucursalId, name=$_selectedSucursalName');
+      debugPrint(
+        'SucursalProvider: Set from prefs - id=$_selectedSucursalId, name=$_selectedSucursalName',
+      );
     } else {
-      debugPrint('SucursalProvider: No saved sucursal in prefs or was set manually');
+      debugPrint(
+        'SucursalProvider: No saved sucursal in prefs or was set manually',
+      );
     }
   }
 }
@@ -78,7 +90,9 @@ class SucursalInherited extends InheritedWidget {
   }) : super(key: key, child: child);
 
   static SucursalProvider? of(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<SucursalInherited>()?.provider;
+    return context
+        .dependOnInheritedWidgetOfExactType<SucursalInherited>()
+        ?.provider;
   }
 
   @override
@@ -97,7 +111,9 @@ class ScaffoldKeyInherited extends InheritedWidget {
   }) : super(key: key, child: child);
 
   static GlobalKey<ScaffoldState>? of(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<ScaffoldKeyInherited>()?.scaffoldKey;
+    return context
+        .dependOnInheritedWidgetOfExactType<ScaffoldKeyInherited>()
+        ?.scaffoldKey;
   }
 
   @override

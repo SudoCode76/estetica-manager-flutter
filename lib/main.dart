@@ -54,7 +54,9 @@ class _MyAppState extends State<MyApp> {
       child: MultiProvider(
         providers: [
           // Hacemos disponible SucursalProvider también vía provider package
-          ChangeNotifierProvider<SucursalProvider>.value(value: _globalSucursalProvider),
+          ChangeNotifierProvider<SucursalProvider>.value(
+            value: _globalSucursalProvider,
+          ),
           Provider<TicketRepository>.value(value: ticketRepo),
           Provider<AuthRepository>.value(value: authRepo),
           Provider<CatalogRepository>.value(value: catalogRepo),
@@ -62,8 +64,12 @@ class _MyAppState extends State<MyApp> {
           Provider<ReportsRepository>.value(value: ReportsRepository()),
 
           // Providers que dependen de repos
-          ChangeNotifierProvider<TicketProvider>(create: (_) => TicketProvider(repo: ticketRepo)),
-          ChangeNotifierProvider<ReportsProvider>(create: (_) => ReportsProvider()),
+          ChangeNotifierProvider<TicketProvider>(
+            create: (_) => TicketProvider(repo: ticketRepo),
+          ),
+          ChangeNotifierProvider<ReportsProvider>(
+            create: (_) => ReportsProvider(),
+          ),
         ],
         child: MaterialApp(
           title: 'App Estetica',
@@ -78,10 +84,7 @@ class _MyAppState extends State<MyApp> {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          supportedLocales: const [
-            Locale('es', 'ES'),
-            Locale('en', 'US'),
-          ],
+          supportedLocales: const [Locale('es', 'ES'), Locale('en', 'US')],
           locale: const Locale('es', 'ES'),
           home: const Root(),
         ),
@@ -112,7 +115,10 @@ class _RootState extends State<Root> {
     final supabaseUser = Supabase.instance.client.auth.currentUser;
 
     if (supabaseUser != null) {
-      if (kDebugMode) debugPrint('=== Usuario autenticado en Supabase: ${supabaseUser.email} ===');
+      if (kDebugMode)
+        debugPrint(
+          '=== Usuario autenticado en Supabase: ${supabaseUser.email} ===',
+        );
 
       // Obtener datos del usuario desde SharedPreferences o metadata
       final prefs = await SharedPreferences.getInstance();
@@ -126,7 +132,9 @@ class _RootState extends State<Root> {
         }
       }
 
-      if (userType == 'admin' || userType == 'administrador' || userType == 'gerente') {
+      if (userType == 'admin' ||
+          userType == 'administrador' ||
+          userType == 'gerente') {
         _initial = const AdminHomeScreen();
       } else if (userType == 'empleado' || userType == 'vendedor') {
         _initial = const AdminHomeScreen(isEmployee: true);
@@ -149,7 +157,11 @@ class _RootState extends State<Root> {
   Widget build(BuildContext context) {
     if (_checking) {
       return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary)),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       );
     }
     return _initial;

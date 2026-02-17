@@ -39,9 +39,7 @@ class MainDrawer extends StatelessWidget {
       child: Column(
         children: [
           DrawerHeader(
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-            ),
+            decoration: BoxDecoration(color: colorScheme.primary),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isSmall = constraints.maxHeight < 150;
@@ -63,7 +61,8 @@ class MainDrawer extends StatelessWidget {
                             children: [
                               Text(
                                 username,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
                                       color: colorScheme.onPrimary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: isSmall ? 14 : null,
@@ -72,8 +71,11 @@ class MainDrawer extends StatelessWidget {
                               ),
                               Text(
                                 rolLabel,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: colorScheme.onPrimary.withValues(
+                                        alpha: 0.8,
+                                      ),
                                       fontSize: isSmall ? 11 : null,
                                     ),
                               ),
@@ -107,103 +109,141 @@ class MainDrawer extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text(
                                   'Cargando...',
-                                  style: TextStyle(color: colorScheme.onPrimary),
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimary,
+                                  ),
                                 ),
                               ],
                             )
                           : isEmployee
-                              // Para empleados: mostrar sucursal bloqueada
-                              ? Row(
-                                  children: [
-                                    Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        employeeSucursalName ?? 'Sin sucursal',
-                                        style: TextStyle(
-                                          color: colorScheme.onPrimary,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                          // Para empleados: mostrar sucursal bloqueada
+                          ? Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: colorScheme.onPrimary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    employeeSucursalName ?? 'Sin sucursal',
+                                    style: TextStyle(
+                                      color: colorScheme.onPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    Icon(
-                                      Icons.lock,
-                                      size: 16,
-                                      color: colorScheme.onPrimary.withValues(alpha: 0.6),
-                                    ),
-                                  ],
-                                )
-                              // Para admin: dropdown editable
-                              : Row(
-                                  children: [
-                                    Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: sucursales.isEmpty
-                                          ? Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    'No hay sucursales disponibles',
-                                                    style: TextStyle(
-                                                        color: colorScheme.onPrimary.withValues(alpha: 0.9),
-                                                        fontWeight: FontWeight.w600),
-                                                  ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.lock,
+                                  size: 16,
+                                  color: colorScheme.onPrimary.withValues(
+                                    alpha: 0.6,
+                                  ),
+                                ),
+                              ],
+                            )
+                          // Para admin: dropdown editable
+                          : Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: colorScheme.onPrimary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: sucursales.isEmpty
+                                      ? Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                'No hay sucursales disponibles',
+                                                style: TextStyle(
+                                                  color: colorScheme.onPrimary
+                                                      .withValues(alpha: 0.9),
+                                                  fontWeight: FontWeight.w600,
                                                 ),
-                                                IconButton(
-                                                  onPressed: onRetryLoadSucursales,
-                                                  icon: Icon(Icons.refresh, color: colorScheme.onPrimary),
-                                                  tooltip: 'Reintentar',
-                                                ),
-                                              ],
-                                            )
-                                          : DropdownButtonHideUnderline(
-                                              child: Builder(
-                                                builder: (context) {
-                                                  final currentId = selectedSucursalId;
-                                                  final validValue = currentId != null &&
-                                                          sucursales.any((s) => s['id'] == currentId)
-                                                      ? currentId
-                                                      : null;
-
-                                                  return DropdownButton<int>(
-                                                    value: validValue,
-                                                    isExpanded: true,
-                                                    dropdownColor: colorScheme.surface,
-                                                    icon: Icon(Icons.arrow_drop_down,
-                                                        color: colorScheme.onSurfaceVariant),
-                                                    style: TextStyle(
-                                                      color: colorScheme.onSurface,
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                    hint: Text(
-                                                      'Seleccionar sucursal',
-                                                      style: TextStyle(
-                                                          color: colorScheme.onPrimary.withValues(alpha: 0.7)),
-                                                    ),
-                                                    items: sucursales.map((s) {
-                                                      return DropdownMenuItem<int>(
-                                                        value: s['id'],
-                                                        child: Text(s['nombreSucursal'] ?? '-'),
-                                                      );
-                                                    }).toList(),
-                                                    onChanged: (value) {
-                                                      if (value != null) {
-                                                        final sucursal =
-                                                            sucursales.firstWhere((s) => s['id'] == value);
-                                                        onSucursalChanged(value, sucursal['nombreSucursal']);
-                                                      }
-                                                    },
-                                                  );
-                                                },
                                               ),
                                             ),
-                                    ),
-                                  ],
+                                            IconButton(
+                                              onPressed: onRetryLoadSucursales,
+                                              icon: Icon(
+                                                Icons.refresh,
+                                                color: colorScheme.onPrimary,
+                                              ),
+                                              tooltip: 'Reintentar',
+                                            ),
+                                          ],
+                                        )
+                                      : DropdownButtonHideUnderline(
+                                          child: Builder(
+                                            builder: (context) {
+                                              final currentId =
+                                                  selectedSucursalId;
+                                              final validValue =
+                                                  currentId != null &&
+                                                      sucursales.any(
+                                                        (s) =>
+                                                            s['id'] ==
+                                                            currentId,
+                                                      )
+                                                  ? currentId
+                                                  : null;
+
+                                              return DropdownButton<int>(
+                                                value: validValue,
+                                                isExpanded: true,
+                                                dropdownColor:
+                                                    colorScheme.surface,
+                                                icon: Icon(
+                                                  Icons.arrow_drop_down,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                                style: TextStyle(
+                                                  color: colorScheme.onSurface,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                hint: Text(
+                                                  'Seleccionar sucursal',
+                                                  style: TextStyle(
+                                                    color: colorScheme.onPrimary
+                                                        .withValues(alpha: 0.7),
+                                                  ),
+                                                ),
+                                                items: sucursales.map((s) {
+                                                  return DropdownMenuItem<int>(
+                                                    value: s['id'],
+                                                    child: Text(
+                                                      s['nombreSucursal'] ??
+                                                          '-',
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                                onChanged: (value) {
+                                                  if (value != null) {
+                                                    final sucursal = sucursales
+                                                        .firstWhere(
+                                                          (s) =>
+                                                              s['id'] == value,
+                                                        );
+                                                    onSucursalChanged(
+                                                      value,
+                                                      sucursal['nombreSucursal'],
+                                                    );
+                                                  }
+                                                },
+                                              );
+                                            },
+                                          ),
+                                        ),
                                 ),
+                              ],
+                            ),
                     ),
                   ],
                 );
@@ -291,7 +331,6 @@ class MainDrawer extends StatelessWidget {
                   ),
                 ],
 
-
                 // Acerca de - colocado justo después de Tickets para máxima visibilidad
                 _DrawerItem(
                   icon: Icons.info_outline,
@@ -300,14 +339,20 @@ class MainDrawer extends StatelessWidget {
                   selected: false,
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AboutScreen()),
+                    );
                   },
                 ),
 
                 // Botón de reintento para cargar sucursales
                 if (!isEmployee) ...[
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: ElevatedButton.icon(
                       onPressed: onRetryLoadSucursales,
                       icon: const Icon(Icons.refresh),
@@ -318,7 +363,10 @@ class MainDrawer extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                       ),
                     ),
                   ),
@@ -391,13 +439,17 @@ class _DrawerItem extends StatelessWidget {
         child: ListTile(
           leading: Icon(
             selected ? selectedIcon : icon,
-            color: selected ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+            color: selected
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
             size: 24,
           ),
           title: Text(
             label,
             style: textTheme.bodyLarge?.copyWith(
-              color: selected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
+              color: selected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurface,
               fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
@@ -405,7 +457,10 @@ class _DrawerItem extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
         ),
       ),
     );

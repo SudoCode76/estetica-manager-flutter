@@ -7,16 +7,16 @@ import 'package:provider/provider.dart';
 class CreateClientDialog extends StatefulWidget {
   final int sucursalId;
 
-  const CreateClientDialog({
-    super.key,
-    required this.sucursalId,
-  });
+  const CreateClientDialog({super.key, required this.sucursalId});
 
   @override
   State<CreateClientDialog> createState() => _CreateClientDialogState();
 
   /// Muestra el diálogo y retorna el cliente creado o null
-  static Future<Map<String, dynamic>?> show(BuildContext context, int sucursalId) async {
+  static Future<Map<String, dynamic>?> show(
+    BuildContext context,
+    int sucursalId,
+  ) async {
     return await showDialog<Map<String, dynamic>?>(
       context: context,
       barrierDismissible: true,
@@ -74,13 +74,19 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
         'apellidoCliente': _apellidoController.text.trim(),
         'telefono': _telefonoController.text.trim(),
         'estadoCliente': true,
-        'sucursal_id': widget.sucursalId, // SIEMPRE incluir la sucursal (clave DB)
+        'sucursal_id':
+            widget.sucursalId, // SIEMPRE incluir la sucursal (clave DB)
       };
 
-      debugPrint('CreateClientDialog: Creando cliente en sucursal=${widget.sucursalId}');
+      debugPrint(
+        'CreateClientDialog: Creando cliente en sucursal=${widget.sucursalId}',
+      );
       debugPrint('CreateClientDialog: Datos: $nuevo');
 
-      final creado = await Provider.of<ClienteRepository>(context, listen: false).crearCliente(nuevo);
+      final creado = await Provider.of<ClienteRepository>(
+        context,
+        listen: false,
+      ).crearCliente(nuevo);
 
       debugPrint('CreateClientDialog: Cliente creado exitosamente');
 
@@ -102,7 +108,9 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
             ),
             backgroundColor: colorScheme.primary,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -123,7 +131,9 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
             ),
             backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -207,17 +217,26 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                           children: [
                             Text(
                               'Nuevo Cliente',
-                              style: (isSmallScreen ? textTheme.titleLarge : textTheme.headlineSmall)?.copyWith(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style:
+                                  (isSmallScreen
+                                          ? textTheme.titleLarge
+                                          : textTheme.headlineSmall)
+                                      ?.copyWith(
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                             ),
                             SizedBox(height: Responsive.spacing(context, 4)),
                             Text(
                               'Registrar información del cliente',
-                              style: (isSmallScreen ? textTheme.labelSmall : textTheme.bodySmall)?.copyWith(
-                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                              ),
+                              style:
+                                  (isSmallScreen
+                                          ? textTheme.labelSmall
+                                          : textTheme.bodySmall)
+                                      ?.copyWith(
+                                        color: colorScheme.onPrimaryContainer
+                                            .withValues(alpha: 0.8),
+                                      ),
                             ),
                           ],
                         ),
@@ -237,7 +256,8 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                         // Campo Nombre
                         TextFormField(
                           controller: _nombreController,
-                          autofocus: !isSmallScreen, // No autofocus en pantallas pequeñas
+                          autofocus:
+                              !isSmallScreen, // No autofocus en pantallas pequeñas
                           style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
                           decoration: InputDecoration(
                             labelText: 'Nombre *',
@@ -246,8 +266,12 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                                color: colorScheme.primaryContainer.withValues(
+                                  alpha: 0.5,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 10 : 12,
+                                ),
                               ),
                               child: Icon(
                                 Icons.person_outline,
@@ -256,16 +280,21 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               ),
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 12 : 16,
+                              ),
                             ),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            fillColor: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: isSmallScreen ? 12 : 16,
                               vertical: isSmallScreen ? 12 : 16,
                             ),
                           ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'El nombre es requerido' : null,
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'El nombre es requerido'
+                              : null,
                           textCapitalization: TextCapitalization.words,
                         ),
                         SizedBox(height: Responsive.spacing(context, 16)),
@@ -281,8 +310,11 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                                color: colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 10 : 12,
+                                ),
                               ),
                               child: Icon(
                                 Icons.badge_outlined,
@@ -291,10 +323,13 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               ),
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 12 : 16,
+                              ),
                             ),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            fillColor: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: isSmallScreen ? 12 : 16,
                               vertical: isSmallScreen ? 12 : 16,
@@ -315,8 +350,12 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                                color: colorScheme.tertiaryContainer.withValues(
+                                  alpha: 0.5,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 10 : 12,
+                                ),
                               ),
                               child: Icon(
                                 Icons.phone_outlined,
@@ -325,10 +364,13 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               ),
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 12 : 16,
+                              ),
                             ),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            fillColor: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: isSmallScreen ? 12 : 16,
                               vertical: isSmallScreen ? 12 : 16,
@@ -356,12 +398,16 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                                     vertical: isSmallScreen ? 12 : 16,
                                   ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                                    borderRadius: BorderRadius.circular(
+                                      isSmallScreen ? 12 : 16,
+                                    ),
                                   ),
                                 ),
                                 child: Text(
                                   'Cancelar',
-                                  style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
+                                  style: TextStyle(
+                                    fontSize: isSmallScreen ? 13 : 14,
+                                  ),
                                 ),
                               ),
                             ),
@@ -370,17 +416,24 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                               flex: 2,
                               child: FilledButton.icon(
                                 onPressed: _crearCliente,
-                                icon: Icon(Icons.check_rounded, size: isSmallScreen ? 18 : 20),
+                                icon: Icon(
+                                  Icons.check_rounded,
+                                  size: isSmallScreen ? 18 : 20,
+                                ),
                                 label: Text(
                                   'Registrar',
-                                  style: TextStyle(fontSize: isSmallScreen ? 13 : 14),
+                                  style: TextStyle(
+                                    fontSize: isSmallScreen ? 13 : 14,
+                                  ),
                                 ),
                                 style: FilledButton.styleFrom(
                                   padding: EdgeInsets.symmetric(
                                     vertical: isSmallScreen ? 12 : 16,
                                   ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+                                    borderRadius: BorderRadius.circular(
+                                      isSmallScreen ? 12 : 16,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -399,4 +452,3 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
     );
   }
 }
-

@@ -24,7 +24,8 @@ class Responsive {
 
   /// Verificar si es tablet
   static bool isTablet(BuildContext context) {
-    return width(context) >= mobileBreakpoint && width(context) < tabletBreakpoint;
+    return width(context) >= mobileBreakpoint &&
+        width(context) < tabletBreakpoint;
   }
 
   /// Verificar si es desktop
@@ -148,4 +149,3 @@ class Responsive {
     return const EdgeInsets.symmetric(horizontal: 24, vertical: 16);
   }
 }
-
