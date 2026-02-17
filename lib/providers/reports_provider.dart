@@ -10,11 +10,9 @@ class ReportsProvider extends ChangeNotifier {
 
   Map<String, dynamic> _financialData = {};
   Map<String, dynamic> _clientsData = {};
-  Map<String, dynamic> _servicesData = {};
 
   Map<String, dynamic> get financialData => _financialData;
   Map<String, dynamic> get clientsData => _clientsData;
-  Map<String, dynamic> get servicesData => _servicesData;
 
   // Calcula las fechas basado en el enum
   (DateTime, DateTime) _getDates(ReportPeriod period) {
@@ -61,6 +59,7 @@ class ReportsProvider extends ChangeNotifier {
 
       debugPrint('ReportsProvider: Cargando datos desde $start hasta $end');
 
+      // Load only financial and clients reports (services removed)
       final results = await Future.wait([
         _repo.getFinancialReport(
           sucursalId: sucursalId,
@@ -68,24 +67,20 @@ class ReportsProvider extends ChangeNotifier {
           end: end,
         ),
         _repo.getClientsReport(sucursalId: sucursalId, start: start, end: end),
-        _repo.getServicesReport(sucursalId: sucursalId, start: start, end: end),
       ]);
 
       // Los repositorios ya devuelven mapas normalizados
       _financialData = results[0] as Map<String, dynamic>? ?? {};
       _clientsData = results[1] as Map<String, dynamic>? ?? {};
-      _servicesData = results[2] as Map<String, dynamic>? ?? {};
 
       debugPrint('ReportsProvider: Datos cargados exitosamente');
       debugPrint('  - financialData keys: ${_financialData.keys}');
       debugPrint('  - clientsData keys: ${_clientsData.keys}');
-      debugPrint('  - servicesData keys: ${_servicesData.keys}');
     } catch (e, stack) {
       debugPrint("ReportsProvider ERROR cargando reportes: $e");
       debugPrint("Stack: $stack");
       _financialData = {};
       _clientsData = {};
-      _servicesData = {};
     } finally {
       _isLoading = false;
       notifyListeners();

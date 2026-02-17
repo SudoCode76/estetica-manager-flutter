@@ -5,7 +5,7 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/providers/reports_provider.dart';
 import 'financial_report.dart';
 import 'clients_report.dart';
-import 'services_report.dart';
+// services_report.dart removed — feature deleted
 import 'report_period.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -250,7 +250,8 @@ class _ReportsScreenState extends State<ReportsScreen>
               children: [
                 FinancialReport(period: _period, data: provider.financialData),
                 ClientsReport(period: _period, data: provider.clientsData),
-                ServicesReport(period: _period, data: provider.servicesData),
+                // Services report removed
+                const SizedBox.shrink(),
               ],
             );
           },
