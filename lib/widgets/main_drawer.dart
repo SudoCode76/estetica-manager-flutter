@@ -247,17 +247,6 @@ class MainDrawer extends StatelessWidget {
                     Navigator.pop(context);
                   },
                 ),
-                // Acerca de - colocado justo después de Tickets para máxima visibilidad
-                _DrawerItem(
-                  icon: Icons.info_outline,
-                  selectedIcon: Icons.info,
-                  label: 'Acerca de',
-                  selected: false,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
-                  },
-                ),
                 // Las siguientes opciones SOLO para admin
                 if (!isEmployee) ...[
                   _DrawerItem(
@@ -301,6 +290,20 @@ class MainDrawer extends StatelessWidget {
                     },
                   ),
                 ],
+
+
+                // Acerca de - colocado justo después de Tickets para máxima visibilidad
+                _DrawerItem(
+                  icon: Icons.info_outline,
+                  selectedIcon: Icons.info,
+                  label: 'Acerca de',
+                  selected: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
+                  },
+                ),
+
                 // Botón de reintento para cargar sucursales
                 if (!isEmployee) ...[
                   Padding(
