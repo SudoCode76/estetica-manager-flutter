@@ -17,7 +17,7 @@ import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'dart:async';
 import 'package:app_estetica/screens/admin/reports/reports_screen.dart';
-import 'package:app_estetica/screens/about_screen.dart';
+import 'package:app_estetica/widgets/main_drawer.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;
@@ -44,22 +44,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   // Pantallas para admin (todas) - usando Key para forzar recreación cuando cambia sucursal
   List<Widget> get _adminScreens => [
-    TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
-    SesionesScreen(key: ValueKey('sesiones_${_sucursalProvider?.selectedSucursalId}')),
-    ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
-    TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
-    PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
-    // Reportes debe estar en la posición 5 del Drawer
-    ReportsScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
-    EmployeesScreen(key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}')),
-  ];
+        TicketsScreen(key: ValueKey('tickets_${_sucursalProvider?.selectedSucursalId}')),
+        SesionesScreen(key: ValueKey('sesiones_${_sucursalProvider?.selectedSucursalId}')),
+        ClientsScreen(key: ValueKey('clients_${_sucursalProvider?.selectedSucursalId}')),
+        TreatmentsScreen(key: ValueKey('treatments_${_sucursalProvider?.selectedSucursalId}')),
+        PaymentsScreen(key: ValueKey('payments_${_sucursalProvider?.selectedSucursalId}')),
+        // Reportes debe estar en la posición 5 del Drawer
+        ReportsScreen(key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}')),
+        EmployeesScreen(key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}')),
+      ];
 
   // Pantallas para empleado (solo tickets y clientes) - usando Key para forzar recreación
   List<Widget> get _employeeScreens => [
-    TicketsScreen(key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}')),
-    SesionesScreen(key: ValueKey('emp_sesiones_${_sucursalProvider?.selectedSucursalId}')),
-    ClientsScreen(key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}')),
-  ];
+        TicketsScreen(key: ValueKey('emp_tickets_${_sucursalProvider?.selectedSucursalId}')),
+        SesionesScreen(key: ValueKey('emp_sesiones_${_sucursalProvider?.selectedSucursalId}')),
+        ClientsScreen(key: ValueKey('emp_clients_${_sucursalProvider?.selectedSucursalId}')),
+      ];
 
   List<Widget> get _screens => widget.isEmployee ? _employeeScreens : _adminScreens;
 
@@ -398,17 +398,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Text(
                   'Sin Sucursal Asignada',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.error,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.error,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Tu cuenta de empleado no tiene una sucursal asignada. Por favor, contacta al administrador para que te asigne una sucursal.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
@@ -428,348 +428,49 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       );
     }
 
-    final username = _employeeData != null ? (_employeeData?['username'] ?? (_employeeData?['email'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador'))) : (widget.isEmployee ? 'Empleado' : 'Administrador');
-    final rolLabel = _employeeData != null ? (_employeeData?['tipoUsuario'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador')) : (widget.isEmployee ? 'Empleado' : 'Administrador');
+    final username = _employeeData != null
+        ? (_employeeData?['username'] ??
+            (_employeeData?['email'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador')))
+        : (widget.isEmployee ? 'Empleado' : 'Administrador');
+    final rolLabel = _employeeData != null
+        ? (_employeeData?['tipoUsuario'] ?? (widget.isEmployee ? 'Empleado' : 'Administrador'))
+        : (widget.isEmployee ? 'Empleado' : 'Administrador');
 
     return Scaffold(
       key: _scaffoldKey,
-      drawer: Drawer(
-        child: Column(
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: colorScheme.primary,
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isSmall = constraints.maxHeight < 150;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.account_circle,
-                            size: isSmall ? 36 : 48,
-                            color: colorScheme.onPrimary,
-                          ),
-                          SizedBox(width: isSmall ? 8 : 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  username,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: colorScheme.onPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: isSmall ? 14 : null,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  rolLabel,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onPrimary.withValues(alpha: 0.8),
-                                    fontSize: isSmall ? 11 : null,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: isSmall ? 8 : 16),
-                      // Selector de sucursal - BLOQUEADO para empleados
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmall ? 8 : 12,
-                          vertical: isSmall ? 6 : 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                    child: _isLoadingSucursales
-                        ? Row(
-                            children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Cargando...',
-                                style: TextStyle(color: colorScheme.onPrimary),
-                              ),
-                            ],
-                          )
-                        : widget.isEmployee
-                            // Para empleados: mostrar sucursal bloqueada
-                            ? Row(
-                                children: [
-                                  Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _employeeSucursalName ?? 'Sin sucursal',
-                                      style: TextStyle(
-                                        color: colorScheme.onPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.lock,
-                                    size: 16,
-                                    color: colorScheme.onPrimary.withValues(alpha: 0.6),
-                                  ),
-                                ],
-                              )
-                            // Para admin: dropdown editable
-                            : Row(
-                                children: [
-                                  Icon(Icons.location_on, color: colorScheme.onPrimary, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _sucursales.isEmpty
-                                        ? Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  'No hay sucursales disponibles',
-                                                  style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
-                                                ),
-                                              ),
-                                              IconButton(
-                                                onPressed: _retryLoadSucursales,
-                                                icon: Icon(Icons.refresh, color: colorScheme.onPrimary),
-                                                tooltip: 'Reintentar',
-                                              ),
-                                            ],
-                                          )
-                                        : DropdownButtonHideUnderline(
-                                            child: Builder(
-                                              builder: (context) {
-                                                final currentId = _sucursalProvider?.selectedSucursalId;
-                                                final validValue = currentId != null && _sucursales.any((s) => s['id'] == currentId) ? currentId : null;
-
-                                                return DropdownButton<int>(
-                                                  value: validValue,
-                                                  isExpanded: true,
-                                                  dropdownColor: colorScheme.surface,
-                                                  icon: Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-                                                  style: TextStyle(
-                                                    color: colorScheme.onSurface,
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                  hint: Text(
-                                                    'Seleccionar sucursal',
-                                                    style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7)),
-                                                  ),
-                                                  items: _sucursales.map((s) {
-                                                    return DropdownMenuItem<int>(
-                                                      value: s['id'],
-                                                      child: Text(s['nombreSucursal'] ?? '-'),
-                                                    );
-                                                  }).toList(),
-                                                  onChanged: (value) {
-                                                    if (value != null) {
-                                                      final sucursal = _sucursales.firstWhere((s) => s['id'] == value);
-                                                      setState(() {
-                                                        _sucursalProvider?.setSucursal(value, sucursal['nombreSucursal']);
-                                                      });
-                                                    }
-                                                  },
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                  ),
-                                ],
-                              ),
-                  ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  // Tickets - disponible para todos
-                  _DrawerItem(
-                    icon: Icons.receipt_long_outlined,
-                    selectedIcon: Icons.receipt_long,
-                    label: 'Tickets',
-                    selected: _selectedIndex == 0,
-                    onTap: () {
-                      setState(() { _selectedIndex = 0; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  // Agenda de Sesiones - disponible para todos
-                  _DrawerItem(
-                    icon: Icons.event_note_outlined,
-                    selectedIcon: Icons.event_note,
-                    label: 'Agenda de Sesiones',
-                    selected: _selectedIndex == 1,
-                    onTap: () {
-                      setState(() { _selectedIndex = 1; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  // Clientes - disponible para todos
-                  _DrawerItem(
-                    icon: Icons.people_outline,
-                    selectedIcon: Icons.people,
-                    label: 'Clientes',
-                    selected: _selectedIndex == 2,
-                    onTap: () {
-                      setState(() { _selectedIndex = 2; });
-                      Navigator.pop(context);
-                    },
-                  ),
-                  // Acerca de - colocado justo después de Tickets para máxima visibilidad
-                  _DrawerItem(
-                    icon: Icons.info_outline,
-                    selectedIcon: Icons.info,
-                    label: 'Acerca de',
-                    selected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
-                    },
-                  ),
-                  // Las siguientes opciones SOLO para admin
-                  if (!widget.isEmployee) ...[
-                    _DrawerItem(
-                      icon: Icons.spa,
-                      selectedIcon: Icons.spa,
-                      label: 'Tratamientos',
-                      selected: _selectedIndex == 3,
-                      onTap: () {
-                        setState(() { _selectedIndex = 3; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.payments,
-                      selectedIcon: Icons.payments_outlined,
-                      label: 'Pagos',
-                      selected: _selectedIndex == 4,
-                      onTap: () {
-                        setState(() { _selectedIndex = 4; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.insights_outlined,
-                      selectedIcon: Icons.bar_chart,
-                      label: 'Reportes',
-                      selected: _selectedIndex == 5,
-                      onTap: () {
-                        setState(() { _selectedIndex = 5; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                    _DrawerItem(
-                      icon: Icons.people_outline_rounded,
-                      selectedIcon: Icons.people_rounded,
-                      label: 'Empleados',
-                      selected: _selectedIndex == 6,
-                      onTap: () {
-                        setState(() { _selectedIndex = 6; });
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ],
-                  // Botón de reintento para cargar sucursales
-                  if (!widget.isEmployee) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ElevatedButton.icon(
-                        onPressed: _retryLoadSucursales,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Reintentar Cargar Sucursales'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            // Acerca de (persistente) — encima de Cerrar Sesión para máxima visibilidad
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: _DrawerItem(
-                icon: Icons.info_outline,
-                selectedIcon: Icons.info,
-                label: 'Acerca de',
-                selected: false,
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
-                },
-              ),
-            ),
-            // Cerrar sesión al final
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  leading: Icon(Icons.logout_rounded, color: colorScheme.error),
-                  title: Text(
-                    'Cerrar Sesión',
-                    style: TextStyle(
-                      color: colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _logout();
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      drawer: MainDrawer(
+        username: username,
+        rolLabel: rolLabel,
+        isEmployee: widget.isEmployee,
+        isLoadingSucursales: _isLoadingSucursales,
+        employeeSucursalName: _employeeSucursalName,
+        sucursales: _sucursales,
+        selectedSucursalId: _sucursalProvider?.selectedSucursalId,
+        selectedIndex: _selectedIndex,
+        onSucursalChanged: (id, name) {
+          setState(() {
+            _sucursalProvider?.setSucursal(id, name);
+          });
+        },
+        onRetryLoadSucursales: _retryLoadSucursales,
+        onIndexChanged: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        onLogout: _logout,
       ),
-        body: SafeArea(
-          child: ScaffoldKeyInherited(
-            scaffoldKey: _scaffoldKey,
-            child: Column(
-              children: [
-                // Header global (menú + logo + título)
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isCompact = constraints.maxWidth < 360;
-                    final isVerySmall = constraints.maxWidth < 340;
-                    return Padding(
+      body: SafeArea(
+        child: ScaffoldKeyInherited(
+          scaffoldKey: _scaffoldKey,
+          child: Column(
+            children: [
+              // Header global (menú + logo + título)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 360;
+                  final isVerySmall = constraints.maxWidth < 340;
+                  return Padding(
                     padding: EdgeInsets.fromLTRB(
                       isCompact ? 8 : 16,
                       isCompact ? 12 : 16,
@@ -801,9 +502,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: isVerySmall ? 16 : (isCompact ? 18 : null),
-                            ),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: isVerySmall ? 16 : (isCompact ? 18 : null),
+                                ),
                           ),
                         ),
                       ],
@@ -816,8 +517,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ],
           ),
         ),
-        ),
-        floatingActionButton: _selectedIndex == 0
+      ),
+      floatingActionButton: _selectedIndex == 0
           ? Builder(
               builder: (context) {
                 final screenWidth = MediaQuery.of(context).size.width;
@@ -900,13 +601,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               },
             )
           : _selectedIndex == 2 // <-- Cambiado: mostrar el FAB de 'Nuevo Cliente' solo cuando la pestaña seleccionada sea la de Clientes (index 2)
-            ? Builder(
-                builder: (context) {
-                  final screenWidth = MediaQuery.of(context).size.width;
-                  final isCompact = screenWidth < 360;
+              ? Builder(
+                  builder: (context) {
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    final isCompact = screenWidth < 360;
 
-                  if (isCompact) {
-                    return FloatingActionButton(
+                    if (isCompact) {
+                      return FloatingActionButton(
+                        onPressed: () async {
+                          if (_sucursalProvider?.selectedSucursalId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final result =
+                              await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+
+                          if (result != null) {
+                            // refrescar clientes - rebuild forzado
+                            setState(() {});
+                          }
+                        },
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        child: const Icon(Icons.person_add),
+                      );
+                    }
+
+                    return FloatingActionButton.extended(
                       onPressed: () async {
                         if (_sucursalProvider?.selectedSucursalId == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -918,101 +644,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           return;
                         }
 
-                        final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
+                        final result =
+                            await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
 
                         if (result != null) {
                           // refrescar clientes - rebuild forzado
                           setState(() {});
                         }
                       },
+                      icon: const Icon(Icons.person_add),
+                      label: const Text('Nuevo Cliente'),
                       backgroundColor: Theme.of(context).colorScheme.primary,
-                      child: const Icon(Icons.person_add),
                     );
-                  }
-
-                  return FloatingActionButton.extended(
-                    onPressed: () async {
-                      if (_sucursalProvider?.selectedSucursalId == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Selecciona una sucursal en el menú lateral antes de continuar'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
-
-                      final result = await CreateClientDialog.show(context, _sucursalProvider!.selectedSucursalId!);
-
-                      if (result != null) {
-                        // refrescar clientes - rebuild forzado
-                        setState(() {});
-                      }
-                    },
-                    icon: const Icon(Icons.person_add),
-                    label: const Text('Nuevo Cliente'),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                  );
-                },
-              )
-            : null,
-    );
-  }
-}
-
-class _DrawerItem extends StatelessWidget {
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DrawerItem({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Container(
-        decoration: BoxDecoration(
-          color: selected
-              ? colorScheme.primaryContainer
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: ListTile(
-          leading: Icon(
-            selected ? selectedIcon : icon,
-            color: selected
-                ? colorScheme.onPrimaryContainer
-                : colorScheme.onSurfaceVariant,
-            size: 24,
-          ),
-          title: Text(
-            label,
-            style: textTheme.bodyLarge?.copyWith(
-              color: selected
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurface,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-          onTap: onTap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
-      ),
+                  },
+                )
+              : null,
     );
   }
 }
