@@ -87,59 +87,34 @@ class FinancialReport extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Totales por método junto al bloque de ingresos
-                Row(
+                const SizedBox(height: 12),
+                // Cards horizontales con Totales por Método
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Total QR',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalQr)}',
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                    SizedBox(
+                      width: 220,
+                      child: _PaymentMethodCard(
+                        context,
+                        label: 'Total QR',
+                        amount: totalQr,
+                        icon: Icons.qr_code,
+                        color: cs.primary,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Total Efectivo',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalEfectivo)}',
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                    SizedBox(
+                      width: 220,
+                      child: _PaymentMethodCard(
+                        context,
+                        label: 'Total Efectivo',
+                        amount: totalEfectivo,
+                        icon: Icons.payments,
+                        color: cs.secondary ?? cs.primary,
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
 
                 Text(
@@ -276,6 +251,56 @@ class FinancialReport extends StatelessWidget {
 
           // Pendientes de cobro removido (se muestra en otra parte si es necesario)
         ],
+      ),
+    );
+  }
+
+  // Small card to show payment method totals
+  Widget _PaymentMethodCard(
+    BuildContext context, {
+    required String label,
+    required double amount,
+    required IconData icon,
+    required Color color,
+  }) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withOpacity(0.12),
+              child: Icon(icon, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: textTheme.bodySmall),
+                  const SizedBox(height: 6),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: amount),
+                    duration: const Duration(milliseconds: 600),
+                    builder: (ctx, value, _) {
+                      return Text(
+                        'Bs ${NumberFormat('#,##0.00', 'es_BO').format(value)}',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(ctx).colorScheme.onSurface,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

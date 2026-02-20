@@ -110,7 +110,7 @@ Recomiendo hacer un `flutter clean` y luego `flutter pub get` si migras entre ra
 
 - Se movió la lógica de tickets/sesiones de `lib/services/api_service.dart` a `lib/repositories/ticket_repository.dart`.
 - Implementación de eliminación atómica en DB: función SQL `eliminar_ticket_atomico(p_ticket_id BIGINT)` (borrado de pagos → sesiones → ticket) y `TicketRepository.eliminarTicket(...)` que la invoca vía RPC.
-- `ReportsRepository` y `ReportsProvider` creados para consumir funciones RPC de reportes (`reporte_financiero`, `reporte_clientes`, `reporte_servicios`).
+- `ReportsRepository` y `ReportsProvider` creados para consumir funciones RPC de reportes (`reporte_financiero`, `reporte_clientes`).
 - Pantallas de reportes actualizadas (`lib/screens/admin/reports/*`) para recibir los JSON devueltos por las RPC y mostrarlos con `fl_chart`.
 - Se añadió la pantalla `lib/screens/about_screen.dart` con botones para abrir el sitio web y WhatsApp; se implementaron múltiples fallbacks para Android y un diálogo para copiar el enlace si no se puede lanzar.
 - Se corrigieron varios problemas UI (Drawer, selección automática de sucursal, selección de cliente al crear ticket en UI, filtros en `treatments_screen`).
