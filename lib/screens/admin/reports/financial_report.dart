@@ -88,102 +88,146 @@ class FinancialReport extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 const SizedBox(height: 12),
-                // Cards horizontales con Totales por Método
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    SizedBox(
-                      width: 220,
-                      child: _PaymentMethodCard(
-                        context,
-                        label: 'Total QR',
-                        amount: totalQr,
-                        icon: Icons.qr_code,
-                        color: cs.primary,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 220,
-                      child: _PaymentMethodCard(
-                        context,
-                        label: 'Total Efectivo',
-                        amount: totalEfectivo,
-                        icon: Icons.payments,
-                        color: cs.secondary ?? cs.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                // Layout: mostrar totales por método a la derecha del gráfico en pantallas anchas
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 700;
 
-                Text(
-                  'Tendencia ($chartLabel)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // GRÁFICO
-                SizedBox(
-                  height: 180,
-                  child: chartData.isEmpty
-                      ? const Center(
-                          child: Text(
-                            "Sin movimientos",
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        )
-                      : BarChart(
-                          BarChartData(
-                            barGroups: _buildChartGroups(chartData, cs),
-                            gridData: const FlGridData(show: false),
-                            titlesData: FlTitlesData(
-                              leftTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
+                    Widget chartWidget = SizedBox(
+                      height: 180,
+                      child: chartData.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "Sin movimientos",
+                                style: TextStyle(color: Colors.grey),
                               ),
-                              topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              rightTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget: (val, meta) {
-                                    final idx = val.toInt();
-                                    if (idx >= 0 && idx < chartData.length) {
-                                      // Mostrar solo algunas etiquetas para que no se amontonen
-                                      if (chartData.length > 7 && idx % 2 != 0)
+                            )
+                          : BarChart(
+                              BarChartData(
+                                barGroups: _buildChartGroups(chartData, cs),
+                                gridData: const FlGridData(show: false),
+                                titlesData: FlTitlesData(
+                                  leftTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  topTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  rightTitles: const AxisTitles(
+                                    sideTitles: SideTitles(showTitles: false),
+                                  ),
+                                  bottomTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      getTitlesWidget: (val, meta) {
+                                        final idx = val.toInt();
+                                        if (idx >= 0 &&
+                                            idx < chartData.length) {
+                                          if (chartData.length > 7 &&
+                                              idx % 2 != 0)
+                                            return const SizedBox.shrink();
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8.0,
+                                            ),
+                                            child: Text(
+                                              chartData[idx]['label']
+                                                  .toString(),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          );
+                                        }
                                         return const SizedBox.shrink();
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: 8.0,
-                                        ),
-                                        child: Text(
-                                          chartData[idx]['label'].toString(),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.onSurfaceVariant,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
-                                  },
+                                      },
+                                    ),
+                                  ),
                                 ),
+                                borderData: FlBorderData(show: false),
                               ),
                             ),
-                            borderData: FlBorderData(show: false),
+                    );
+
+                    final rightColumn = ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 260),
+                      child: Column(
+                        children: [
+                          _PaymentMethodCard(
+                            context,
+                            label: 'Total QR',
+                            amount: totalQr,
+                            icon: Icons.qr_code,
+                            color: cs.primary,
+                          ),
+                          const SizedBox(height: 12),
+                          _PaymentMethodCard(
+                            context,
+                            label: 'Total Efectivo',
+                            amount: totalEfectivo,
+                            icon: Icons.payments,
+                            color: cs.secondary ?? cs.primary,
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (isNarrow) {
+                      // On narrow screens stack: cards then chart full width
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          rightColumn,
+                          const SizedBox(height: 12),
+                          Text(
+                            'Tendencia ($chartLabel)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          chartWidget,
+                        ],
+                      );
+                    }
+
+                    // Wide layout: chart left, cards right
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tendencia ($chartLabel)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              chartWidget,
+                            ],
                           ),
                         ),
+                        const SizedBox(width: 16),
+                        rightColumn,
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
