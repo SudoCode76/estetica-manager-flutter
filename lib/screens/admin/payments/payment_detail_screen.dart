@@ -22,6 +22,9 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
   // Controlador para monto manual
   final TextEditingController _montoController = TextEditingController();
 
+  // Metodo de pago seleccionado por defecto
+  String _metodoPagoSeleccionado = 'efectivo';
+
   double get _totalDeudaGlobal {
     return _ticketsConDeuda.fold(0.0, (sum, t) {
       return sum + ((t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0);
@@ -151,7 +154,11 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
             ? saldoTicket
             : montoRestante;
 
-        await repo.registrarAbono(ticketId: ticketId, montoAbono: aPagar);
+        await repo.registrarAbono(
+          ticketId: ticketId,
+          montoAbono: aPagar,
+          metodoPago: _metodoPagoSeleccionado,
+        );
         montoRestante -= aPagar;
       }
 
@@ -182,6 +189,19 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
     if (id == null) return '-';
     if (id.length > 8) return '#${id.substring(0, 8)}';
     return '#$id';
+  }
+
+  // Label legible para el método de pago
+  String _labelForMetodo(String? metodo) {
+    if (metodo == null) return '-';
+    switch (metodo) {
+      case 'efectivo':
+        return 'Efectivo';
+      case 'qr':
+        return 'QR';
+      default:
+        return metodo;
+    }
   }
 
   @override
@@ -254,312 +274,411 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                     const SizedBox(height: 32),
 
                     // 2. TICKETS CON DEUDA (Sin circulitos, estilo tarjeta seleccionable)
-                    if (_ticketsConDeuda.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                size: 64,
-                                color: Colors.green.withValues(alpha: 0.5),
+                    _ticketsConDeuda.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    size: 64,
+                                    color: Colors.green.withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    "¡Todo al día!",
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 16),
+                            ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: Text(
+                                  'Selecciona tickets a pagar',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _ticketsConDeuda.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final t = _ticketsConDeuda[index];
+                                  final id = t['id'];
+                                  final saldo = (t['saldo_pendiente'] as num)
+                                      .toDouble();
+                                  final isSelected =
+                                      _selectedTickets[id] ?? false;
+
+                                  final sesiones =
+                                      t['sesiones'] as List<dynamic>? ?? [];
+                                  String info = sesiones.isNotEmpty
+                                      ? sesiones
+                                            .map(
+                                              (s) =>
+                                                  s['tratamiento']?['nombretratamiento'] ??
+                                                  '',
+                                            )
+                                            .join(', ')
+                                      : 'Ticket sin detalle';
+
+                                  return GestureDetector(
+                                    onTap: () => _onTicketTap(id, saldo),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? colorScheme.primaryContainer
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? colorScheme.primary
+                                              : Colors.grey.shade300,
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                        boxShadow: isSelected
+                                            ? []
+                                            : [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withOpacity(0.03),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  info,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isSelected
+                                                        ? colorScheme.primary
+                                                        : Colors.black87,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Ticket ${_shortId(id.toString())}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isSelected
+                                                        ? colorScheme.primary
+                                                              .withOpacity(0.7)
+                                                        : Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                'Pendiente',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Bs ${saldo.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 16,
+                                                  color: isSelected
+                                                      ? colorScheme.primary
+                                                      : colorScheme.error,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 32),
+
+                              // 3. INPUT Y BOTÓN
                               Text(
-                                "¡Todo al día!",
+                                'Registrar Pago',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          'Selecciona tickets a pagar',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _ticketsConDeuda.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final t = _ticketsConDeuda[index];
-                          final id = t['id'];
-                          final saldo = (t['saldo_pendiente'] as num)
-                              .toDouble();
-                          final isSelected = _selectedTickets[id] ?? false;
-
-                          final sesiones =
-                              t['sesiones'] as List<dynamic>? ?? [];
-                          String info = sesiones.isNotEmpty
-                              ? sesiones
-                                    .map(
-                                      (s) =>
-                                          s['tratamiento']?['nombretratamiento'] ??
-                                          '',
-                                    )
-                                    .join(', ')
-                              : 'Ticket sin detalle';
-
-                          return GestureDetector(
-                            onTap: () => _onTicketTap(id, saldo),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? colorScheme.primaryContainer
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : Colors.grey.shade300,
-                                  width: isSelected ? 2 : 1,
-                                ),
-                                boxShadow: isSelected
-                                    ? []
-                                    : [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              const SizedBox(height: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          info,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected
-                                                ? colorScheme.primary
-                                                : Colors.black87,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Ticket ${_shortId(id.toString())}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isSelected
-                                                ? colorScheme.primary
-                                                      .withOpacity(0.7)
-                                                : Colors.grey,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                  Text(
+                                    'Método de pago',
+                                    style: theme.textTheme.titleSmall,
                                   ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                  const SizedBox(height: 8),
+                                  Row(
                                     children: [
-                                      Text(
-                                        'Pendiente',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey.shade600,
+                                      Expanded(
+                                        child: RadioListTile<String>(
+                                          title: const Text('Efectivo'),
+                                          value: 'efectivo',
+                                          groupValue: _metodoPagoSeleccionado,
+                                          onChanged: (v) => setState(() {
+                                            _metodoPagoSeleccionado =
+                                                v ?? 'efectivo';
+                                          }),
                                         ),
                                       ),
-                                      Text(
-                                        'Bs ${saldo.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 16,
-                                          color: isSelected
-                                              ? colorScheme.primary
-                                              : colorScheme.error,
+                                      Expanded(
+                                        child: RadioListTile<String>(
+                                          title: const Text('QR'),
+                                          value: 'qr',
+                                          groupValue: _metodoPagoSeleccionado,
+                                          onChanged: (v) => setState(() {
+                                            _metodoPagoSeleccionado =
+                                                v ?? 'efectivo';
+                                          }),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 4,
+                                        child: TextField(
+                                          controller: _montoController,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                decimal: true,
+                                              ),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                          ),
+                                          decoration: InputDecoration(
+                                            labelText: 'Monto (Bs)',
+                                            prefixIcon: const Icon(
+                                              Icons.attach_money,
+                                            ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 16,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        flex: 5,
+                                        child: SizedBox(
+                                          height: 56,
+                                          child: FilledButton(
+                                            onPressed: _registrarPago,
+                                            style: FilledButton.styleFrom(
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                              backgroundColor:
+                                                  colorScheme.primary,
+                                              foregroundColor:
+                                                  colorScheme.onPrimary,
+                                              elevation: 2,
+                                            ),
+                                            child: const Text(
+                                              'CONFIRMAR',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
 
-                      const SizedBox(height: 32),
+                              const SizedBox(height: 40),
 
-                      // 3. INPUT Y BOTÓN
-                      Text(
-                        'Registrar Pago',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 4,
-                            child: TextField(
-                              controller: _montoController,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: 'Monto (Bs)',
-                                prefixIcon: const Icon(Icons.attach_money),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
+                              _historialPagos.isNotEmpty
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          'Historial reciente',
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        ListView.separated(
+                                          shrinkWrap: true,
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          itemCount: _historialPagos.length,
+                                          separatorBuilder: (_, __) => Divider(
+                                            height: 1,
+                                            color: Colors.grey.shade200,
+                                          ),
+                                          itemBuilder: (context, index) {
+                                            final p = _historialPagos[index];
+                                            final monto =
+                                                (p['monto'] as num?)
+                                                    ?.toDouble() ??
+                                                0.0;
+
+                                            String fechaStr = '-';
+                                            try {
+                                              final rawDate = p['fecha_pago'];
+                                              final date = rawDate is DateTime
+                                                  ? rawDate
+                                                  : DateTime.tryParse(
+                                                      rawDate.toString(),
+                                                    );
+                                              if (date != null) {
+                                                fechaStr = DateFormat(
+                                                  'dd MMM, HH:mm',
+                                                  'es',
+                                                ).format(date);
+                                              }
+                                            } catch (_) {}
+
+                                            final fullId =
+                                                p['ticket_id']?.toString() ??
+                                                (p['ticket']?['id']
+                                                    ?.toString());
+                                            final shortTicketId = _shortId(
+                                              fullId,
+                                            );
+
+                                            return ListTile(
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 0,
+                                                  ),
+                                              leading: CircleAvatar(
+                                                radius: 18,
+                                                backgroundColor:
+                                                    Colors.grey.shade100,
+                                                child: const Icon(
+                                                  Icons.receipt,
+                                                  color: Colors.grey,
+                                                  size: 18,
+                                                ),
+                                              ),
+                                              title: Text(
+                                                'Pago de Bs ${monto.toStringAsFixed(2)}',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                ),
+                                              ),
+                                              subtitle: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    fechaStr,
+                                                    style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    _labelForMetodo(
+                                                      p['metodo_pago']
+                                                          ?.toString(),
+                                                    ),
+                                                    style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade700,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              trailing: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade50,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: Colors.grey.shade200,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  shortTicketId,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade700,
+                                                    fontFamily: 'Monospace',
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
+
+                              const SizedBox(height: 40),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 5,
-                            child: SizedBox(
-                              height: 56,
-                              child: FilledButton(
-                                onPressed: _registrarPago,
-                                style: FilledButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  backgroundColor: colorScheme.primary,
-                                  foregroundColor: colorScheme.onPrimary,
-                                  elevation: 2,
-                                ),
-                                child: const Text(
-                                  'CONFIRMAR',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-
-                    const SizedBox(height: 40),
-
-                    // 5. HISTORIAL DE PAGOS (ARREGLADO)
-                    if (_historialPagos.isNotEmpty) ...[
-                      Text(
-                        'Historial reciente',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _historialPagos.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(height: 1, color: Colors.grey.shade200),
-                        itemBuilder: (context, index) {
-                          final p = _historialPagos[index];
-                          final monto = (p['monto'] as num?)?.toDouble() ?? 0.0;
-
-                          String fechaStr = '-';
-                          try {
-                            final rawDate = p['fecha_pago'];
-                            final date = rawDate is DateTime
-                                ? rawDate
-                                : DateTime.tryParse(rawDate.toString());
-                            if (date != null) {
-                              fechaStr = DateFormat(
-                                'dd MMM, HH:mm',
-                                'es',
-                              ).format(date);
-                            }
-                          } catch (_) {}
-
-                          // Obtenemos ID y lo cortamos
-                          final fullId =
-                              p['ticket_id']?.toString() ??
-                              (p['ticket']?['id']?.toString());
-                          final shortTicketId = _shortId(fullId);
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 0,
-                            ),
-                            leading: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: Colors.grey.shade100,
-                              child: const Icon(
-                                Icons.receipt,
-                                color: Colors.grey,
-                                size: 18,
-                              ),
-                            ),
-                            title: Text(
-                              'Pago de Bs ${monto.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            subtitle: Text(
-                              fechaStr,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            // Usamos trailing para el ID del ticket, bien alineado a la derecha
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.grey.shade200),
-                              ),
-                              child: Text(
-                                shortTicketId,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade700,
-                                  fontFamily: 'Monospace',
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-
-                    const SizedBox(height: 40),
                   ],
                 ),
               ),

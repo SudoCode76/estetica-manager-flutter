@@ -40,6 +40,8 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
   String? clienteNombre;
   int? usuarioId;
   String? usuarioNombre;
+  // Metodo de pago seleccionado por defecto
+  String _metodoPagoSeleccionado = 'efectivo';
   double? cuota;
   double? pago;
   double saldoPendiente = 0;
@@ -767,6 +769,7 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
         totalVenta: totalVenta,
         pagoInicial: pago ?? 0.0,
         itemsCarrito: itemsCarrito,
+        metodoPago: _metodoPagoSeleccionado,
       );
 
       // 6. Éxito!
@@ -1357,6 +1360,38 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                     ],
                                   ),
                                 const SizedBox(height: 18),
+                                // Selector de método de pago
+                                Text(
+                                  'Método de pago',
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: RadioListTile<String>(
+                                        title: const Text('Efectivo'),
+                                        value: 'efectivo',
+                                        groupValue: _metodoPagoSeleccionado,
+                                        onChanged: (v) => setState(() {
+                                          _metodoPagoSeleccionado =
+                                              v ?? 'efectivo';
+                                        }),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: RadioListTile<String>(
+                                        title: const Text('QR'),
+                                        value: 'qr',
+                                        groupValue: _metodoPagoSeleccionado,
+                                        onChanged: (v) => setState(() {
+                                          _metodoPagoSeleccionado =
+                                              v ?? 'efectivo';
+                                        }),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 Text(
                                   'Cliente',
                                   style: Theme.of(context).textTheme.labelLarge,

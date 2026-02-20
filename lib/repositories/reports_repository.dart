@@ -84,11 +84,21 @@ class ReportsRepository {
           };
         }).toList();
 
+        // También parsear totales por método si vienen desde la función SQL
+        final totalQr = (m['total_qr'] is num)
+            ? (m['total_qr'] as num).toDouble()
+            : 0.0;
+        final totalEfectivo = (m['total_efectivo'] is num)
+            ? (m['total_efectivo'] as num).toDouble()
+            : 0.0;
+
         return {
           'ingresos': ingresos,
           'chart_data': chartData,
           'top_tratamientos': topTratamientos,
           'pendientes_cobro': pendientes,
+          'total_qr': totalQr,
+          'total_efectivo': totalEfectivo,
         };
       }
 

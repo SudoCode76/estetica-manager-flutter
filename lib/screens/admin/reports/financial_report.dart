@@ -13,6 +13,8 @@ class FinancialReport extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final ingresos = (data['ingresos'] as num?)?.toDouble() ?? 0.0;
+    final totalQr = (data['total_qr'] as num?)?.toDouble() ?? 0.0;
+    final totalEfectivo = (data['total_efectivo'] as num?)?.toDouble() ?? 0.0;
     final rawChart = (data['chart_data'] as List?) ?? [];
     final List<Map<String, dynamic>> chartData = rawChart
         .map<Map<String, dynamic>>((e) {
@@ -184,6 +186,22 @@ class FinancialReport extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Total QR: Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalQr)}',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Total Efectivo: Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalEfectivo)}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
 
                 if (topTratamientos.isEmpty)
                   const Padding(

@@ -504,6 +504,7 @@ class TicketRepository {
     required double pagoInicial,
     required List<Map<String, dynamic>> itemsCarrito,
     required int? sucursalId,
+    String metodoPago = 'efectivo',
   }) async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -555,6 +556,7 @@ class TicketRepository {
           'p_monto_pagado_inicial': pagoInicial,
           'p_sesiones': sesionesParaEnviar,
           'p_fecha_creacion': fechaLocal,
+          'p_metodo_pago_text': metodoPago,
         },
       );
 

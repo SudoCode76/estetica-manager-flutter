@@ -101,6 +101,19 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
+  // Label legible para el método de pago
+  String _labelForMetodo(String? metodo) {
+    if (metodo == null) return '-';
+    switch (metodo) {
+      case 'efectivo':
+        return 'Efectivo';
+      case 'qr':
+        return 'QR';
+      default:
+        return metodo;
+    }
+  }
+
   Future<void> _eliminarTicket() async {
     // Mostrar diálogo de confirmación
     final confirmacion = await showDialog<bool>(
@@ -426,6 +439,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     // Extraer información del ticket (estructura Supabase)
     final cliente = ticketData['cliente'];
     final sesiones = ticketData['sesiones'] as List<dynamic>? ?? [];
+    final pagos = ticketData['pagos'] as List<dynamic>? ?? [];
 
     // Crear una copia ordenada de las sesiones: de más antiguo a más reciente.
     // Si la sesión no tiene fecha, la colocamos al final.
@@ -748,6 +762,59 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+
+              if (pagos.isNotEmpty)
+                _SectionCard(
+                  title: 'Pagos',
+                  icon: Icons.payments,
+                  children: [
+                    ...pagos.map((p) {
+                      final monto = (p['monto'] as num?)?.toDouble() ?? 0.0;
+                      final metodo = p['metodo_pago']?.toString();
+                      String fechaStr = '-';
+                      try {
+                        final raw = p['fecha_pago'] ?? p['created_at'];
+                        final dt = raw is DateTime
+                            ? raw
+                            : DateTime.tryParse(raw.toString());
+                        if (dt != null)
+                          fechaStr = DateFormat(
+                            'dd MMM, HH:mm',
+                            'es',
+                          ).format(dt);
+                      } catch (_) {}
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Bs ${monto.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$fechaStr • ${_labelForMetodo(metodo)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox.shrink(),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
 
               // Botón de acción - Enviar por WhatsApp (deshabilitado si loading)
               SizedBox(
