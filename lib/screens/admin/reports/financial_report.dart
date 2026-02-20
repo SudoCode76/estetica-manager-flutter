@@ -85,7 +85,62 @@ class FinancialReport extends StatelessWidget {
                     fontSize: 32,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+
+                // Totales por método junto al bloque de ingresos
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total QR',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalQr)}',
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Efectivo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalEfectivo)}',
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
 
                 Text(
                   'Tendencia ($chartLabel)',
@@ -186,23 +241,8 @@ class FinancialReport extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Total QR: Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalQr)}',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Total Efectivo: Bs ${NumberFormat('#,##0.00', 'es_BO').format(totalEfectivo)}',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
 
+                // Totales por método removidos de esta sección
                 if (topTratamientos.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
@@ -234,63 +274,7 @@ class FinancialReport extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          // --- 3. PENDIENTES DE COBRO ---
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: surface,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color.fromRGBO(0, 0, 0, 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Pendientes de Cobro',
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {}, // Navegar a lista completa si deseas
-                      child: Text(
-                        'Ver todos',
-                        style: TextStyle(
-                          color: cs.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                if (pendientes.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      "¡Todo al día! No hay deudas.",
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  )
-                else
-                  ...pendientes.map((p) => _buildDebtRow(context, p)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 30),
+          // Pendientes de cobro removido (se muestra en otra parte si es necesario)
         ],
       ),
     );
