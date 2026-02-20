@@ -356,6 +356,23 @@ class _TicketsScreenState extends State<TicketsScreen> {
     return filtered;
   }
 
+  // Devuelve el método del último pago del ticket ('qr'|'efectivo') o null
+  String? _ultimoMetodoPago(dynamic ticket) {
+    try {
+      final pagos = (ticket['pagos'] as List<dynamic>?) ?? [];
+      if (pagos.isEmpty) return null;
+      pagos.sort((a, b) {
+        final da = DateTime.tryParse((a['fecha_pago'] ?? a['created_at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final db = DateTime.tryParse((b['fecha_pago'] ?? b['created_at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return db.compareTo(da);
+      });
+      final first = pagos.first;
+      return (first is Map && first['metodo_pago'] != null) ? first['metodo_pago'].toString() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _onShowTodayPressed() async {
     setState(() {
       _showHistoryMode = false;
@@ -495,8 +512,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         padding: const EdgeInsets.all(16),
                       ),
                     ),
-                  ],
-                ),
+                                          ],
+                                        ),
 
                 const SizedBox(height: 12),
 
@@ -639,8 +656,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         if (cliente.isEmpty) cliente = '-';
                       }
 
-                      final sesiones = t['sesiones'] as List<dynamic>? ?? [];
-                      final List<String> nombresTratamientos = [];
+                       final sesiones = t['sesiones'] as List<dynamic>? ?? [];
+                       final List<String> nombresTratamientos = [];
 
                       for (var s in sesiones) {
                         if (s['tratamiento'] != null) {
@@ -650,15 +667,17 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         }
                       }
 
-                      final tratamientoTexto = nombresTratamientos.isEmpty
-                          ? 'Sin tratamientos'
-                          : nombresTratamientos.length == 1
-                          ? nombresTratamientos.first
-                          : '${nombresTratamientos.length} tratamientos';
+                       final tratamientoTexto = nombresTratamientos.isEmpty
+                           ? 'Sin tratamientos'
+                           : nombresTratamientos.length == 1
+                           ? nombresTratamientos.first
+                           : '${nombresTratamientos.length} tratamientos';
 
-                      final saldoPendiente =
-                          (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
-                      final tieneSaldo = saldoPendiente > 0;
+                       final saldoPendiente =
+                           (t['saldo_pendiente'] as num?)?.toDouble() ?? 0.0;
+                       final tieneSaldo = saldoPendiente > 0;
+                       // Metodo del ultimo pago (si viene en la carga de tickets)
+                       final ultimoMetodo = _ultimoMetodoPago(t);
                       // final estadoTicket = t['estadoTicket'] == true; // variable no usada, eliminada
 
                       return Dismissible(
@@ -813,7 +832,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                               ),
                                             ),
                                             const SizedBox(width: 16),
-                                            Expanded(
+                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
@@ -840,7 +859,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                           ).colorScheme.primary,
                                                         ),
                                                   ),
-                                                  const SizedBox(height: 8),
+                                                   const SizedBox(height: 8),
                                                   Row(
                                                     children: [
                                                       Icon(
@@ -864,6 +883,32 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                       ),
                                                     ],
                                                   ),
+                                                  const SizedBox(width: 8),
+                                                  // Mostrar pequeño icono del metodo si existe
+                                                  if (ultimoMetodo != null) ...[
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          ultimoMetodo.toLowerCase() == 'qr'
+                                                              ? Icons.qr_code_2
+                                                              : Icons.payments,
+                                                          size: 16,
+                                                          color: Theme.of(context).colorScheme.primary,
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Text(
+                                                          ultimoMetodo.toLowerCase() == 'qr' ? 'QR' : 'Efectivo',
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
                                                   if (tieneSaldo) ...[
                                                     const SizedBox(height: 8),
                                                     Container(

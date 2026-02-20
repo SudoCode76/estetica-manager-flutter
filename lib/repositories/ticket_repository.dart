@@ -172,7 +172,7 @@ class TicketRepository {
       final response = await Supabase.instance.client
           .from('ticket')
           .select('''
-            *, 
+           *, 
             cliente:cliente_id(nombrecliente, apellidocliente, telefono),
             sesiones:sesion(
               id,
@@ -181,6 +181,7 @@ class TicketRepository {
               estado_sesion,
               tratamiento:tratamiento_id(id, nombretratamiento, precio)
             )
+            , pagos:pago(id, monto, metodo_pago, fecha_pago, created_at)
           ''')
           .eq('sucursal_id', sucursalId)
           .gte('created_at', inicioDia)
@@ -196,7 +197,7 @@ class TicketRepository {
 
   Future<List<dynamic>> getAllTickets({required int sucursalId}) async {
     try {
-      final response = await Supabase.instance.client
+    final response = await Supabase.instance.client
           .from('ticket')
           .select('''
             *, 
@@ -208,6 +209,7 @@ class TicketRepository {
               estado_sesion,
               tratamiento:tratamiento_id(id, nombretratamiento, precio)
             )
+            , pagos:pago(id, monto, metodo_pago, fecha_pago, created_at)
           ''')
           .eq('sucursal_id', sucursalId)
           .order('created_at', ascending: false);
@@ -230,18 +232,19 @@ class TicketRepository {
       final startIso = startLocal.toUtc().toIso8601String();
       final endIso = endLocal.toUtc().toIso8601String();
 
-      final response = await Supabase.instance.client
-          .from('ticket')
-          .select('''
-            *, 
-            cliente:cliente_id(nombrecliente, apellidocliente, telefono),
-            sesiones:sesion(
-              id,
-              numero_sesion,
-              fecha_hora_inicio,
-              estado_sesion,
-              tratamiento:tratamiento_id(id, nombretratamiento, precio)
-            )
+       final response = await Supabase.instance.client
+           .from('ticket')
+           .select('''
+             *, 
+             cliente:cliente_id(nombrecliente, apellidocliente, telefono),
+             sesiones:sesion(
+               id,
+               numero_sesion,
+               fecha_hora_inicio,
+               estado_sesion,
+               tratamiento:tratamiento_id(id, nombretratamiento, precio)
+             )
+            , pagos:pago(id, monto, metodo_pago, fecha_pago, created_at)
           ''')
           .eq('sucursal_id', sucursalId)
           .gte('created_at', startIso)
@@ -673,6 +676,7 @@ class TicketRepository {
             *,
             cliente:cliente_id(nombrecliente,apellidocliente,telefono),
             sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))
+            , pagos:pago(id, monto, metodo_pago, fecha_pago, created_at)
           ''')
           .eq('sucursal_id', sucursalId)
           .or(orFilter)
@@ -829,11 +833,12 @@ class TicketRepository {
     bool? estadoTicket,
   }) async {
     try {
-      var qb = Supabase.instance.client.from('ticket').select('''
-            *,
-            cliente:cliente_id(nombrecliente,apellidocliente,telefono),
-            sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))
-          ''');
+       var qb = Supabase.instance.client.from('ticket').select('''
+             *,
+             cliente:cliente_id(nombrecliente,apellidocliente,telefono),
+             sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))
+             , pagos:pago(id, monto, metodo_pago, fecha_pago, created_at)
+           ''');
       if (sucursalId != null) qb = qb.eq('sucursal_id', sucursalId);
       if (estadoTicket != null) qb = qb.eq('estado_ticket', estadoTicket);
       final resp = await qb.order('created_at', ascending: false);
