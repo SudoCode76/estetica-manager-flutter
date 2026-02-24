@@ -10,7 +10,6 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/screens/admin/tickets/new_ticket_screen.dart';
 import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/services/supabase_auth_service.dart';
-import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
@@ -706,73 +705,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Nuevo Ticket'),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                );
-              },
-            )
-          : _selectedIndex ==
-                2 // <-- Cambiado: mostrar el FAB de 'Nuevo Cliente' solo cuando la pestaña seleccionada sea la de Clientes (index 2)
-          ? Builder(
-              builder: (context) {
-                final screenWidth = MediaQuery.of(context).size.width;
-                final isCompact = screenWidth < 360;
-
-                if (isCompact) {
-                  return FloatingActionButton(
-                    onPressed: () async {
-                      if (_sucursalProvider?.selectedSucursalId == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Selecciona una sucursal en el menú lateral antes de continuar',
-                            ),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
-
-                      final result = await CreateClientDialog.show(
-                        context,
-                        _sucursalProvider!.selectedSucursalId!,
-                      );
-
-                      if (result != null) {
-                        // refrescar clientes - rebuild forzado
-                        setState(() {});
-                      }
-                    },
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: const Icon(Icons.person_add),
-                  );
-                }
-
-                return FloatingActionButton.extended(
-                  onPressed: () async {
-                    if (_sucursalProvider?.selectedSucursalId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Selecciona una sucursal en el menú lateral antes de continuar',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      return;
-                    }
-
-                    final result = await CreateClientDialog.show(
-                      context,
-                      _sucursalProvider!.selectedSucursalId!,
-                    );
-
-                    if (result != null) {
-                      // refrescar clientes - rebuild forzado
-                      setState(() {});
-                    }
-                  },
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Nuevo Cliente'),
                   backgroundColor: Theme.of(context).colorScheme.primary,
                 );
               },

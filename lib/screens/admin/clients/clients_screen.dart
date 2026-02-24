@@ -320,12 +320,13 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
   // ── Selector de páginas ───────────────────────────────────────────────────
 
-  /// Construye la barra de paginación con números y flechas.
   Widget _buildPaginator() {
     if (_totalPages <= 1) return const SizedBox.shrink();
 
-    // Ventana deslizante: máximo 5 números visibles
-    const windowSize = 5;
+    // En pantallas pequeñas usamos ventana de 3, en grandes de 5
+    final screenWidth = MediaQuery.of(context).size.width;
+    final windowSize = screenWidth < 400 ? 3 : 5;
+
     int start = (_currentPage - (windowSize ~/ 2)).clamp(1, _totalPages);
     int end = (start + windowSize - 1).clamp(1, _totalPages);
     if (end - start < windowSize - 1) {
@@ -333,27 +334,35 @@ class _ClientsScreenState extends State<ClientsScreen> {
     }
 
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    // Botones más pequeños en pantallas angostas
+    final btnSize = screenWidth < 400 ? 32.0 : 36.0;
+    final btnPad = screenWidth < 400 ? 1.0 : 2.0;
 
-    final bottomPad = MediaQuery.of(context).padding.bottom + 80;
-    return Padding(
+    return Container(
       padding: EdgeInsets.only(
-        top: Responsive.spacing(context, 8),
-        bottom: bottomPad, // espacio para el FAB flotante + safe area
+        top: 4,
+        bottom: 8,
         left: Responsive.horizontalPadding(context),
         right: Responsive.horizontalPadding(context),
       ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: cs.outlineVariant.withValues(alpha: 0.4),
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.max,
         children: [
-          // Info total
           Text(
             '$_totalCount clientes',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           const Spacer(),
-          // Flecha anterior
           IconButton(
             onPressed: _currentPage > 1
                 ? () {
@@ -363,20 +372,24 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 : null,
             icon: const Icon(Icons.chevron_left_rounded),
             visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
           ),
-          // Números de página
           for (int p = start; p <= end; p++)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: EdgeInsets.symmetric(horizontal: btnPad),
               child: _currentPage == p
                   ? FilledButton(
                       onPressed: null,
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size(36, 36),
+                        minimumSize: Size(btnSize, btnSize),
+                        maximumSize: Size(btnSize, btnSize),
                         padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
+                        textStyle: tt.labelSmall,
                       ),
                       child: Text('$p'),
                     )
@@ -386,16 +399,18 @@ class _ClientsScreenState extends State<ClientsScreen> {
                         fetchClients();
                       },
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(36, 36),
+                        minimumSize: Size(btnSize, btnSize),
+                        maximumSize: Size(btnSize, btnSize),
                         padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
+                        textStyle: tt.labelSmall,
                       ),
                       child: Text('$p'),
                     ),
             ),
-          // Flecha siguiente
           IconButton(
             onPressed: _currentPage < _totalPages
                 ? () {
@@ -405,9 +420,163 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 : null,
             icon: const Icon(Icons.chevron_right_rounded),
             visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: BoxConstraints(minWidth: btnSize, minHeight: btnSize),
           ),
         ],
       ),
+    );
+  }
+
+  // ── Lista de clientes ─────────────────────────────────────────────────────
+
+  Widget _buildClientList(
+    BuildContext context,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+    bool isSmallScreen,
+  ) {
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(
+        horizontal: Responsive.horizontalPadding(context),
+        vertical: Responsive.verticalPadding(context),
+      ),
+      itemCount: filteredClients.length,
+      itemBuilder: (context, i) {
+        final c = filteredClients[i];
+        final nombre =
+            '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'.trim();
+        final telefono = c['telefono']?.toString() ?? 'Sin teléfono';
+        final avatarSize = isSmallScreen ? 48.0 : 56.0;
+        final fontSize = isSmallScreen ? 18.0 : 20.0;
+
+        return Card(
+          margin: EdgeInsets.only(bottom: Responsive.spacing(context, 12)),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+          ),
+          child: ListTile(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 12 : 16,
+              vertical: isSmallScreen ? 8 : 12,
+            ),
+            leading: Container(
+              width: avatarSize,
+              height: avatarSize,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colorScheme.primaryContainer,
+                    colorScheme.secondaryContainer,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+              ),
+              child: Center(
+                child: Text(
+                  nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            title: Text(
+              nombre,
+              style: (isSmallScreen ? textTheme.titleSmall : textTheme.titleMedium)
+                  ?.copyWith(fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Row(
+              children: [
+                Icon(
+                  Icons.phone,
+                  size: isSmallScreen ? 12 : 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                SizedBox(width: Responsive.spacing(context, 4)),
+                Flexible(
+                  child: Text(
+                    telefono,
+                    style: (isSmallScreen
+                            ? textTheme.bodySmall
+                            : textTheme.bodyMedium)
+                        ?.copyWith(color: colorScheme.onSurfaceVariant),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            trailing: _isEmployee
+                ? null
+                : PopupMenuButton(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: colorScheme.onSurfaceVariant,
+                      size: isSmallScreen ? 20 : 24,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        onTap: () {
+                          Future.delayed(
+                            Duration.zero,
+                            () => _showEditClientDialog(c),
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit,
+                              size: isSmallScreen ? 18 : 20,
+                              color: colorScheme.primary,
+                            ),
+                            SizedBox(width: Responsive.spacing(context, 12)),
+                            Text(
+                              'Editar',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 13 : 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        onTap: () {
+                          Future.delayed(
+                            Duration.zero,
+                            () => _deleteClient(c),
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete,
+                              size: isSmallScreen ? 18 : 20,
+                              color: colorScheme.error,
+                            ),
+                            SizedBox(width: Responsive.spacing(context, 12)),
+                            Text(
+                              'Eliminar',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 13 : 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 
@@ -421,7 +590,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
     return SafeArea(
       child: Column(
         children: [
-          // Barra de búsqueda y acciones
+          // ── Barra de búsqueda y acciones ──────────────────────────────────
           Padding(
             padding: EdgeInsets.symmetric(
               horizontal: Responsive.horizontalPadding(context),
@@ -439,10 +608,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                     trailing: [
                       if (_searchController.text.isNotEmpty)
                         IconButton(
-                          icon: Icon(
-                            Icons.clear,
-                            size: isSmallScreen ? 20 : 24,
-                          ),
+                          icon: Icon(Icons.clear, size: isSmallScreen ? 20 : 24),
                           onPressed: () {
                             _searchController.clear();
                             search = '';
@@ -477,9 +643,8 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: _isEmployee
-                              ? null
-                              : _showCreateClientDialog,
+                          onPressed:
+                              _isEmployee ? null : _showCreateClientDialog,
                           icon: const Icon(Icons.person_add, size: 18),
                           label: const Text(
                             'Nuevo',
@@ -556,20 +721,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
             ),
           ),
 
-          // Lista de clientes
+          // ── Contenido principal (lista o estados) ─────────────────────────
           Expanded(
             child: isLoading
                 ? Center(
-                    child: CircularProgressIndicator(
-                      color: colorScheme.primary,
-                    ),
+                    child: CircularProgressIndicator(color: colorScheme.primary),
                   )
                 : errorMsg != null
                 ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(
-                        Responsive.horizontalPadding(context),
-                      ),
+                      padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -594,9 +755,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 : filteredClients.isEmpty
                 ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(
-                        Responsive.horizontalPadding(context),
-                      ),
+                      padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -613,9 +772,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             style: (isSmallScreen
                                     ? textTheme.bodyMedium
                                     : textTheme.bodyLarge)
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: Responsive.spacing(context, 8)),
@@ -626,197 +783,18 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             style: (isSmallScreen
                                     ? textTheme.bodySmall
                                     : textTheme.bodyMedium)
-                                ?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
                   )
-                : Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: Responsive.horizontalPadding(context),
-                            vertical: Responsive.verticalPadding(context),
-                          ),
-                          itemCount: filteredClients.length,
-                          itemBuilder: (context, i) {
-                            final c = filteredClients[i];
-                            final nombre =
-                                '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'
-                                    .trim();
-                            final telefono =
-                                c['telefono']?.toString() ?? 'Sin teléfono';
-                            final avatarSize = isSmallScreen ? 48.0 : 56.0;
-                            final fontSize = isSmallScreen ? 18.0 : 20.0;
-
-                            return Card(
-                              margin: EdgeInsets.only(
-                                bottom: Responsive.spacing(context, 12),
-                              ),
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  isSmallScreen ? 12 : 16,
-                                ),
-                              ),
-                              child: ListTile(
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: isSmallScreen ? 12 : 16,
-                                  vertical: isSmallScreen ? 8 : 12,
-                                ),
-                                leading: Container(
-                                  width: avatarSize,
-                                  height: avatarSize,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        colorScheme.primaryContainer,
-                                        colorScheme.secondaryContainer,
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(
-                                      isSmallScreen ? 10 : 12,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      nombre.isNotEmpty
-                                          ? nombre[0].toUpperCase()
-                                          : '?',
-                                      style: TextStyle(
-                                        fontSize: fontSize,
-                                        color: colorScheme.onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                title: Text(
-                                  nombre,
-                                  style: (isSmallScreen
-                                          ? textTheme.titleSmall
-                                          : textTheme.titleMedium)
-                                      ?.copyWith(fontWeight: FontWeight.w600),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.phone,
-                                      size: isSmallScreen ? 12 : 14,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    SizedBox(
-                                      width: Responsive.spacing(context, 4),
-                                    ),
-                                    Flexible(
-                                      child: Text(
-                                        telefono,
-                                        style: (isSmallScreen
-                                                ? textTheme.bodySmall
-                                                : textTheme.bodyMedium)
-                                            ?.copyWith(
-                                              color:
-                                                  colorScheme.onSurfaceVariant,
-                                            ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                trailing: _isEmployee
-                                    ? null
-                                    : PopupMenuButton(
-                                        icon: Icon(
-                                          Icons.more_vert,
-                                          color: colorScheme.onSurfaceVariant,
-                                          size: isSmallScreen ? 20 : 24,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        itemBuilder: (context) => [
-                                          PopupMenuItem(
-                                            onTap: () {
-                                              Future.delayed(
-                                                Duration.zero,
-                                                () =>
-                                                    _showEditClientDialog(c),
-                                              );
-                                            },
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.edit,
-                                                  size: isSmallScreen ? 18 : 20,
-                                                  color: colorScheme.primary,
-                                                ),
-                                                SizedBox(
-                                                  width: Responsive.spacing(
-                                                    context,
-                                                    12,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'Editar',
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        isSmallScreen ? 13 : 14,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                            onTap: () {
-                                              Future.delayed(
-                                                Duration.zero,
-                                                () => _deleteClient(c),
-                                              );
-                                            },
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.delete,
-                                                  size: isSmallScreen ? 18 : 20,
-                                                  color: colorScheme.error,
-                                                ),
-                                                SizedBox(
-                                                  width: Responsive.spacing(
-                                                    context,
-                                                    12,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'Eliminar',
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        isSmallScreen ? 13 : 14,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      // Selector de páginas
-                      _buildPaginator(),
-                    ],
-                  ),
+                : _buildClientList(context, colorScheme, textTheme, isSmallScreen),
           ),
+
+          // ── Paginador — siempre al fondo, FUERA del Expanded ─────────────
+          _buildPaginator(),
         ],
       ),
     );
