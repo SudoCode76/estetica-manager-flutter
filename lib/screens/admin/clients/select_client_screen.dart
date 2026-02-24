@@ -21,15 +21,14 @@ class _SelectClientScreenState extends State<SelectClientScreen>
 
   List<dynamic> clients = [];
   bool isLoading = false;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
   int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalCount = 0;
   String? loadError;
   String query = '';
 
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
 
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -46,58 +45,43 @@ class _SelectClientScreenState extends State<SelectClientScreen>
       curve: Curves.easeInOut,
     );
     _animationController.forward();
-
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 200 &&
-          _hasMore &&
-          !_isLoadingMore &&
-          !isLoading) {
-        _loadMore();
-      }
-    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
-    _scrollController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadClients([String? q, bool append = false]) async {
-    if (!append) {
-      setState(() {
-        isLoading = true;
-        loadError = null;
-        clients = [];
-        _currentPage = 1;
-        _hasMore = true;
-      });
-    } else {
-      setState(() => _isLoadingMore = true);
-    }
+  Future<void> _loadClients([String? q]) async {
+    setState(() {
+      isLoading = true;
+      loadError = null;
+    });
 
     try {
       final repo = Provider.of<ClienteRepository>(context, listen: false);
-      final data = await repo.searchClientes(
-        sucursalId: widget.sucursalId,
-        query: q,
-        page: _currentPage,
-        pageSize: _pageSize,
-      );
+      final results = await Future.wait([
+        repo.searchClientes(
+          sucursalId: widget.sucursalId,
+          query: q,
+          page: _currentPage,
+          pageSize: _pageSize,
+        ),
+        repo.countClientes(sucursalId: widget.sucursalId, query: q),
+      ]);
+
       if (!mounted) return;
+      final data = results[0] as List<dynamic>;
+      final total = results[1] as int;
+
       setState(() {
-        if (append) {
-          clients.addAll(data);
-        } else {
-          clients = data;
-        }
-        _hasMore = data.length == _pageSize;
+        clients = data;
+        _totalCount = total;
+        _totalPages = (total / _pageSize).ceil().clamp(1, 999999);
         isLoading = false;
-        _isLoadingMore = false;
       });
     } catch (e) {
       final msg = e.toString();
@@ -105,9 +89,10 @@ class _SelectClientScreenState extends State<SelectClientScreen>
       if (!mounted) return;
       setState(() {
         loadError = msg;
-        if (!append) clients = [];
+        clients = [];
+        _totalCount = 0;
+        _totalPages = 1;
         isLoading = false;
-        _isLoadingMore = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -116,12 +101,6 @@ class _SelectClientScreenState extends State<SelectClientScreen>
         ),
       );
     }
-  }
-
-  void _loadMore() {
-    _currentPage++;
-    final q = query.trim();
-    _loadClients(q.isEmpty ? null : q, true);
   }
 
   Future<void> _openCreateClient() async {
@@ -142,18 +121,96 @@ class _SelectClientScreenState extends State<SelectClientScreen>
     _debounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
       final trimmed = v.trim();
-      setState(() => query = trimmed);
+      setState(() {
+        query = trimmed;
+        _currentPage = 1;
+      });
       if (trimmed.isEmpty) {
-        // limpiar resultados sin disparar query
         setState(() {
           clients = [];
-          _hasMore = false;
+          _totalCount = 0;
+          _totalPages = 1;
           loadError = null;
         });
       } else if (trimmed.length >= 3) {
         _loadClients(trimmed);
       }
     });
+  }
+
+  void _goToPage(int page) {
+    setState(() => _currentPage = page);
+    final q = query.trim();
+    _loadClients(q.isEmpty ? null : q);
+  }
+
+  Widget _buildPaginator(ColorScheme cs) {
+    if (_totalPages <= 1) return const SizedBox.shrink();
+
+    const windowSize = 5;
+    int start = (_currentPage - (windowSize ~/ 2)).clamp(1, _totalPages);
+    int end = (start + windowSize - 1).clamp(1, _totalPages);
+    if (end - start < windowSize - 1) {
+      start = (end - windowSize + 1).clamp(1, _totalPages);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '$_totalCount clientes',
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: _currentPage > 1
+                ? () => _goToPage(_currentPage - 1)
+                : null,
+            icon: const Icon(Icons.chevron_left_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+          for (int p = start; p <= end; p++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: _currentPage == p
+                  ? FilledButton(
+                      onPressed: null,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text('$p'),
+                    )
+                  : OutlinedButton(
+                      onPressed: () => _goToPage(p),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text('$p'),
+                    ),
+            ),
+          IconButton(
+            onPressed: _currentPage < _totalPages
+                ? () => _goToPage(_currentPage + 1)
+                : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -182,7 +239,7 @@ class _SelectClientScreenState extends State<SelectClientScreen>
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
@@ -217,6 +274,7 @@ class _SelectClientScreenState extends State<SelectClientScreen>
               child: _buildBody(cs, tt),
             ),
           ),
+          _buildPaginator(cs),
         ],
       ),
     );
@@ -245,7 +303,7 @@ class _SelectClientScreenState extends State<SelectClientScreen>
       );
     }
 
-    // Query muy corto (1-2 chars): indicar que se necesitan más
+    // Query muy corto (1-2 chars)
     if (!isLoading &&
         clients.isEmpty &&
         query.isNotEmpty &&
@@ -334,21 +392,11 @@ class _SelectClientScreenState extends State<SelectClientScreen>
       );
     }
 
-    final itemCount = clients.length + (_isLoadingMore ? 1 : 0);
-
     return ListView.separated(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      itemCount: itemCount,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      itemCount: clients.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, idx) {
-        if (idx == clients.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
         final c = clients[idx] as Map<String, dynamic>;
         final nombre =
             ('${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}')

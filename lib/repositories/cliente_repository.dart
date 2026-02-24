@@ -25,7 +25,10 @@ class ClienteRepository {
 
       final from = (page - 1) * pageSize;
       final to = from + pageSize - 1;
-      final data = await qb.range(from, to).order('nombrecliente');
+      final data = await qb
+          .range(from, to)
+          .order('nombrecliente', ascending: true)
+          .order('apellidocliente', ascending: true);
       return (data as List<dynamic>).map((e) {
         if (e is Map<String, dynamic>) {
           return {

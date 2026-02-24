@@ -334,10 +334,13 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
     final cs = Theme.of(context).colorScheme;
 
+    final bottomPad = MediaQuery.of(context).padding.bottom + 80;
     return Padding(
-      padding: EdgeInsets.symmetric(
-        vertical: Responsive.spacing(context, 12),
-        horizontal: Responsive.horizontalPadding(context),
+      padding: EdgeInsets.only(
+        top: Responsive.spacing(context, 8),
+        bottom: bottomPad, // espacio para el FAB flotante + safe area
+        left: Responsive.horizontalPadding(context),
+        right: Responsive.horizontalPadding(context),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
