@@ -55,7 +55,7 @@ class ReportsProvider extends ChangeNotifier {
   ReportDateMode get dateMode => _dateMode;
 
   /// Período clásico activo (null cuando se usa DateNavBar).
-  ReportPeriod? _activePeriod = ReportPeriod.month;
+  ReportPeriod? _activePeriod = ReportPeriod.today;
   ReportPeriod? get activePeriod => _activePeriod;
 
   /// Fecha seleccionada en modo singleDay.

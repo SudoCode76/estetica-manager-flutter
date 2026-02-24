@@ -19,7 +19,7 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
   /// Período clásico seleccionado. `null` cuando se usa DateNavBar.
-  ReportPeriod? _period = ReportPeriod.month;
+  ReportPeriod? _period = ReportPeriod.today;
 
   late TabController _tabController;
   int _currentTab = 0;
