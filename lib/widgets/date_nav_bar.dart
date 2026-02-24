@@ -236,20 +236,41 @@ class DateNavBar extends StatelessWidget {
 
   Future<void> _pickYear(BuildContext context) async {
     final now = DateTime.now();
-    final initial = provider.selectedYear != null
-        ? DateTime(provider.selectedYear!, 1, 1)
-        : DateTime(now.year, 1, 1);
+    final initialYear = provider.selectedYear ?? now.year;
 
-    final picked = await showDatePicker(
+    final picked = await showDialog<int>(
       context: context,
-      initialDate: initial,
-      firstDate: DateTime(2020),
-      lastDate: now,
-      initialDatePickerMode: DatePickerMode.year,
-      locale: const Locale('es'),
+      builder: (ctx) {
+        DateTime selectedDt = DateTime(initialYear);
+        return AlertDialog(
+          title: const Text('Seleccionar año'),
+          contentPadding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
+          content: SizedBox(
+            width: 280,
+            height: 220,
+            child: StatefulBuilder(
+              builder: (ctx, setState) => YearPicker(
+                firstDate: DateTime(2020),
+                lastDate: now,
+                selectedDate: selectedDt,
+                onChanged: (dt) {
+                  Navigator.of(ctx).pop(dt.year);
+                },
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
     );
+
     if (picked != null) {
-      onYearChanged(picked.year);
+      onYearChanged(picked);
     }
   }
 }
