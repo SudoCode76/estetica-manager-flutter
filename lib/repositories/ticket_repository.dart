@@ -197,7 +197,7 @@ class TicketRepository {
 
   Future<List<dynamic>> getAllTickets({required int sucursalId}) async {
     try {
-    final response = await Supabase.instance.client
+      final response = await Supabase.instance.client
           .from('ticket')
           .select('''
             *, 
@@ -232,9 +232,9 @@ class TicketRepository {
       final startIso = startLocal.toUtc().toIso8601String();
       final endIso = endLocal.toUtc().toIso8601String();
 
-       final response = await Supabase.instance.client
-           .from('ticket')
-           .select('''
+      final response = await Supabase.instance.client
+          .from('ticket')
+          .select('''
              *, 
              cliente:cliente_id(nombrecliente, apellidocliente, telefono),
              sesiones:sesion(
@@ -833,7 +833,7 @@ class TicketRepository {
     bool? estadoTicket,
   }) async {
     try {
-       var qb = Supabase.instance.client.from('ticket').select('''
+      var qb = Supabase.instance.client.from('ticket').select('''
              *,
              cliente:cliente_id(nombrecliente,apellidocliente,telefono),
              sesiones:sesion(id,numero_sesion,fecha_hora_inicio,estado_sesion,tratamiento:tratamiento_id(id,nombretratamiento,precio))

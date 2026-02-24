@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'package:app_estetica/config/responsive.dart';
+import 'package:app_estetica/widgets/payment_method_selector.dart';
 
 class NewTicketScreen extends StatefulWidget {
   final String? currentUserId;
@@ -1366,31 +1367,28 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                   style: Theme.of(context).textTheme.labelLarge,
                                 ),
                                 const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: RadioListTile<String>(
-                                        title: const Text('Efectivo'),
-                                        value: 'efectivo',
-                                        groupValue: _metodoPagoSeleccionado,
-                                        onChanged: (v) => setState(() {
-                                          _metodoPagoSeleccionado =
-                                              v ?? 'efectivo';
-                                        }),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: RadioListTile<String>(
-                                        title: const Text('QR'),
-                                        value: 'qr',
-                                        groupValue: _metodoPagoSeleccionado,
-                                        onChanged: (v) => setState(() {
-                                          _metodoPagoSeleccionado =
-                                              v ?? 'efectivo';
-                                        }),
-                                      ),
-                                    ),
-                                  ],
+                                // Selector de método de pago responsive
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Builder(
+                                    builder: (context) {
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          // Use widget from shared components
+                                          // ignore: prefer_const_constructors
+                                          SizedBox(height: 0),
+                                          PaymentMethodSelector(
+                                            value: _metodoPagoSeleccionado,
+                                            onChanged: (m) => setState(() {
+                                              _metodoPagoSeleccionado = m;
+                                            }),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
                                 ),
                                 Text(
                                   'Cliente',
