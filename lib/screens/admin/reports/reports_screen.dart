@@ -95,30 +95,63 @@ class _ReportsScreenState extends State<ReportsScreen>
     ).fetchReportForRange(sucursalId, range);
   }
 
+  /// Llamado por DateNavBar cuando el usuario elige un mes.
+  void _onMonthChanged(int year, int month) {
+    setState(() => _period = null);
+    final sucursalId = _loadedSucursalId;
+    if (sucursalId == null) return;
+    Provider.of<ReportsProvider>(
+      context,
+      listen: false,
+    ).fetchReportForMonth(sucursalId, year, month);
+  }
+
+  /// Llamado por DateNavBar cuando el usuario elige un año.
+  void _onYearChanged(int year) {
+    setState(() => _period = null);
+    final sucursalId = _loadedSucursalId;
+    if (sucursalId == null) return;
+    Provider.of<ReportsProvider>(
+      context,
+      listen: false,
+    ).fetchReportForYear(sucursalId, year);
+  }
+
   void _retryLoad() {
     final sucursalId = Provider.of<SucursalProvider>(
       context,
       listen: false,
     ).selectedSucursalId;
-    if (sucursalId != null) {
-      // Si hay período seleccionado lo recarga; si no, recarga el último modo.
-      if (_period != null) {
-        _loadData(sucursalId);
-      } else {
-        final provider = Provider.of<ReportsProvider>(context, listen: false);
-        if (provider.dateMode == ReportDateMode.dateRange &&
-            provider.selectedRange != null) {
-          provider.fetchReportForRange(sucursalId, provider.selectedRange!);
-        } else {
-          provider.fetchReportForDate(sucursalId, provider.selectedDate);
-        }
-      }
-    } else {
+    if (sucursalId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No hay sucursal seleccionada')),
         );
       }
+      return;
+    }
+    final provider = Provider.of<ReportsProvider>(context, listen: false);
+    switch (provider.dateMode) {
+      case ReportDateMode.period:
+        if (_period != null) _loadData(sucursalId);
+      case ReportDateMode.singleDay:
+        provider.fetchReportForDate(sucursalId, provider.selectedDate);
+      case ReportDateMode.dateRange:
+        if (provider.selectedRange != null) {
+          provider.fetchReportForRange(sucursalId, provider.selectedRange!);
+        }
+      case ReportDateMode.monthPick:
+        if (provider.selectedMonth != null) {
+          provider.fetchReportForMonth(
+            sucursalId,
+            provider.selectedMonth!.year,
+            provider.selectedMonth!.month,
+          );
+        }
+      case ReportDateMode.yearPick:
+        if (provider.selectedYear != null) {
+          provider.fetchReportForYear(sucursalId, provider.selectedYear!);
+        }
     }
   }
 
@@ -218,12 +251,11 @@ class _ReportsScreenState extends State<ReportsScreen>
                 Consumer<ReportsProvider>(
                   builder: (context, provider, _) {
                     return DateNavBar(
-                      selectedDate: provider.selectedDate,
-                      selectedRange: provider.selectedRange,
-                      isRangeMode:
-                          provider.dateMode == ReportDateMode.dateRange,
+                      provider: provider,
                       onDateChanged: _onDateChanged,
                       onRangeChanged: _onRangeChanged,
+                      onMonthChanged: _onMonthChanged,
+                      onYearChanged: _onYearChanged,
                     );
                   },
                 ),
@@ -308,6 +340,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                 FinancialReport(
                   period: _period,
                   dateMode: provider.dateMode,
+                  chartGranularity: provider.chartGranularity,
                   data: provider.financialData,
                 ),
                 ClientsReport(

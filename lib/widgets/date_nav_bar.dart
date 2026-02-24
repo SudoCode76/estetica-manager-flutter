@@ -1,90 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:month_picker_dialog/month_picker_dialog.dart';
+import 'package:app_estetica/providers/reports_provider.dart';
 
 /// Barra de navegación de fechas para reportes históricos.
 ///
-/// Permite al usuario:
-/// - Avanzar / retroceder un día.
-/// - Abrir el selector de calendario (día único).
-/// - Abrir el selector de rango de fechas.
-///
-/// Callbacks:
-/// - [onDateChanged] — se llama con el nuevo [DateTime] cuando el usuario
-///   navega por días o selecciona una fecha en el calendario.
-/// - [onRangeChanged] — se llama con el [DateTimeRange] cuando el usuario
-///   selecciona un rango.
+/// Permite al usuario elegir:
+/// - Un día (prev/next o calendario),
+/// - Un rango de fechas,
+/// - Un mes completo (month_picker_dialog),
+/// - Un año completo (DatePicker en modo año).
 class DateNavBar extends StatelessWidget {
   const DateNavBar({
     super.key,
-    required this.selectedDate,
-    required this.selectedRange,
-    required this.isRangeMode,
+    required this.provider,
     required this.onDateChanged,
     required this.onRangeChanged,
+    required this.onMonthChanged,
+    required this.onYearChanged,
   });
 
-  /// Fecha activa cuando [isRangeMode] es `false`.
-  final DateTime selectedDate;
+  /// Provider para leer el estado de fecha actual.
+  final ReportsProvider provider;
 
-  /// Rango activo cuando [isRangeMode] es `true`.
-  final DateTimeRange? selectedRange;
-
-  /// Si `true`, muestra el label del rango; si `false`, muestra el día.
-  final bool isRangeMode;
-
-  /// Callback para día único / navegación prev-next.
+  /// Callback: día único seleccionado.
   final ValueChanged<DateTime> onDateChanged;
 
-  /// Callback para rango de fechas.
+  /// Callback: rango seleccionado.
   final ValueChanged<DateTimeRange> onRangeChanged;
+
+  /// Callback: mes seleccionado (año, mes).
+  final void Function(int year, int month) onMonthChanged;
+
+  /// Callback: año seleccionado.
+  final ValueChanged<int> onYearChanged;
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
-  bool get _isToday {
-    final now = DateTime.now();
-    return selectedDate.year == now.year &&
-        selectedDate.month == now.month &&
-        selectedDate.day == now.day;
-  }
+  bool get _isRangeMode => provider.dateMode == ReportDateMode.dateRange;
+  bool get _isMonthMode => provider.dateMode == ReportDateMode.monthPick;
+  bool get _isYearMode => provider.dateMode == ReportDateMode.yearPick;
+  bool get _isDayMode =>
+      provider.dateMode == ReportDateMode.singleDay ||
+      provider.dateMode == ReportDateMode.period;
 
   bool get _canGoForward {
-    // No permitir ir más allá de hoy.
-    if (isRangeMode) {
-      final rangeEnd = selectedRange?.end;
-      if (rangeEnd == null) return false;
-      final now = DateTime.now();
-      return rangeEnd.isBefore(DateTime(now.year, now.month, now.day));
-    }
-    return !_isToday;
+    if (!_isDayMode) return false;
+    final now = DateTime.now();
+    final d = provider.selectedDate;
+    return !(d.year == now.year && d.month == now.month && d.day == now.day);
   }
 
   String _buildLabel(BuildContext context) {
-    final locale = Localizations.localeOf(context).toString();
-    if (isRangeMode && selectedRange != null) {
+    // Año
+    if (_isYearMode && provider.selectedYear != null) {
+      return 'Año ${provider.selectedYear}';
+    }
+    // Mes
+    if (_isMonthMode && provider.selectedMonth != null) {
+      return DateFormat('MMMM yyyy', 'es').format(provider.selectedMonth!);
+    }
+    // Rango
+    if (_isRangeMode && provider.selectedRange != null) {
+      final locale = Localizations.localeOf(context).toString();
       final fmt = DateFormat('dd MMM', locale);
       final fmtYear = DateFormat('dd MMM yyyy', locale);
-      final s = selectedRange!.start;
-      final e = selectedRange!.end;
-      if (s.year == e.year) {
-        return '${fmt.format(s)} – ${fmtYear.format(e)}';
-      }
-      return '${fmtYear.format(s)} – ${fmtYear.format(e)}';
+      final s = provider.selectedRange!.start;
+      final e = provider.selectedRange!.end;
+      return s.year == e.year
+          ? '${fmt.format(s)} – ${fmtYear.format(e)}'
+          : '${fmtYear.format(s)} – ${fmtYear.format(e)}';
     }
-
     // Día único
     final now = DateTime.now();
-    if (selectedDate.year == now.year &&
-        selectedDate.month == now.month &&
-        selectedDate.day == now.day) {
+    final d = provider.selectedDate;
+    if (d.year == now.year && d.month == now.month && d.day == now.day) {
       return 'Hoy';
     }
     final yesterday = now.subtract(const Duration(days: 1));
-    if (selectedDate.year == yesterday.year &&
-        selectedDate.month == yesterday.month &&
-        selectedDate.day == yesterday.day) {
+    if (d.year == yesterday.year &&
+        d.month == yesterday.month &&
+        d.day == yesterday.day) {
       return 'Ayer';
     }
-    return DateFormat('EEE, dd MMM yyyy', 'es').format(selectedDate);
+    return DateFormat('EEE, dd MMM yyyy', 'es').format(d);
+  }
+
+  IconData get _modeIcon {
+    if (_isYearMode) return Icons.event_repeat_rounded;
+    if (_isMonthMode) return Icons.calendar_view_month_rounded;
+    if (_isRangeMode) return Icons.date_range_rounded;
+    return Icons.calendar_today_rounded;
   }
 
   // ── build ─────────────────────────────────────────────────────────────────
@@ -103,31 +109,25 @@ class DateNavBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ← Prev
+          // ← Prev (solo en modo día)
           _NavIconButton(
             icon: Icons.chevron_left_rounded,
             tooltip: 'Día anterior',
-            onPressed: isRangeMode
-                ? null
-                : () => onDateChanged(
-                    selectedDate.subtract(const Duration(days: 1)),
-                  ),
+            onPressed: _isDayMode
+                ? () => onDateChanged(
+                    provider.selectedDate.subtract(const Duration(days: 1)),
+                  )
+                : null,
           ),
 
-          // Label + calendario
+          // Label central — tap = seleccionar día
           Expanded(
             child: GestureDetector(
-              onTap: () => _pickDate(context),
+              onTap: () => _pickDay(context),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    isRangeMode
-                        ? Icons.date_range_rounded
-                        : Icons.calendar_today_rounded,
-                    size: 15,
-                    color: cs.primary,
-                  ),
+                  Icon(_modeIcon, size: 15, color: cs.primary),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
@@ -145,20 +145,23 @@ class DateNavBar extends StatelessWidget {
             ),
           ),
 
-          // Botón rango
-          _NavIconButton(
-            icon: Icons.date_range_rounded,
-            tooltip: 'Seleccionar rango',
-            color: isRangeMode ? cs.primary : null,
-            onPressed: () => _pickRange(context),
+          // Menú de opciones de modo
+          _ModeMenuButton(
+            activeMode: provider.dateMode,
+            onPickDay: () => _pickDay(context),
+            onPickRange: () => _pickRange(context),
+            onPickMonth: () => _pickMonth(context),
+            onPickYear: () => _pickYear(context),
           ),
 
-          // → Next
+          // → Next (solo en modo día y si no es hoy)
           _NavIconButton(
             icon: Icons.chevron_right_rounded,
             tooltip: 'Día siguiente',
-            onPressed: _canGoForward && !isRangeMode
-                ? () => onDateChanged(selectedDate.add(const Duration(days: 1)))
+            onPressed: _canGoForward
+                ? () => onDateChanged(
+                    provider.selectedDate.add(const Duration(days: 1)),
+                  )
                 : null,
           ),
         ],
@@ -168,12 +171,14 @@ class DateNavBar extends StatelessWidget {
 
   // ── pickers ───────────────────────────────────────────────────────────────
 
-  Future<void> _pickDate(BuildContext context) async {
+  Future<void> _pickDay(BuildContext context) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final initial = _isDayMode ? provider.selectedDate : today;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: isRangeMode ? today : selectedDate,
+      initialDate: initial.isAfter(today) ? today : initial,
       firstDate: DateTime(2020),
       lastDate: today,
       locale: const Locale('es'),
@@ -187,58 +192,193 @@ class DateNavBar extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final initialRange =
-        selectedRange ??
+        provider.selectedRange ??
         DateTimeRange(
           start: today.subtract(const Duration(days: 6)),
           end: today,
         );
+
     final picked = await showDateRangePicker(
       context: context,
       initialDateRange: initialRange,
       firstDate: DateTime(2020),
       lastDate: today,
       locale: const Locale('es'),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            appBarTheme: AppBarTheme(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          appBarTheme: AppBarTheme(
+            backgroundColor: Theme.of(ctx).colorScheme.primary,
+            foregroundColor: Theme.of(ctx).colorScheme.onPrimary,
           ),
-          child: child!,
-        );
-      },
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
       onRangeChanged(picked);
     }
   }
+
+  Future<void> _pickMonth(BuildContext context) async {
+    final now = DateTime.now();
+    final initial = provider.selectedMonth ?? DateTime(now.year, now.month);
+
+    final picked = await showMonthPicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year, now.month),
+    );
+    if (picked != null) {
+      onMonthChanged(picked.year, picked.month);
+    }
+  }
+
+  Future<void> _pickYear(BuildContext context) async {
+    final now = DateTime.now();
+    final initial = provider.selectedYear != null
+        ? DateTime(provider.selectedYear!, 1, 1)
+        : DateTime(now.year, 1, 1);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      initialDatePickerMode: DatePickerMode.year,
+      locale: const Locale('es'),
+    );
+    if (picked != null) {
+      onYearChanged(picked.year);
+    }
+  }
 }
 
-// ── Widget auxiliar ──────────────────────────────────────────────────────────
+// ── Menú de selección de modo ─────────────────────────────────────────────────
+
+enum _DateMode { day, range, month, year }
+
+class _ModeMenuButton extends StatelessWidget {
+  const _ModeMenuButton({
+    required this.activeMode,
+    required this.onPickDay,
+    required this.onPickRange,
+    required this.onPickMonth,
+    required this.onPickYear,
+  });
+
+  final ReportDateMode activeMode;
+  final VoidCallback onPickDay;
+  final VoidCallback onPickRange;
+  final VoidCallback onPickMonth;
+  final VoidCallback onPickYear;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return PopupMenuButton<_DateMode>(
+      icon: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+      tooltip: 'Cambiar tipo de período',
+      onSelected: (mode) {
+        switch (mode) {
+          case _DateMode.day:
+            onPickDay();
+          case _DateMode.range:
+            onPickRange();
+          case _DateMode.month:
+            onPickMonth();
+          case _DateMode.year:
+            onPickYear();
+        }
+      },
+      itemBuilder: (_) => [
+        _menuItem(
+          context,
+          value: _DateMode.day,
+          icon: Icons.calendar_today_rounded,
+          label: 'Seleccionar día',
+          active: activeMode == ReportDateMode.singleDay,
+        ),
+        _menuItem(
+          context,
+          value: _DateMode.range,
+          icon: Icons.date_range_rounded,
+          label: 'Seleccionar rango',
+          active: activeMode == ReportDateMode.dateRange,
+        ),
+        _menuItem(
+          context,
+          value: _DateMode.month,
+          icon: Icons.calendar_view_month_rounded,
+          label: 'Seleccionar mes',
+          active: activeMode == ReportDateMode.monthPick,
+        ),
+        _menuItem(
+          context,
+          value: _DateMode.year,
+          icon: Icons.event_repeat_rounded,
+          label: 'Seleccionar año',
+          active: activeMode == ReportDateMode.yearPick,
+        ),
+      ],
+    );
+  }
+
+  PopupMenuItem<_DateMode> _menuItem(
+    BuildContext context, {
+    required _DateMode value,
+    required IconData icon,
+    required String label,
+    required bool active,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuItem<_DateMode>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: active ? cs.primary : cs.onSurfaceVariant,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              color: active ? cs.primary : cs.onSurface,
+              fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          if (active) ...[
+            const Spacer(),
+            Icon(Icons.check_rounded, size: 16, color: cs.primary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Botón icono de navegación ─────────────────────────────────────────────────
 
 class _NavIconButton extends StatelessWidget {
   const _NavIconButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.color,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final effectiveColor =
-        color ??
-        (onPressed != null ? cs.onSurface : cs.onSurface.withAlpha(60));
+    final color = onPressed != null ? cs.onSurface : cs.onSurface.withAlpha(60);
     return IconButton(
-      icon: Icon(icon, color: effectiveColor, size: 22),
+      icon: Icon(icon, color: color, size: 22),
       tooltip: tooltip,
       onPressed: onPressed,
       visualDensity: VisualDensity.compact,

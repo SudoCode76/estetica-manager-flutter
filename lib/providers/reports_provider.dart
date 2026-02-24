@@ -12,6 +12,30 @@ enum ReportDateMode {
 
   /// Muestra un rango de fechas personalizado.
   dateRange,
+
+  /// Mes completo seleccionado explícitamente.
+  monthPick,
+
+  /// Año completo seleccionado explícitamente.
+  yearPick,
+}
+
+/// Granularidad del eje X del gráfico de barras.
+enum ChartGranularity {
+  /// Agrupado por hora — día único.
+  hourly,
+
+  /// Agrupado por día — rango ≤ 7 días o período semana/mes.
+  daily,
+
+  /// Agrupado por día del mes — mes completo.
+  monthly,
+
+  /// Agrupado por mes — año completo.
+  yearly,
+
+  /// No mostrar gráfico — rango > 7 días arbitrario.
+  none,
 }
 
 class ReportsProvider extends ChangeNotifier {
@@ -26,21 +50,69 @@ class ReportsProvider extends ChangeNotifier {
   Map<String, dynamic> get financialData => _financialData;
   Map<String, dynamic> get clientsData => _clientsData;
 
-  // ── Estado de navegación de fecha ──────────────────────────────────────────
+  // ── Estado de navegación ───────────────────────────────────────────────────
   ReportDateMode _dateMode = ReportDateMode.period;
   ReportDateMode get dateMode => _dateMode;
 
-  /// Fecha seleccionada en modo [ReportDateMode.singleDay].
+  /// Período clásico activo (null cuando se usa DateNavBar).
+  ReportPeriod? _activePeriod = ReportPeriod.month;
+  ReportPeriod? get activePeriod => _activePeriod;
+
+  /// Fecha seleccionada en modo singleDay.
   DateTime _selectedDate = DateTime.now();
   DateTime get selectedDate => _selectedDate;
 
-  /// Rango seleccionado en modo [ReportDateMode.dateRange].
+  /// Rango seleccionado en modo dateRange.
   DateTimeRange? _selectedRange;
   DateTimeRange? get selectedRange => _selectedRange;
 
-  // ── Helpers de bounds ──────────────────────────────────────────────────────
+  /// Mes seleccionado en modo monthPick (día siempre = 1).
+  DateTime? _selectedMonth;
+  DateTime? get selectedMonth => _selectedMonth;
 
-  /// Devuelve [start, end] en hora local para el período clásico.
+  /// Año seleccionado en modo yearPick.
+  int? _selectedYear;
+  int? get selectedYear => _selectedYear;
+
+  // ── Granularidad calculada ─────────────────────────────────────────────────
+
+  ChartGranularity get chartGranularity {
+    switch (_dateMode) {
+      case ReportDateMode.yearPick:
+        return ChartGranularity.yearly;
+
+      case ReportDateMode.monthPick:
+        return ChartGranularity.monthly;
+
+      case ReportDateMode.singleDay:
+        return ChartGranularity.hourly;
+
+      case ReportDateMode.dateRange:
+        final r = _selectedRange;
+        if (r == null) return ChartGranularity.none;
+        final days = r.end.difference(r.start).inDays + 1;
+        if (days <= 1) return ChartGranularity.hourly;
+        if (days <= 7) return ChartGranularity.daily;
+        return ChartGranularity.none;
+
+      case ReportDateMode.period:
+        switch (_activePeriod) {
+          case ReportPeriod.today:
+            return ChartGranularity.hourly;
+          case ReportPeriod.week:
+            return ChartGranularity.daily;
+          case ReportPeriod.month:
+            return ChartGranularity.daily;
+          case ReportPeriod.year:
+            return ChartGranularity.yearly;
+          case null:
+            return ChartGranularity.none;
+        }
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
   (DateTime, DateTime) _getDates(ReportPeriod period) {
     final now = DateTime.now();
     final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
@@ -67,11 +139,41 @@ class ReportsProvider extends ChangeNotifier {
     return (start, end);
   }
 
-  // ── Métodos públicos de carga ──────────────────────────────────────────────
+  void _resetSelections() {
+    _selectedRange = null;
+    _selectedMonth = null;
+    _selectedYear = null;
+  }
 
-  /// Carga usando el período clásico (hoy/semana/mes/año).
+  Future<void> _fetchBoth({
+    required int sucursalId,
+    required DateTime startUtc,
+    required DateTime endUtc,
+  }) async {
+    final results = await Future.wait([
+      _repo.getFinancialReport(
+        sucursalId: sucursalId,
+        start: startUtc,
+        end: endUtc,
+      ),
+      _repo.getClientsReport(
+        sucursalId: sucursalId,
+        start: startUtc,
+        end: endUtc,
+      ),
+    ]);
+    _financialData = results[0] as Map<String, dynamic>? ?? {};
+    _clientsData = results[1] as Map<String, dynamic>? ?? {};
+  }
+
+  // ── Métodos públicos ───────────────────────────────────────────────────────
+
+  /// Período clásico (Hoy / Semana / Mes / Año).
   Future<void> loadReports(int sucursalId, ReportPeriod period) async {
     _dateMode = ReportDateMode.period;
+    _activePeriod = period;
+    _resetSelections();
+
     debugPrint(
       'ReportsProvider.loadReports: sucursalId=$sucursalId, period=$period',
     );
@@ -81,27 +183,14 @@ class ReportsProvider extends ChangeNotifier {
 
     try {
       final dates = _getDates(period);
-      final start = dates.$1.toUtc();
-      final end = dates.$2.toUtc();
-
-      debugPrint('ReportsProvider: Cargando datos desde $start hasta $end');
-
-      final results = await Future.wait([
-        _repo.getFinancialReport(
-          sucursalId: sucursalId,
-          start: start,
-          end: end,
-        ),
-        _repo.getClientsReport(sucursalId: sucursalId, start: start, end: end),
-      ]);
-
-      _financialData = results[0] as Map<String, dynamic>? ?? {};
-      _clientsData = results[1] as Map<String, dynamic>? ?? {};
-
-      debugPrint('ReportsProvider: Datos cargados exitosamente');
+      await _fetchBoth(
+        sucursalId: sucursalId,
+        startUtc: dates.$1.toUtc(),
+        endUtc: dates.$2.toUtc(),
+      );
+      debugPrint('ReportsProvider: loadReports OK');
     } catch (e, stack) {
-      debugPrint('ReportsProvider ERROR cargando reportes: $e');
-      debugPrint('Stack: $stack');
+      debugPrint('ReportsProvider ERROR loadReports: $e\n$stack');
       _financialData = {};
       _clientsData = {};
     } finally {
@@ -110,11 +199,12 @@ class ReportsProvider extends ChangeNotifier {
     }
   }
 
-  /// Carga el reporte para un único día histórico [date] (hora local).
+  /// Día único histórico.
   Future<void> fetchReportForDate(int sucursalId, DateTime date) async {
     _dateMode = ReportDateMode.singleDay;
+    _activePeriod = null;
     _selectedDate = date;
-    _selectedRange = null;
+    _resetSelections();
 
     debugPrint(
       'ReportsProvider.fetchReportForDate: sucursalId=$sucursalId, date=$date',
@@ -124,27 +214,14 @@ class ReportsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final start = DateTime(date.year, date.month, date.day).toUtc();
-      final end = DateTime(date.year, date.month, date.day, 23, 59, 59).toUtc();
-
-      debugPrint('ReportsProvider: Día único $start → $end');
-
-      final results = await Future.wait([
-        _repo.getFinancialReport(
-          sucursalId: sucursalId,
-          start: start,
-          end: end,
-        ),
-        _repo.getClientsReport(sucursalId: sucursalId, start: start, end: end),
-      ]);
-
-      _financialData = results[0] as Map<String, dynamic>? ?? {};
-      _clientsData = results[1] as Map<String, dynamic>? ?? {};
-
-      debugPrint('ReportsProvider: Día único cargado');
+      await _fetchBoth(
+        sucursalId: sucursalId,
+        startUtc: DateTime(date.year, date.month, date.day).toUtc(),
+        endUtc: DateTime(date.year, date.month, date.day, 23, 59, 59).toUtc(),
+      );
+      debugPrint('ReportsProvider: fetchReportForDate OK');
     } catch (e, stack) {
-      debugPrint('ReportsProvider ERROR fetchReportForDate: $e');
-      debugPrint('Stack: $stack');
+      debugPrint('ReportsProvider ERROR fetchReportForDate: $e\n$stack');
       _financialData = {};
       _clientsData = {};
     } finally {
@@ -153,10 +230,13 @@ class ReportsProvider extends ChangeNotifier {
     }
   }
 
-  /// Carga el reporte para un rango de fechas [range] (hora local).
+  /// Rango de fechas personalizado.
   Future<void> fetchReportForRange(int sucursalId, DateTimeRange range) async {
     _dateMode = ReportDateMode.dateRange;
+    _activePeriod = null;
     _selectedRange = range;
+    _selectedMonth = null;
+    _selectedYear = null;
 
     debugPrint(
       'ReportsProvider.fetchReportForRange: sucursalId=$sucursalId, '
@@ -167,38 +247,91 @@ class ReportsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final start = DateTime(
-        range.start.year,
-        range.start.month,
-        range.start.day,
-      ).toUtc();
-      final end = DateTime(
-        range.end.year,
-        range.end.month,
-        range.end.day,
-        23,
-        59,
-        59,
-      ).toUtc();
-
-      debugPrint('ReportsProvider: Rango $start → $end');
-
-      final results = await Future.wait([
-        _repo.getFinancialReport(
-          sucursalId: sucursalId,
-          start: start,
-          end: end,
-        ),
-        _repo.getClientsReport(sucursalId: sucursalId, start: start, end: end),
-      ]);
-
-      _financialData = results[0] as Map<String, dynamic>? ?? {};
-      _clientsData = results[1] as Map<String, dynamic>? ?? {};
-
-      debugPrint('ReportsProvider: Rango cargado');
+      await _fetchBoth(
+        sucursalId: sucursalId,
+        startUtc: DateTime(
+          range.start.year,
+          range.start.month,
+          range.start.day,
+        ).toUtc(),
+        endUtc: DateTime(
+          range.end.year,
+          range.end.month,
+          range.end.day,
+          23,
+          59,
+          59,
+        ).toUtc(),
+      );
+      debugPrint('ReportsProvider: fetchReportForRange OK');
     } catch (e, stack) {
-      debugPrint('ReportsProvider ERROR fetchReportForRange: $e');
-      debugPrint('Stack: $stack');
+      debugPrint('ReportsProvider ERROR fetchReportForRange: $e\n$stack');
+      _financialData = {};
+      _clientsData = {};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Mes completo ([year], [month]).
+  Future<void> fetchReportForMonth(int sucursalId, int year, int month) async {
+    _dateMode = ReportDateMode.monthPick;
+    _activePeriod = null;
+    _selectedMonth = DateTime(year, month);
+    _selectedRange = null;
+    _selectedYear = null;
+
+    debugPrint(
+      'ReportsProvider.fetchReportForMonth: sucursalId=$sucursalId, '
+      'year=$year, month=$month',
+    );
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      // Último día del mes = día 0 del mes siguiente
+      await _fetchBoth(
+        sucursalId: sucursalId,
+        startUtc: DateTime(year, month, 1).toUtc(),
+        endUtc: DateTime(year, month + 1, 0, 23, 59, 59).toUtc(),
+      );
+      debugPrint('ReportsProvider: fetchReportForMonth OK');
+    } catch (e, stack) {
+      debugPrint('ReportsProvider ERROR fetchReportForMonth: $e\n$stack');
+      _financialData = {};
+      _clientsData = {};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Año completo [year].
+  Future<void> fetchReportForYear(int sucursalId, int year) async {
+    _dateMode = ReportDateMode.yearPick;
+    _activePeriod = null;
+    _selectedYear = year;
+    _selectedRange = null;
+    _selectedMonth = null;
+
+    debugPrint(
+      'ReportsProvider.fetchReportForYear: sucursalId=$sucursalId, year=$year',
+    );
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      await _fetchBoth(
+        sucursalId: sucursalId,
+        startUtc: DateTime(year, 1, 1).toUtc(),
+        endUtc: DateTime(year, 12, 31, 23, 59, 59).toUtc(),
+      );
+      debugPrint('ReportsProvider: fetchReportForYear OK');
+    } catch (e, stack) {
+      debugPrint('ReportsProvider ERROR fetchReportForYear: $e\n$stack');
       _financialData = {};
       _clientsData = {};
     } finally {
