@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:app_estetica/providers/reports_provider.dart';
+import 'package:app_estetica/widgets/time_nav_bar.dart';
 import 'package:app_estetica/screens/admin/tickets/ticket_detail_screen.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
@@ -28,6 +30,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
   bool _showHistoryMode = false;
+  DateTime _selectedDate = DateTime.now();
   // IDs de tickets que se están borrando (para mostrar loading por item)
   final Set<String> _deletingIds = <String>{};
 
@@ -314,16 +317,17 @@ class _TicketsScreenState extends State<TicketsScreen> {
                 ? (s['tratamiento'] ?? s['tratamiento_id'] ?? s)
                 : s;
             String nombreTrat = '';
-            if (trat is Map)
+            if (trat is Map) {
               nombreTrat =
                   (trat['nombretratamiento'] ??
                           trat['nombreTratamiento'] ??
                           trat['nombre'] ??
                           '')
                       .toString();
-            else if (s is Map)
+            } else if (s is Map) {
               nombreTrat = (s['nombreTratamiento'] ?? s['nombre'] ?? '')
                   .toString();
+            }
             return _normalize(nombreTrat).contains(term);
           } catch (e) {
             return false;
@@ -334,10 +338,13 @@ class _TicketsScreenState extends State<TicketsScreen> {
             aNorm.contains(term) ||
             tNorm.contains(term) ||
             eNorm.contains(term) ||
-            tratamientosMatch)
+            tratamientosMatch) {
           return true;
+        }
         final clienteFull = _normalize('$nombre $apellido');
-        if (clienteFull.contains(term)) return true;
+        if (clienteFull.contains(term)) {
+          return true;
+        }
         return false;
       }).toList();
     }
@@ -383,62 +390,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
     }
   }
 
-  void _onShowTodayPressed() async {
-    setState(() {
-      _showHistoryMode = false;
-      _rangeStart = null;
-      _rangeEnd = null;
-    });
-    _reloadTicketsForCurrentFilters();
-  }
-
-  Future<void> _selectDateRange() async {
-    final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 1),
-      initialDateRange: _rangeStart != null && _rangeEnd != null
-          ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!)
-          : null,
-    );
-
-    if (picked == null) return;
-
-    // Asegurarnos que start <= end
-    DateTime start = picked.start;
-    DateTime end = picked.end;
-    if (start.isAfter(end)) {
-      final tmp = start;
-      start = end;
-      end = tmp;
-    }
-
-    setState(() {
-      _rangeStart = start;
-      _rangeEnd = end;
-      _showHistoryMode = true;
-      errorMsg = null;
-    });
-
-    try {
-      if (_sucursalProvider?.selectedSucursalId == null) {
-        setState(() => errorMsg = 'Seleccione una sucursal primero');
-        return;
-      }
-
-      await Provider.of<TicketProvider>(
-        context,
-        listen: false,
-      ).fetchTicketsByRange(
-        start: _rangeStart!,
-        end: _rangeEnd!,
-        sucursalId: _sucursalProvider!.selectedSucursalId!,
-      );
-    } catch (e) {
-      setState(() => errorMsg = 'Error al cargar historial: $e');
-    }
-  }
+  // Historial y selección de fechas ahora manejados por TimeNavBar.
 
   @override
   void dispose() {
@@ -527,25 +479,158 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
                 const SizedBox(height: 12),
 
-                // Controles de Historial
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _selectDateRange,
-                        child: Text(
-                          _rangeStart == null || _rangeEnd == null
-                              ? 'Seleccionar rango'
-                              : '${DateFormat('dd/MM/yyyy').format(_rangeStart!)} - ${DateFormat('dd/MM/yyyy').format(_rangeEnd!)}',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _onShowTodayPressed,
-                      child: const Text('Hoy'),
-                    ),
-                  ],
+                // Controles de Historial -> Reemplazado por TimeNavBar
+                TimeNavBar(
+                  mode: _showHistoryMode
+                      ? ReportDateMode.dateRange
+                      : ReportDateMode.singleDay,
+                  selectedDate: _selectedDate,
+                  selectedRange: _rangeStart != null && _rangeEnd != null
+                      ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!)
+                      : null,
+                  selectedMonth: null,
+                  selectedYear: null,
+                  onDateChanged: (d) async {
+                    // Al seleccionar día mostramos tickets de ese día
+                    final start = DateTime(d.year, d.month, d.day);
+                    final end = DateTime(d.year, d.month, d.day, 23, 59, 59);
+                    final now = DateTime.now();
+                    final today = DateTime(now.year, now.month, now.day);
+                    final isToday = d.year == today.year &&
+                        d.month == today.month &&
+                        d.day == today.day;
+                    setState(() {
+                      _selectedDate = d;
+                      _rangeStart = start;
+                      _rangeEnd = end;
+                      // Activar modo histórico si la fecha seleccionada NO es hoy
+                      _showHistoryMode = !isToday;
+                      errorMsg = null;
+                    });
+                    if (_sucursalProvider?.selectedSucursalId == null) {
+                      setState(
+                        () => errorMsg = 'Seleccione una sucursal primero',
+                      );
+                      return;
+                    }
+                    try {
+                      final tp = Provider.of<TicketProvider>(
+                        context,
+                        listen: false,
+                      );
+                      await tp.fetchTicketsByRange(
+                        start: start,
+                        end: end,
+                        sucursalId: _sucursalProvider!.selectedSucursalId!,
+                      );
+                      if (kDebugMode) {
+                        debugPrint(
+                            'TicketsScreen: fetchTicketsByRange start=$start end=$end returned=${tp.tickets.length}');
+                      }
+                    } catch (e) {
+                      setState(() => errorMsg = 'Error al cargar historial: $e');
+                    }
+                  },
+                  onRangeChanged: (r) async {
+                    DateTime start = r.start;
+                    DateTime end = r.end;
+                    if (start.isAfter(end)) {
+                      final tmp = start;
+                      start = end;
+                      end = tmp;
+                    }
+                    setState(() {
+                      _selectedDate = start;
+                      _rangeStart = start;
+                      _rangeEnd = end;
+                      _showHistoryMode = true;
+                      errorMsg = null;
+                    });
+                    if (_sucursalProvider?.selectedSucursalId == null) {
+                      setState(
+                        () => errorMsg = 'Seleccione una sucursal primero',
+                      );
+                      return;
+                    }
+                    try {
+                      final tp = Provider.of<TicketProvider>(
+                        context,
+                        listen: false,
+                      );
+                      await tp.fetchTicketsByRange(
+                        start: start,
+                        end: end,
+                        sucursalId: _sucursalProvider!.selectedSucursalId!,
+                      );
+                    } catch (e) {
+                      setState(
+                        () => errorMsg = 'Error al cargar historial: $e',
+                      );
+                    }
+                  },
+                  onMonthChanged: (year, month) async {
+                    final start = DateTime(year, month, 1);
+                    final end = DateTime(year, month + 1, 0, 23, 59, 59);
+                    setState(() {
+                      _selectedDate = start;
+                      _rangeStart = start;
+                      _rangeEnd = end;
+                      _showHistoryMode = true;
+                      errorMsg = null;
+                    });
+                    if (_sucursalProvider?.selectedSucursalId == null) {
+                      setState(
+                        () => errorMsg = 'Seleccione una sucursal primero',
+                      );
+                      return;
+                    }
+                    try {
+                      final tp = Provider.of<TicketProvider>(
+                        context,
+                        listen: false,
+                      );
+                      await tp.fetchTicketsByRange(
+                        start: start,
+                        end: end,
+                        sucursalId: _sucursalProvider!.selectedSucursalId!,
+                      );
+                    } catch (e) {
+                      setState(
+                        () => errorMsg = 'Error al cargar historial: $e',
+                      );
+                    }
+                  },
+                  onYearChanged: (y) async {
+                    final start = DateTime(y, 1, 1);
+                    final end = DateTime(y, 12, 31, 23, 59, 59);
+                    setState(() {
+                      _selectedDate = start;
+                      _rangeStart = start;
+                      _rangeEnd = end;
+                      _showHistoryMode = true;
+                      errorMsg = null;
+                    });
+                    if (_sucursalProvider?.selectedSucursalId == null) {
+                      setState(
+                        () => errorMsg = 'Seleccione una sucursal primero',
+                      );
+                      return;
+                    }
+                    try {
+                      await Provider.of<TicketProvider>(
+                        context,
+                        listen: false,
+                      ).fetchTicketsByRange(
+                        start: start,
+                        end: end,
+                        sucursalId: _sucursalProvider!.selectedSucursalId!,
+                      );
+                    } catch (e) {
+                      setState(
+                        () => errorMsg = 'Error al cargar historial: $e',
+                      );
+                    }
+                  },
                 ),
 
                 const SizedBox(height: 16),
@@ -705,6 +790,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
                           child: const Icon(Icons.delete, color: Colors.white),
                         ),
                         confirmDismiss: (direction) async {
+                          final tpProviderBefore = Provider.of<TicketProvider>(
+                            context,
+                            listen: false,
+                          );
+                          final messengerBefore = ScaffoldMessenger.of(context);
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
@@ -737,12 +827,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
                             }
                             try {
                               final id = t['id'] ?? t['documentId'];
-                              final success = await Provider.of<TicketProvider>(
-                                context,
-                                listen: false,
-                              ).deleteTicket(id);
+                              final success = await tpProviderBefore
+                                  .deleteTicket(id);
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                messengerBefore.showSnackBar(
                                   SnackBar(
                                     content: Text(
                                       success
@@ -756,13 +844,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                 );
                               }
                             } catch (e) {
-                              if (mounted)
-                                ScaffoldMessenger.of(context).showSnackBar(
+                              if (mounted) {
+                                messengerBefore.showSnackBar(
                                   SnackBar(
                                     content: Text('Error al eliminar: $e'),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
+                              }
                             } finally {
                               if (idStr.isNotEmpty) {
                                 setState(() {
@@ -995,7 +1084,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                 child: Container(
                                   margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.35),
+                                    color: Colors.black.withValues(alpha: 0.35),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Center(

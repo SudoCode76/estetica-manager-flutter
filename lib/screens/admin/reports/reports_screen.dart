@@ -66,12 +66,7 @@ class _ReportsScreenState extends State<ReportsScreen>
     }
   }
 
-  void _setPeriod(ReportPeriod p) {
-    setState(() => _period = p);
-    if (_loadedSucursalId != null) {
-      _loadData(_loadedSucursalId!);
-    }
-  }
+  // Nota: _setPeriod se removió porque el selector clásico fue eliminado.
 
   /// Llamado por DateNavBar cuando el usuario elige un día.
   void _onDateChanged(DateTime date) {
@@ -157,32 +152,7 @@ class _ReportsScreenState extends State<ReportsScreen>
 
   // ── Builders de UI ────────────────────────────────────────────────────────
 
-  Widget _buildPeriodChip(ReportPeriod p, String label) {
-    final selected = _period == p;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => _setPeriod(p),
-        selectedColor: Theme.of(context).colorScheme.primary,
-        labelStyle: TextStyle(
-          color: selected
-              ? Theme.of(context).colorScheme.onPrimary
-              : Colors.black87,
-          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: selected ? Colors.transparent : Colors.grey.shade300,
-          ),
-        ),
-      ),
-    );
-  }
+  // Nota: el selector clásico de períodos (chips) fue removido en favor de DateNavBar.
 
   Widget _buildTabButton(int index, String label) {
     final selected = _currentTab == index;
@@ -226,26 +196,13 @@ class _ReportsScreenState extends State<ReportsScreen>
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(130),
+          preferredSize: const Size.fromHeight(82),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Período selector (Scroll horizontal)
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildPeriodChip(ReportPeriod.today, 'Hoy'),
-                      _buildPeriodChip(ReportPeriod.week, 'Semana'),
-                      _buildPeriodChip(ReportPeriod.month, 'Mes'),
-                      _buildPeriodChip(ReportPeriod.year, 'Año'),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 8),
+                // (Se removió el selector clásico de Períodos — se usa DateNavBar)
 
                 // DateNavBar — navegación histórica
                 Consumer<ReportsProvider>(
