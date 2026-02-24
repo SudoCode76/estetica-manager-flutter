@@ -3,6 +3,7 @@ import 'package:app_estetica/config/responsive.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/providers/reports_provider.dart';
+import 'package:app_estetica/widgets/date_nav_bar.dart';
 import 'financial_report.dart';
 import 'clients_report.dart';
 // services_report.dart removed — feature deleted
@@ -17,7 +18,9 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen>
     with SingleTickerProviderStateMixin {
-  ReportPeriod _period = ReportPeriod.month; // Por defecto Mes
+  /// Período clásico seleccionado. `null` cuando se usa DateNavBar.
+  ReportPeriod? _period = ReportPeriod.month;
+
   late TabController _tabController;
   int _currentTab = 0;
 
@@ -54,6 +57,15 @@ class _ReportsScreenState extends State<ReportsScreen>
     super.dispose();
   }
 
+  // ── Carga de datos ────────────────────────────────────────────────────────
+
+  void _loadData(int sucursalId) {
+    final provider = Provider.of<ReportsProvider>(context, listen: false);
+    if (_period != null) {
+      provider.loadReports(sucursalId, _period!);
+    }
+  }
+
   void _setPeriod(ReportPeriod p) {
     setState(() => _period = p);
     if (_loadedSucursalId != null) {
@@ -61,12 +73,56 @@ class _ReportsScreenState extends State<ReportsScreen>
     }
   }
 
-  void _loadData(int sucursalId) {
+  /// Llamado por DateNavBar cuando el usuario elige un día.
+  void _onDateChanged(DateTime date) {
+    setState(() => _period = null); // deseleccionar chip
+    final sucursalId = _loadedSucursalId;
+    if (sucursalId == null) return;
     Provider.of<ReportsProvider>(
       context,
       listen: false,
-    ).loadReports(sucursalId, _period);
+    ).fetchReportForDate(sucursalId, date);
   }
+
+  /// Llamado por DateNavBar cuando el usuario elige un rango.
+  void _onRangeChanged(DateTimeRange range) {
+    setState(() => _period = null);
+    final sucursalId = _loadedSucursalId;
+    if (sucursalId == null) return;
+    Provider.of<ReportsProvider>(
+      context,
+      listen: false,
+    ).fetchReportForRange(sucursalId, range);
+  }
+
+  void _retryLoad() {
+    final sucursalId = Provider.of<SucursalProvider>(
+      context,
+      listen: false,
+    ).selectedSucursalId;
+    if (sucursalId != null) {
+      // Si hay período seleccionado lo recarga; si no, recarga el último modo.
+      if (_period != null) {
+        _loadData(sucursalId);
+      } else {
+        final provider = Provider.of<ReportsProvider>(context, listen: false);
+        if (provider.dateMode == ReportDateMode.dateRange &&
+            provider.selectedRange != null) {
+          provider.fetchReportForRange(sucursalId, provider.selectedRange!);
+        } else {
+          provider.fetchReportForDate(sucursalId, provider.selectedDate);
+        }
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay sucursal seleccionada')),
+        );
+      }
+    }
+  }
+
+  // ── Builders de UI ────────────────────────────────────────────────────────
 
   Widget _buildPeriodChip(ReportPeriod p, String label) {
     final selected = _period == p;
@@ -125,21 +181,6 @@ class _ReportsScreenState extends State<ReportsScreen>
     );
   }
 
-  void _retryLoad() {
-    final sucursalId = Provider.of<SucursalProvider>(
-      context,
-      listen: false,
-    ).selectedSucursalId;
-    if (sucursalId != null) {
-      _loadData(sucursalId);
-    } else {
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No hay sucursal seleccionada')),
-        );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -152,7 +193,7 @@ class _ReportsScreenState extends State<ReportsScreen>
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(86),
+          preferredSize: const Size.fromHeight(130),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
             child: Column(
@@ -171,9 +212,25 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
-                // Tabs secundarias: Financiero | Clientes | Servicios (custom control)
+                // DateNavBar — navegación histórica
+                Consumer<ReportsProvider>(
+                  builder: (context, provider, _) {
+                    return DateNavBar(
+                      selectedDate: provider.selectedDate,
+                      selectedRange: provider.selectedRange,
+                      isRangeMode:
+                          provider.dateMode == ReportDateMode.dateRange,
+                      onDateChanged: _onDateChanged,
+                      onRangeChanged: _onRangeChanged,
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 8),
+
+                // Tabs secundarias: Financiero | Clientes
                 Container(
                   height: 40,
                   decoration: BoxDecoration(
@@ -202,8 +259,9 @@ class _ReportsScreenState extends State<ReportsScreen>
         ),
         child: Consumer<ReportsProvider>(
           builder: (context, provider, _) {
-            if (provider.isLoading)
+            if (provider.isLoading) {
               return const Center(child: CircularProgressIndicator());
+            }
 
             final hasData = provider.financialData.isNotEmpty;
 
@@ -247,8 +305,15 @@ class _ReportsScreenState extends State<ReportsScreen>
             return TabBarView(
               controller: _tabController,
               children: [
-                FinancialReport(period: _period, data: provider.financialData),
-                ClientsReport(period: _period, data: provider.clientsData),
+                FinancialReport(
+                  period: _period,
+                  dateMode: provider.dateMode,
+                  data: provider.financialData,
+                ),
+                ClientsReport(
+                  period: _period ?? ReportPeriod.month,
+                  data: provider.clientsData,
+                ),
               ],
             );
           },

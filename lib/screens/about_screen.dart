@@ -288,7 +288,7 @@ class AboutScreen extends StatelessWidget {
                 Divider(color: cs.onSurfaceVariant),
                 const SizedBox(height: 12),
                 Text(
-                  '© 2025 KeyBusy Software',
+                  '© 2026 KeyBusy Software',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),

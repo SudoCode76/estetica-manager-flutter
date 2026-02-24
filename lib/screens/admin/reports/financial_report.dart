@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:app_estetica/providers/reports_provider.dart';
 import 'report_period.dart';
 
 class FinancialReport extends StatelessWidget {
-  final ReportPeriod period;
+  /// Período clásico activo. `null` cuando se navega con DateNavBar.
+  final ReportPeriod? period;
+
+  /// Modo de fecha activo (period / singleDay / dateRange).
+  final ReportDateMode dateMode;
+
   final Map<String, dynamic> data;
-  const FinancialReport({super.key, required this.period, required this.data});
+
+  const FinancialReport({
+    super.key,
+    required this.period,
+    required this.dateMode,
+    required this.data,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -33,20 +45,30 @@ class FinancialReport extends StatelessWidget {
     final topTratamientos = (data['top_tratamientos'] as List?) ?? [];
     final pendientes = (data['pendientes_cobro'] as List?) ?? [];
 
-    String chartLabel = '';
-    switch (period) {
-      case ReportPeriod.today:
-        chartLabel = 'Por hora';
-        break;
-      case ReportPeriod.week:
-        chartLabel = 'Por día';
-        break;
-      case ReportPeriod.month:
-        chartLabel = 'Por día del mes';
-        break;
-      case ReportPeriod.year:
-        chartLabel = 'Por mes';
-        break;
+    // Etiqueta del eje del gráfico según el modo activo.
+    String chartLabel;
+    if (dateMode == ReportDateMode.singleDay) {
+      chartLabel = 'Por hora';
+    } else if (dateMode == ReportDateMode.dateRange) {
+      chartLabel = 'Por día';
+    } else {
+      switch (period) {
+        case ReportPeriod.today:
+          chartLabel = 'Por hora';
+          break;
+        case ReportPeriod.week:
+          chartLabel = 'Por día';
+          break;
+        case ReportPeriod.month:
+          chartLabel = 'Por día del mes';
+          break;
+        case ReportPeriod.year:
+          chartLabel = 'Por mes';
+          break;
+        case null:
+          chartLabel = '';
+          break;
+      }
     }
 
     // Normalizar chartData a lista de {label, value}
