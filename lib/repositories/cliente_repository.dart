@@ -3,7 +3,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class ClienteRepository {
   // Implementación directa usando Supabase SDK en lugar de ApiService
 
-  Future<List<dynamic>> searchClientes({String? query, int? sucursalId}) async {
+  /// Busca clientes con paginación offset.
+  ///
+  /// [page] empieza en 1. [pageSize] por defecto 20.
+  /// Retorna hasta [pageSize] registros de la página solicitada.
+  Future<List<dynamic>> searchClientes({
+    String? query,
+    int? sucursalId,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
     try {
       var qb = Supabase.instance.client.from('cliente').select('*');
       if (sucursalId != null) qb = qb.eq('sucursal_id', sucursalId);
@@ -14,9 +23,11 @@ class ClienteRepository {
         );
       }
 
-      final data = await qb;
+      final from = (page - 1) * pageSize;
+      final to = from + pageSize - 1;
+      final data = await qb.range(from, to).order('nombrecliente');
       return (data as List<dynamic>).map((e) {
-        if (e is Map<String, dynamic>)
+        if (e is Map<String, dynamic>) {
           return {
             'id': e['id'],
             'nombreCliente': e['nombrecliente'] ?? e['nombreCliente'] ?? '',
@@ -24,14 +35,32 @@ class ClienteRepository {
                 e['apellidocliente'] ?? e['apellidoCliente'] ?? '',
             'telefono': e['telefono'],
             'estadoCliente': e['estadocliente'] ?? e['estadoCliente'] ?? true,
-            'sucursal_id': e['sucursal_id'] ?? e['sucursal'] ?? null,
+            'sucursal_id': e['sucursal_id'] ?? e['sucursal'],
             'created_at': e['created_at'],
           };
+        }
         return e;
       }).toList();
     } catch (e) {
-      // fallback vacío en caso de error
       return [];
+    }
+  }
+
+  /// Retorna el total de clientes que coinciden con los filtros (sin traer datos).
+  Future<int> countClientes({String? query, int? sucursalId}) async {
+    try {
+      var qb = Supabase.instance.client.from('cliente').select('id');
+      if (sucursalId != null) qb = qb.eq('sucursal_id', sucursalId);
+      if (query != null && query.trim().isNotEmpty) {
+        final pattern = '%${query.trim()}%';
+        qb = qb.or(
+          'nombrecliente.ilike.$pattern,apellidocliente.ilike.$pattern,telefono.ilike.$pattern',
+        );
+      }
+      final resp = await qb.count(CountOption.exact);
+      return resp.count;
+    } catch (_) {
+      return 0;
     }
   }
 

@@ -7,7 +7,6 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_estetica/config/responsive.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart';
 
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({super.key});
@@ -17,7 +16,6 @@ class ClientsScreen extends StatefulWidget {
 }
 
 class _ClientsScreenState extends State<ClientsScreen> {
-  // use injected ClienteRepository via Provider
   List<dynamic> clients = [];
   List<dynamic> filteredClients = [];
   bool isLoading = true;
@@ -27,6 +25,12 @@ class _ClientsScreenState extends State<ClientsScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
   bool _isEmployee = false;
+
+  // Paginación
+  static const int _pageSize = 20;
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalCount = 0;
 
   @override
   void initState() {
@@ -59,6 +63,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
       _sucursalProvider?.removeListener(_onSucursalChanged);
       _sucursalProvider = provider;
       _sucursalProvider?.addListener(_onSucursalChanged);
+      _currentPage = 1;
       debugPrint('ClientsScreen: Calling fetchClients()');
       fetchClients();
     }
@@ -74,50 +79,68 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
   void _onSucursalChanged() {
     debugPrint('ClientsScreen: _onSucursalChanged called');
+    _currentPage = 1;
     fetchClients();
   }
 
   Future<void> fetchClients() async {
-    debugPrint('ClientsScreen: fetchClients() called');
-    debugPrint(
-      'ClientsScreen: selectedSucursalId = ${_sucursalProvider?.selectedSucursalId}',
-    );
+    debugPrint('ClientsScreen: fetchClients() — page=$_currentPage');
 
     if (_sucursalProvider?.selectedSucursalId == null) {
-      debugPrint('ClientsScreen: ⚠️ NO HAY SUCURSAL SELECCIONADA');
       setState(() {
         isLoading = false;
         errorMsg =
             'No hay sucursal seleccionada. Por favor, contacte al administrador.';
         clients = [];
         filteredClients = [];
+        _totalCount = 0;
+        _totalPages = 1;
       });
       return;
     }
 
-    debugPrint(
-      'ClientsScreen: ✓ Sucursal seleccionada: ${_sucursalProvider!.selectedSucursalId}',
-    );
     setState(() {
       isLoading = true;
       errorMsg = null;
     });
+
     try {
-      debugPrint(
-        'ClientsScreen: Llamando api.getClientes con sucursalId=${_sucursalProvider!.selectedSucursalId}',
-      );
       final repo = Provider.of<ClienteRepository>(context, listen: false);
-      final data = await repo.searchClientes(
-        sucursalId: _sucursalProvider!.selectedSucursalId,
-        query: search.isEmpty ? null : search,
-      );
-      debugPrint('ClientsScreen: ✓ Recibidos ${data.length} clientes');
-      clients = data;
-      filteredClients = clients;
+      final queryArg = search.isEmpty ? null : search;
+      final sucId = _sucursalProvider!.selectedSucursalId;
+
+      // Fetch datos + conteo en paralelo
+      final results = await Future.wait([
+        repo.searchClientes(
+          sucursalId: sucId,
+          query: queryArg,
+          page: _currentPage,
+          pageSize: _pageSize,
+        ),
+        repo.countClientes(sucursalId: sucId, query: queryArg),
+      ]);
+
+      final data = results[0] as List<dynamic>;
+      final total = results[1] as int;
+
+      debugPrint('ClientsScreen: ✓ ${data.length} / $total clientes');
+      setState(() {
+        clients = data;
+        filteredClients = data;
+        _totalCount = total;
+        _totalPages = (total / _pageSize).ceil().clamp(1, 999999);
+      });
     } catch (e) {
       debugPrint('ClientsScreen: ❌ Error: $e');
-      errorMsg = 'No se pudo conectar al servidor.';
+      setState(() {
+        errorMsg = 'No se pudo conectar al servidor.';
+        clients = [];
+        filteredClients = [];
+        _totalCount = 0;
+        _totalPages = 1;
+      });
     }
+
     setState(() {
       isLoading = false;
     });
@@ -125,6 +148,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
   void filterClients(String value) {
     search = value;
+    _currentPage = 1;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
       fetchClients();
@@ -150,7 +174,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
     );
 
     if (result != null) {
-      // Recargar lista
+      _currentPage = 1;
       await fetchClients();
     }
   }
@@ -195,7 +219,6 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
     if (confirmed == true) {
       try {
-        // Mostrar loading
         if (mounted) {
           showDialog(
             context: context,
@@ -220,17 +243,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
           );
         }
 
-        // Preferir documentId (string) si existe; si no, usar id convertido a string
         final String docIdForDelete =
             cliente['documentId']?.toString() ??
             cliente['id']?.toString() ??
             '';
         if (docIdForDelete.isEmpty) {
-          if (mounted) Navigator.pop(context); // Cerrar loading
+          if (mounted) Navigator.pop(context);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
+                content: const Text(
                   'ID del cliente no disponible, no se puede eliminar.',
                 ),
                 backgroundColor: colorScheme.error,
@@ -245,7 +267,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
         );
         await clienteRepo.deleteCliente(docIdForDelete);
 
-        if (mounted) Navigator.pop(context); // Cerrar loading
+        if (mounted) Navigator.pop(context);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -266,9 +288,13 @@ class _ClientsScreenState extends State<ClientsScreen> {
           );
         }
 
+        // Si la página actual queda vacía tras borrar, retroceder una página
+        if (clients.length == 1 && _currentPage > 1) {
+          _currentPage--;
+        }
         await fetchClients();
       } catch (e) {
-        if (mounted) Navigator.pop(context); // Cerrar loading
+        if (mounted) Navigator.pop(context);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -292,6 +318,96 @@ class _ClientsScreenState extends State<ClientsScreen> {
     }
   }
 
+  // ── Selector de páginas ───────────────────────────────────────────────────
+
+  /// Construye la barra de paginación con números y flechas.
+  Widget _buildPaginator() {
+    if (_totalPages <= 1) return const SizedBox.shrink();
+
+    // Ventana deslizante: máximo 5 números visibles
+    const windowSize = 5;
+    int start = (_currentPage - (windowSize ~/ 2)).clamp(1, _totalPages);
+    int end = (start + windowSize - 1).clamp(1, _totalPages);
+    if (end - start < windowSize - 1) {
+      start = (end - windowSize + 1).clamp(1, _totalPages);
+    }
+
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        vertical: Responsive.spacing(context, 12),
+        horizontal: Responsive.horizontalPadding(context),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Info total
+          Text(
+            '$_totalCount clientes',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          // Flecha anterior
+          IconButton(
+            onPressed: _currentPage > 1
+                ? () {
+                    setState(() => _currentPage--);
+                    fetchClients();
+                  }
+                : null,
+            icon: const Icon(Icons.chevron_left_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+          // Números de página
+          for (int p = start; p <= end; p++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: _currentPage == p
+                  ? FilledButton(
+                      onPressed: null,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text('$p'),
+                    )
+                  : OutlinedButton(
+                      onPressed: () {
+                        setState(() => _currentPage = p);
+                        fetchClients();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text('$p'),
+                    ),
+            ),
+          // Flecha siguiente
+          IconButton(
+            onPressed: _currentPage < _totalPages
+                ? () {
+                    setState(() => _currentPage++);
+                    fetchClients();
+                  }
+                : null,
+            icon: const Icon(Icons.chevron_right_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -309,9 +425,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
             ),
             child: Column(
               children: [
-                // Búsqueda y botones en diseño adaptativo
                 if (isSmallScreen) ...[
-                  // En pantallas muy pequeñas, poner los botones debajo del SearchBar
                   SearchBar(
                     controller: _searchController,
                     hintText: 'Buscar cliente...',
@@ -329,6 +443,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                           onPressed: () {
                             _searchController.clear();
                             search = '';
+                            _currentPage = 1;
                             _debounce?.cancel();
                             fetchClients();
                           },
@@ -343,29 +458,32 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: fetchClients,
-                          icon: Icon(Icons.refresh, size: 18),
-                          label: Text(
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text(
                             'Actualizar',
                             style: TextStyle(fontSize: 13),
                           ),
                           style: FilledButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 10,
                             ),
                           ),
                         ),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: _isEmployee
                               ? null
                               : _showCreateClientDialog,
-                          icon: Icon(Icons.person_add, size: 18),
-                          label: Text('Nuevo', style: TextStyle(fontSize: 13)),
+                          icon: const Icon(Icons.person_add, size: 18),
+                          label: const Text(
+                            'Nuevo',
+                            style: TextStyle(fontSize: 13),
+                          ),
                           style: FilledButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 10,
                             ),
@@ -375,7 +493,6 @@ class _ClientsScreenState extends State<ClientsScreen> {
                     ],
                   ),
                 ] else ...[
-                  // En pantallas normales, mantener diseño horizontal
                   Row(
                     children: [
                       Expanded(
@@ -392,6 +509,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                                 onPressed: () {
                                   _searchController.clear();
                                   search = '';
+                                  _currentPage = 1;
                                   _debounce?.cancel();
                                   fetchClients();
                                 },
@@ -460,11 +578,10 @@ class _ClientsScreenState extends State<ClientsScreen> {
                           SizedBox(height: Responsive.spacing(context, 16)),
                           Text(
                             errorMsg!,
-                            style:
-                                (isSmallScreen
-                                        ? textTheme.bodyMedium
-                                        : textTheme.bodyLarge)
-                                    ?.copyWith(color: colorScheme.error),
+                            style: (isSmallScreen
+                                    ? textTheme.bodyMedium
+                                    : textTheme.bodyLarge)
+                                ?.copyWith(color: colorScheme.error),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -490,13 +607,12 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             search.isEmpty
                                 ? 'No hay clientes en esta sucursal'
                                 : 'No se encontraron clientes',
-                            style:
-                                (isSmallScreen
-                                        ? textTheme.bodyMedium
-                                        : textTheme.bodyLarge)
-                                    ?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                            style: (isSmallScreen
+                                    ? textTheme.bodyMedium
+                                    : textTheme.bodyLarge)
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: Responsive.spacing(context, 8)),
@@ -504,186 +620,198 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             search.isEmpty
                                 ? 'Registra el primer cliente'
                                 : 'Intenta con otro término de búsqueda',
-                            style:
-                                (isSmallScreen
-                                        ? textTheme.bodySmall
-                                        : textTheme.bodyMedium)
-                                    ?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                            style: (isSmallScreen
+                                    ? textTheme.bodySmall
+                                    : textTheme.bodyMedium)
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                             textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
                   )
-                : ListView.builder(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Responsive.horizontalPadding(context),
-                      vertical: Responsive.verticalPadding(context),
-                    ),
-                    itemCount: filteredClients.length,
-                    itemBuilder: (context, i) {
-                      final c = filteredClients[i];
-                      final nombre =
-                          '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'
-                              .trim();
-                      final telefono =
-                          c['telefono']?.toString() ?? 'Sin teléfono';
-                      final avatarSize = isSmallScreen ? 48.0 : 56.0;
-                      final fontSize = isSmallScreen ? 18.0 : 20.0;
+                : Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.horizontalPadding(context),
+                            vertical: Responsive.verticalPadding(context),
+                          ),
+                          itemCount: filteredClients.length,
+                          itemBuilder: (context, i) {
+                            final c = filteredClients[i];
+                            final nombre =
+                                '${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}'
+                                    .trim();
+                            final telefono =
+                                c['telefono']?.toString() ?? 'Sin teléfono';
+                            final avatarSize = isSmallScreen ? 48.0 : 56.0;
+                            final fontSize = isSmallScreen ? 18.0 : 20.0;
 
-                      return Card(
-                        margin: EdgeInsets.only(
-                          bottom: Responsive.spacing(context, 12),
-                        ),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            isSmallScreen ? 12 : 16,
-                          ),
-                        ),
-                        child: ListTile(
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 12 : 16,
-                            vertical: isSmallScreen ? 8 : 12,
-                          ),
-                          leading: Container(
-                            width: avatarSize,
-                            height: avatarSize,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  colorScheme.primaryContainer,
-                                  colorScheme.secondaryContainer,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                            return Card(
+                              margin: EdgeInsets.only(
+                                bottom: Responsive.spacing(context, 12),
                               ),
-                              borderRadius: BorderRadius.circular(
-                                isSmallScreen ? 10 : 12,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                nombre.isNotEmpty
-                                    ? nombre[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: fontSize,
-                                  color: colorScheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 12 : 16,
                                 ),
                               ),
-                            ),
-                          ),
-                          title: Text(
-                            nombre,
-                            style:
-                                (isSmallScreen
-                                        ? textTheme.titleSmall
-                                        : textTheme.titleMedium)
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Row(
-                            children: [
-                              Icon(
-                                Icons.phone,
-                                size: isSmallScreen ? 12 : 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              SizedBox(width: Responsive.spacing(context, 4)),
-                              Flexible(
-                                child: Text(
-                                  telefono,
-                                  style:
-                                      (isSmallScreen
-                                              ? textTheme.bodySmall
-                                              : textTheme.bodyMedium)
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                  overflow: TextOverflow.ellipsis,
+                              child: ListTile(
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: isSmallScreen ? 12 : 16,
+                                  vertical: isSmallScreen ? 8 : 12,
                                 ),
-                              ),
-                            ],
-                          ),
-                          trailing: _isEmployee
-                              ? null // No mostrar menú para empleados
-                              : PopupMenuButton(
-                                  icon: Icon(
-                                    Icons.more_vert,
-                                    color: colorScheme.onSurfaceVariant,
-                                    size: isSmallScreen ? 20 : 24,
+                                leading: Container(
+                                  width: avatarSize,
+                                  height: avatarSize,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        colorScheme.primaryContainer,
+                                        colorScheme.secondaryContainer,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      isSmallScreen ? 10 : 12,
+                                    ),
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      onTap: () {
-                                        Future.delayed(
-                                          Duration.zero,
-                                          () => _showEditClientDialog(c),
-                                        );
-                                      },
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.edit,
-                                            size: isSmallScreen ? 18 : 20,
-                                            color: colorScheme.primary,
-                                          ),
-                                          SizedBox(
-                                            width: Responsive.spacing(
-                                              context,
-                                              12,
-                                            ),
-                                          ),
-                                          Text(
-                                            'Editar',
-                                            style: TextStyle(
-                                              fontSize: isSmallScreen ? 13 : 14,
-                                            ),
-                                          ),
-                                        ],
+                                  child: Center(
+                                    child: Text(
+                                      nombre.isNotEmpty
+                                          ? nombre[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        fontSize: fontSize,
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    PopupMenuItem(
-                                      onTap: () {
-                                        Future.delayed(
-                                          Duration.zero,
-                                          () => _deleteClient(c),
-                                        );
-                                      },
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.delete,
-                                            size: isSmallScreen ? 18 : 20,
-                                            color: colorScheme.error,
-                                          ),
-                                          SizedBox(
-                                            width: Responsive.spacing(
-                                              context,
-                                              12,
+                                  ),
+                                ),
+                                title: Text(
+                                  nombre,
+                                  style: (isSmallScreen
+                                          ? textTheme.titleSmall
+                                          : textTheme.titleMedium)
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.phone,
+                                      size: isSmallScreen ? 12 : 14,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    SizedBox(
+                                      width: Responsive.spacing(context, 4),
+                                    ),
+                                    Flexible(
+                                      child: Text(
+                                        telefono,
+                                        style: (isSmallScreen
+                                                ? textTheme.bodySmall
+                                                : textTheme.bodyMedium)
+                                            ?.copyWith(
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
                                             ),
-                                          ),
-                                          Text(
-                                            'Eliminar',
-                                            style: TextStyle(
-                                              fontSize: isSmallScreen ? 13 : 14,
-                                            ),
-                                          ),
-                                        ],
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
                                 ),
+                                trailing: _isEmployee
+                                    ? null
+                                    : PopupMenuButton(
+                                        icon: Icon(
+                                          Icons.more_vert,
+                                          color: colorScheme.onSurfaceVariant,
+                                          size: isSmallScreen ? 20 : 24,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        itemBuilder: (context) => [
+                                          PopupMenuItem(
+                                            onTap: () {
+                                              Future.delayed(
+                                                Duration.zero,
+                                                () =>
+                                                    _showEditClientDialog(c),
+                                              );
+                                            },
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.edit,
+                                                  size: isSmallScreen ? 18 : 20,
+                                                  color: colorScheme.primary,
+                                                ),
+                                                SizedBox(
+                                                  width: Responsive.spacing(
+                                                    context,
+                                                    12,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Editar',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        isSmallScreen ? 13 : 14,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            onTap: () {
+                                              Future.delayed(
+                                                Duration.zero,
+                                                () => _deleteClient(c),
+                                              );
+                                            },
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.delete,
+                                                  size: isSmallScreen ? 18 : 20,
+                                                  color: colorScheme.error,
+                                                ),
+                                                SizedBox(
+                                                  width: Responsive.spacing(
+                                                    context,
+                                                    12,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Eliminar',
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        isSmallScreen ? 13 : 14,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                      ),
+                      // Selector de páginas
+                      _buildPaginator(),
+                    ],
                   ),
           ),
         ],
@@ -692,7 +820,8 @@ class _ClientsScreenState extends State<ClientsScreen> {
   }
 }
 
-// Diálogo de editar cliente
+// ── Diálogo de editar cliente ─────────────────────────────────────────────────
+
 class _EditClientDialog extends StatefulWidget {
   final Map<String, dynamic> cliente;
   final int sucursalId;
@@ -737,7 +866,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    // Mostrar loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -769,17 +897,16 @@ class _EditClientDialogState extends State<_EditClientDialog> {
         'sucursal': widget.sucursalId,
       };
 
-      // Preferir documentId (string) si existe; si no, usar id convertido a string
       final String docIdForUpdate =
           widget.cliente['documentId']?.toString() ??
           widget.cliente['id']?.toString() ??
           '';
       if (docIdForUpdate.isEmpty) {
-        if (mounted) Navigator.pop(context); // Cerrar loading
+        if (mounted) Navigator.pop(context);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
+              content: const Text(
                 'ID del cliente no disponible, no se puede actualizar.',
               ),
               backgroundColor: colorScheme.error,
@@ -794,12 +921,9 @@ class _EditClientDialogState extends State<_EditClientDialog> {
       );
       await clienteRepo.updateCliente(docIdForUpdate, actualizado);
 
-      // Cerrar loading
       if (mounted) Navigator.pop(context);
-      // Cerrar diálogo con resultado
       if (mounted) Navigator.pop(context, actualizado);
 
-      // Mostrar confirmación
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -819,7 +943,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
         );
       }
     } catch (e) {
-      // Cerrar loading
       if (mounted) Navigator.pop(context);
 
       if (mounted) {
@@ -876,7 +999,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header con gradiente
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -929,8 +1051,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                     ],
                   ),
                 ),
-
-                // Formulario
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Form(
@@ -938,7 +1058,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Campo Nombre
                         TextFormField(
                           controller: _nombreController,
                           autofocus: true,
@@ -949,9 +1068,8 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               margin: const EdgeInsets.all(8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(
-                                  alpha: 0.5,
-                                ),
+                                color: colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -977,8 +1095,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                           textCapitalization: TextCapitalization.words,
                         ),
                         const SizedBox(height: 16),
-
-                        // Campo Apellido
                         TextFormField(
                           controller: _apellidoController,
                           decoration: InputDecoration(
@@ -1012,8 +1128,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                           textCapitalization: TextCapitalization.words,
                         ),
                         const SizedBox(height: 16),
-
-                        // Campo Teléfono
                         TextFormField(
                           controller: _telefonoController,
                           decoration: InputDecoration(
@@ -1023,9 +1137,8 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                               margin: const EdgeInsets.all(8),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer.withValues(
-                                  alpha: 0.5,
-                                ),
+                                color: colorScheme.tertiaryContainer
+                                    .withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
@@ -1048,8 +1161,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
                           keyboardType: TextInputType.phone,
                         ),
                         const SizedBox(height: 24),
-
-                        // Botones
                         Row(
                           children: [
                             Expanded(

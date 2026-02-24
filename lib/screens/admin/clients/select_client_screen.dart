@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -18,12 +17,20 @@ class SelectClientScreen extends StatefulWidget {
 
 class _SelectClientScreenState extends State<SelectClientScreen>
     with SingleTickerProviderStateMixin {
+  static const int _pageSize = 20;
+
   List<dynamic> clients = [];
-  bool isLoading = true;
+  bool isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 1;
   String? loadError;
   String query = '';
+
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
 
@@ -38,9 +45,16 @@ class _SelectClientScreenState extends State<SelectClientScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadClients();
-      _animationController.forward();
+    _animationController.forward();
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 200 &&
+          _hasMore &&
+          !_isLoadingMore &&
+          !isLoading) {
+        _loadMore();
+      }
     });
   }
 
@@ -48,58 +62,97 @@ class _SelectClientScreenState extends State<SelectClientScreen>
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadClients([String? q]) async {
-    setState(() {
-      isLoading = true;
-      loadError = null;
-    });
-    try {
-      final data = await Provider.of<ClienteRepository>(
-        context,
-        listen: false,
-      ).searchClientes(sucursalId: widget.sucursalId, query: q);
+  Future<void> _loadClients([String? q, bool append = false]) async {
+    if (!append) {
       setState(() {
-        clients = data;
+        isLoading = true;
+        loadError = null;
+        clients = [];
+        _currentPage = 1;
+        _hasMore = true;
+      });
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
+
+    try {
+      final repo = Provider.of<ClienteRepository>(context, listen: false);
+      final data = await repo.searchClientes(
+        sucursalId: widget.sucursalId,
+        query: q,
+        page: _currentPage,
+        pageSize: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (append) {
+          clients.addAll(data);
+        } else {
+          clients = data;
+        }
+        _hasMore = data.length == _pageSize;
         isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (e) {
       final msg = e.toString();
       if (kDebugMode) debugPrint('SelectClientScreen: error: $msg');
+      if (!mounted) return;
       setState(() {
         loadError = msg;
-        clients = [];
+        if (!append) clients = [];
         isLoading = false;
+        _isLoadingMore = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar clientes: $msg'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar clientes: $msg'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+
+  void _loadMore() {
+    _currentPage++;
+    final q = query.trim();
+    _loadClients(q.isEmpty ? null : q, true);
   }
 
   Future<void> _openCreateClient() async {
     final res = await CreateClientDialog.show(context, widget.sucursalId);
+    if (!mounted) return;
     if (res != null) {
-      if (mounted) Navigator.pop(context, res);
+      Navigator.pop(context, res);
     } else {
-      await _loadClients(query);
+      final q = query.trim();
+      if (q.length >= 3) {
+        await _loadClients(q);
+      }
     }
   }
 
   void _onSearchChanged(String v) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+    _debounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      setState(() => query = v);
-      _loadClients(v.trim().isEmpty ? null : v.trim());
+      final trimmed = v.trim();
+      setState(() => query = trimmed);
+      if (trimmed.isEmpty) {
+        // limpiar resultados sin disparar query
+        setState(() {
+          clients = [];
+          _hasMore = false;
+          loadError = null;
+        });
+      } else if (trimmed.length >= 3) {
+        _loadClients(trimmed);
+      }
     });
   }
 
@@ -161,141 +214,175 @@ class _SelectClientScreenState extends State<SelectClientScreen>
           Expanded(
             child: FadeTransition(
               opacity: _fadeAnimation,
-              child: Builder(
-                builder: (context) {
-                  if (isLoading) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(color: cs.primary),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Cargando clientes...',
-                            style: tt.bodyLarge?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (loadError != null) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 56,
-                              color: cs.error,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Error al cargar clientes',
-                              style: tt.titleLarge?.copyWith(
-                                color: cs.error,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(loadError!, textAlign: TextAlign.center),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              onPressed: () => _loadClients(query),
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Reintentar'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (clients.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.person_search_rounded,
-                            size: 64,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            query.isEmpty
-                                ? 'No hay clientes en esta sucursal'
-                                : 'No se encontraron clientes',
-                            style: tt.titleLarge?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (query.isEmpty)
-                            FilledButton.tonalIcon(
-                              onPressed: _openCreateClient,
-                              icon: const Icon(Icons.person_add_rounded),
-                              label: const Text('Registrar cliente'),
-                            ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    itemCount: clients.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, idx) {
-                      final c = clients[idx] as Map<String, dynamic>;
-                      final nombre =
-                          ('${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}')
-                              .trim();
-                      final telefono = c['telefono']?.toString() ?? '';
-                      final initials = nombre.isNotEmpty
-                          ? nombre[0].toUpperCase()
-                          : '?';
-
-                      return ListTile(
-                        onTap: () => Navigator.pop(context, c),
-                        leading: CircleAvatar(
-                          backgroundColor: cs.primaryContainer,
-                          child: Text(
-                            initials,
-                            style: TextStyle(
-                              color: cs.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        title: Text(nombre.isNotEmpty ? nombre : 'Sin nombre'),
-                        subtitle: Text(
-                          telefono.isNotEmpty ? telefono : 'Sin teléfono',
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        tileColor: cs.surfaceContainerHighest.withValues(
-                          alpha: 0.02,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+              child: _buildBody(cs, tt),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBody(ColorScheme cs, TextTheme tt) {
+    // Estado inicial: sin búsqueda aún
+    if (!isLoading && clients.isEmpty && query.isEmpty && loadError == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_rounded,
+              size: 64,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Escribe al menos 3 caracteres\npara buscar',
+              textAlign: TextAlign.center,
+              style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Query muy corto (1-2 chars): indicar que se necesitan más
+    if (!isLoading &&
+        clients.isEmpty &&
+        query.isNotEmpty &&
+        query.length < 3 &&
+        loadError == null) {
+      return Center(
+        child: Text(
+          'Escribe al menos 3 caracteres\npara buscar',
+          textAlign: TextAlign.center,
+          style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+        ),
+      );
+    }
+
+    if (isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: cs.primary),
+            const SizedBox(height: 12),
+            Text(
+              'Buscando clientes...',
+              style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 56, color: cs.error),
+              const SizedBox(height: 16),
+              Text(
+                'Error al cargar clientes',
+                style: tt.titleLarge?.copyWith(
+                  color: cs.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(loadError!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => _loadClients(
+                  query.trim().isEmpty ? null : query.trim(),
+                ),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (clients.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_search_rounded,
+              size: 64,
+              color: cs.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No se encontraron clientes',
+              style: tt.titleLarge?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: _openCreateClient,
+              icon: const Icon(Icons.person_add_rounded),
+              label: const Text('Registrar cliente'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final itemCount = clients.length + (_isLoadingMore ? 1 : 0);
+
+    return ListView.separated(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: itemCount,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, idx) {
+        if (idx == clients.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final c = clients[idx] as Map<String, dynamic>;
+        final nombre =
+            ('${c['nombreCliente'] ?? ''} ${c['apellidoCliente'] ?? ''}')
+                .trim();
+        final telefono = c['telefono']?.toString() ?? '';
+        final initials = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
+
+        return ListTile(
+          onTap: () => Navigator.pop(context, c),
+          leading: CircleAvatar(
+            backgroundColor: cs.primaryContainer,
+            child: Text(
+              initials,
+              style: TextStyle(
+                color: cs.onPrimaryContainer,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          title: Text(nombre.isNotEmpty ? nombre : 'Sin nombre'),
+          subtitle: Text(
+            telefono.isNotEmpty ? telefono : 'Sin teléfono',
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          tileColor: cs.surfaceContainerHighest.withValues(alpha: 0.02),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+        );
+      },
     );
   }
 }
