@@ -40,10 +40,9 @@ class FinancialReport extends StatelessWidget {
           final value = (e is Map && e['value'] is num)
               ? (e['value'] as num).toDouble()
               : 0.0;
-          // Traducir días de la semana en inglés solo cuando aplica
+          // Traducir días de la semana en inglés cuando la granularidad es diaria
           final translated =
-              (chartGranularity == ChartGranularity.daily &&
-                  period == ReportPeriod.week)
+              (chartGranularity == ChartGranularity.daily)
               ? _weekdayLabelEs(label)
               : label;
           return {'label': translated, 'value': value};

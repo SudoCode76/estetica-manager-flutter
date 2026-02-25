@@ -196,10 +196,11 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     }
   }
 
-  void _logout() {
+  Future<void> _logout() async {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
@@ -219,29 +220,57 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           ],
         );
       },
-    ).then((confirmed) async {
-      if (confirmed != true) return;
-      // Acción de cierre de sesión: cerrar sesión en Supabase, limpiar provider y prefs, navegar a login
-      try {
-        await SupabaseAuthService().signOut();
-      } catch (e) {
-        debugPrint('EmployeeHome: Error al ejecutar signOut Supabase: $e');
-      }
+    );
 
-      _sucursalProvider?.clearSucursal();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('jwt');
-      await prefs.remove('user');
-      await prefs.remove('userType');
-      await prefs.remove('selectedSucursalId');
-      await prefs.remove('selectedSucursalName');
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
-    });
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    // Mostrar loader mientras se cierra sesión
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: Dialog(
+          backgroundColor: colorScheme.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: colorScheme.primary),
+                const SizedBox(height: 20),
+                Text(
+                  'Cerrando sesión...',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      await SupabaseAuthService().signOut();
+    } catch (e) {
+      debugPrint('EmployeeHome: Error al ejecutar signOut Supabase: $e');
+    }
+
+    _sucursalProvider?.clearSucursal();
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override

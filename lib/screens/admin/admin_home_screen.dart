@@ -382,6 +382,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   Future<void> _logout() async {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -406,29 +407,52 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
+
+    // Mostrar loader mientras se cierra sesión
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: Dialog(
+          backgroundColor: colorScheme.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: colorScheme.primary),
+                const SizedBox(height: 20),
+                Text(
+                  'Cerrando sesión...',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
 
     try {
-      // Cerrar sesión con Supabase (esto limpia SharedPreferences también)
       await SupabaseAuthService().signOut();
-
-      // Limpiar sucursal del provider
       _sucursalProvider?.clearSucursal();
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
     } catch (e) {
       debugPrint('Error al cerrar sesión: $e');
-      // Aún sí navegar al login
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
+    }
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 

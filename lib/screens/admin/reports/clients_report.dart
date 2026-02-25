@@ -27,9 +27,7 @@ class ClientsReport extends StatelessWidget {
           final value = (e is Map && e['value'] is num)
               ? (e['value'] as num).toDouble()
               : 0.0;
-          final translated = (period == ReportPeriod.week)
-              ? _weekdayLabelEs(label)
-              : label;
+          final translated = _weekdayLabelEs(label);
           return {'label': translated, 'value': value};
         })
         .toList();
