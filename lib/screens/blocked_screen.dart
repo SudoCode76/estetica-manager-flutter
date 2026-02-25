@@ -10,8 +10,11 @@ class BlockedScreen extends StatelessWidget {
 
   Future<void> _launchWeb() async {
     final uri = Uri.parse(_webUrl);
-    if (await canLaunchUrl(uri)) {
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Fallback: webview interno si el navegador externo no está disponible
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
     }
   }
 

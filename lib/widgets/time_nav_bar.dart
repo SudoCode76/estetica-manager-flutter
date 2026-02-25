@@ -17,6 +17,7 @@ class TimeNavBar extends StatefulWidget {
     required this.onRangeChanged,
     required this.onMonthChanged,
     required this.onYearChanged,
+    this.allowFuture = false,
   });
 
   final ReportDateMode mode;
@@ -29,6 +30,10 @@ class TimeNavBar extends StatefulWidget {
   final ValueChanged<DateTimeRange> onRangeChanged;
   final void Function(int year, int month) onMonthChanged;
   final ValueChanged<int> onYearChanged;
+
+  /// Si es true, los pickers permiten seleccionar fechas futuras.
+  /// Útil para pantallas de sesiones/agenda donde existen citas futuras.
+  final bool allowFuture;
 
   @override
   State<TimeNavBar> createState() => _TimeNavBarState();
@@ -48,6 +53,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
 
   bool get _canGoForward {
     if (!_isDayMode) return false;
+    if (widget.allowFuture) return true;
     final now = DateTime.now();
     final d = widget.selectedDate;
     return !(d.year == now.year && d.month == now.month && d.day == now.day);
@@ -55,8 +61,9 @@ class _TimeNavBarState extends State<TimeNavBar> {
 
   IconData get _modeIcon {
     if (_mode == ReportDateMode.yearPick) return Icons.event_repeat_rounded;
-    if (_mode == ReportDateMode.monthPick)
+    if (_mode == ReportDateMode.monthPick) {
       return Icons.calendar_view_month_rounded;
+    }
     if (_mode == ReportDateMode.dateRange) return Icons.date_range_rounded;
     return Icons.calendar_today_rounded;
   }
@@ -95,15 +102,18 @@ class _TimeNavBarState extends State<TimeNavBar> {
   Future<void> _pickDay(BuildContext context) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final initial = widget.selectedDate.isAfter(today)
-        ? today
+    final lastDate = widget.allowFuture
+        ? DateTime(now.year + 2, 12, 31)
+        : today;
+    final initial = widget.selectedDate.isAfter(lastDate)
+        ? lastDate
         : widget.selectedDate;
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2020),
-      lastDate: today,
+      lastDate: lastDate,
       locale: const Locale('es'),
     );
     if (picked != null) widget.onDateChanged(picked);
@@ -112,6 +122,9 @@ class _TimeNavBarState extends State<TimeNavBar> {
   Future<void> _pickRange(BuildContext context) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final lastDate = widget.allowFuture
+        ? DateTime(now.year + 2, 12, 31)
+        : today;
     final initialRange =
         widget.selectedRange ??
         DateTimeRange(
@@ -123,7 +136,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
       context: context,
       initialDateRange: initialRange,
       firstDate: DateTime(2020),
-      lastDate: today,
+      lastDate: lastDate,
       locale: const Locale('es'),
     );
     if (picked != null) widget.onRangeChanged(picked);

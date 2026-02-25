@@ -56,6 +56,15 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Permitir abrir URLs http/https en el navegador -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
         <!-- Permitir visibilidad de WhatsApp y WhatsApp Business -->
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />

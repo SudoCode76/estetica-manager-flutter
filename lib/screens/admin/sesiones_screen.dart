@@ -2,11 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:app_estetica/providers/reports_provider.dart';
 import 'package:app_estetica/models/agenda_item.dart';
+import 'package:app_estetica/widgets/time_nav_bar.dart';
 
 class SesionesScreen extends StatefulWidget {
   const SesionesScreen({super.key});
@@ -17,11 +18,12 @@ class SesionesScreen extends StatefulWidget {
 
 class _SesionesScreenState extends State<SesionesScreen>
     with SingleTickerProviderStateMixin {
-  // Usamos un rango por defecto: hoy - hoy
-  DateTimeRange _selectedRange = DateTimeRange(
-    start: DateTime.now(),
-    end: DateTime.now(),
-  );
+  // --- Navegación de fechas (igual que en reportes / tickets) ---
+  ReportDateMode _dateMode = ReportDateMode.singleDay;
+  DateTime _selectedDate = DateTime.now();
+  DateTimeRange? _selectedRange;
+  DateTime? _selectedMonth;
+  int? _selectedYear;
   SucursalProvider? _sucursalProvider;
   late TabController _tabController;
   String _filtroEstado = 'agendada'; // 'agendada' o 'realizada'
@@ -110,85 +112,88 @@ class _SesionesScreenState extends State<SesionesScreen>
   Future<void> _loadAgenda() async {
     final sucursalId = _sucursalProvider?.selectedSucursalId;
 
-    // Verificar que hay sucursal seleccionada
     if (sucursalId == null) {
       debugPrint(
         'SesionesScreen: No hay sucursal seleccionada, no se puede cargar agenda',
       );
-      if (mounted) {
-        setState(() {
-          // El provider manejará el estado de error
-        });
-      }
+      if (mounted) setState(() {});
       return;
     }
 
+    // Calcular start/end según el modo activo
+    DateTime start;
+    DateTime end;
+
+    switch (_dateMode) {
+      case ReportDateMode.singleDay:
+      case ReportDateMode.period:
+        start = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+        );
+        end = start;
+        break;
+      case ReportDateMode.dateRange:
+        start = _selectedRange!.start;
+        end = _selectedRange!.end;
+        break;
+      case ReportDateMode.monthPick:
+        final m = _selectedMonth!;
+        start = DateTime(m.year, m.month, 1);
+        end = DateTime(m.year, m.month + 1, 0);
+        break;
+      case ReportDateMode.yearPick:
+        start = DateTime(_selectedYear!, 1, 1);
+        end = DateTime(_selectedYear!, 12, 31);
+        break;
+    }
+
     debugPrint(
-      'SesionesScreen: Loading agenda for range=${_selectedRange.start} -> ${_selectedRange.end} and sucursal=$sucursalId, estado=$_filtroEstado',
+      'SesionesScreen: Loading agenda for $start -> $end | sucursal=$sucursalId | estado=$_filtroEstado',
     );
 
-    // Usar fetchAgendaRango para soportar rango de fechas (inicialmente hoy)
     await Provider.of<TicketProvider>(context, listen: false).fetchAgendaRango(
-      start: _selectedRange.start,
-      end: _selectedRange.end,
+      start: start,
+      end: end,
       sucursalId: sucursalId,
       estadoSesion: _filtroEstado,
     );
   }
 
-  // Selector de rango
-  Future<void> _selectDateRange() async {
-    final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 2),
-      initialDateRange: _selectedRange,
-      locale: const Locale('es', 'ES'),
-      builder: (context, child) {
-        // Asegurar que el DateRangePicker tenga MaterialLocalizations disponibles
-        return Localizations.override(
-          context: context,
-          locale: const Locale('es', 'ES'),
-          delegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: Theme.of(context).colorScheme.copyWith(
-                primary: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            child: child!,
-          ),
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedRange = picked;
-      });
-      _loadAgenda();
-    }
+  // --- Callbacks para TimeNavBar ---
+  void _onDateChanged(DateTime d) {
+    setState(() {
+      _dateMode = ReportDateMode.singleDay;
+      _selectedDate = d;
+    });
+    _loadAgenda();
   }
 
-  String _getRangoTexto() {
-    final start = DateFormat('d MMM', 'es_ES').format(_selectedRange.start);
-    final end = DateFormat('d MMM', 'es_ES').format(_selectedRange.end);
-
-    if (_selectedRange.start.day == _selectedRange.end.day &&
-        _selectedRange.start.month == _selectedRange.end.month &&
-        _selectedRange.start.year == _selectedRange.end.year) {
-      return DateFormat(
-        'EEEE, d MMMM yyyy',
-        'es_ES',
-      ).format(_selectedRange.start);
-    }
-    return '$start - $end';
+  void _onRangeChanged(DateTimeRange r) {
+    setState(() {
+      _dateMode = ReportDateMode.dateRange;
+      _selectedRange = r;
+    });
+    _loadAgenda();
   }
+
+  void _onMonthChanged(int year, int month) {
+    setState(() {
+      _dateMode = ReportDateMode.monthPick;
+      _selectedMonth = DateTime(year, month);
+    });
+    _loadAgenda();
+  }
+
+  void _onYearChanged(int year) {
+    setState(() {
+      _dateMode = ReportDateMode.yearPick;
+      _selectedYear = year;
+    });
+    _loadAgenda();
+  }
+
 
   // --- NUEVAS FUNCIONES UTIL: normalizar texto y filtrar agenda ---
   String _normalize(String s) {
@@ -239,10 +244,11 @@ class _SesionesScreenState extends State<SesionesScreen>
     if (value.trim().isEmpty) {
       if (_debounceSearch?.isActive ?? false) _debounceSearch!.cancel();
       // Limpiar resultados de búsqueda en servidor cuando se borra el término
-      if (mounted)
+      if (mounted) {
         setState(() {
           _searchResults = null;
         });
+      }
       debugPrint('Sesiones: búsqueda vacía, mostrando todas las sesiones');
       return;
     }
@@ -277,15 +283,17 @@ class _SesionesScreenState extends State<SesionesScreen>
         });
       } catch (e) {
         debugPrint('Sesiones: search error: ${e.toString()}');
-        if (mounted)
+        if (mounted) {
           setState(() {
             _searchResults = [];
           });
+        }
       } finally {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _searching = false;
           });
+        }
       }
     });
   }
@@ -296,7 +304,7 @@ class _SesionesScreenState extends State<SesionesScreen>
       final term = _normalize(_search);
       final filtered = <dynamic>[];
 
-      String _extractNombreCliente(dynamic item) {
+      String extractNombreCliente(dynamic item) {
         try {
           if (item == null) return '';
           // Si ya es AgendaItem
@@ -418,7 +426,7 @@ class _SesionesScreenState extends State<SesionesScreen>
 
       for (final item in agenda) {
         try {
-          final nombre = _extractNombreCliente(item);
+          final nombre = extractNombreCliente(item);
           if (nombre.isNotEmpty && _normalize(nombre).contains(term)) {
             filtered.add(item);
             continue;
@@ -454,67 +462,20 @@ class _SesionesScreenState extends State<SesionesScreen>
     return Scaffold(
       body: Column(
         children: [
-          // Selector de rango compacto
-          InkWell(
-            onTap: _selectDateRange,
-            child: Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primaryContainer,
-                    colorScheme.primaryContainer.withValues(alpha: 0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colorScheme.primary.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.event,
-                      color: colorScheme.onPrimary,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Periodo visualizado',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer.withValues(
-                              alpha: 0.8,
-                            ),
-                            fontSize: 11,
-                          ),
-                        ),
-                        Text(
-                          _getRangoTexto(),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.edit, size: 18),
-                ],
-              ),
+          // Selector de fecha con TimeNavBar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: TimeNavBar(
+              mode: _dateMode,
+              selectedDate: _selectedDate,
+              selectedRange: _selectedRange,
+              selectedMonth: _selectedMonth,
+              selectedYear: _selectedYear,
+              onDateChanged: _onDateChanged,
+              onRangeChanged: _onRangeChanged,
+              onMonthChanged: _onMonthChanged,
+              onYearChanged: _onYearChanged,
+              allowFuture: true,
             ),
           ),
 
@@ -734,7 +695,15 @@ class _SesionesScreenState extends State<SesionesScreen>
                           ),
                           const Spacer(),
                           Text(
-                            _getRangoTexto(),
+                            _dateMode == ReportDateMode.singleDay
+                                ? DateFormat('d MMM yyyy', 'es_ES').format(_selectedDate)
+                                : _dateMode == ReportDateMode.dateRange && _selectedRange != null
+                                    ? '${DateFormat('d MMM', 'es_ES').format(_selectedRange!.start)} – ${DateFormat('d MMM', 'es_ES').format(_selectedRange!.end)}'
+                                    : _dateMode == ReportDateMode.monthPick && _selectedMonth != null
+                                        ? DateFormat('MMMM yyyy', 'es_ES').format(_selectedMonth!)
+                                        : _selectedYear != null
+                                            ? 'Año $_selectedYear'
+                                            : '',
                             style: theme.textTheme.bodySmall,
                           ),
                         ],
@@ -756,6 +725,7 @@ class _SesionesScreenState extends State<SesionesScreen>
                               // Mostrar acciones (reprogramar/atendida) sólo si estamos en la pestaña 'agendada'
                               showActions: _filtroEstado == 'agendada',
                               onMarcarAtendida: () async {
+                                final messenger = ScaffoldMessenger.of(context);
                                 final confirmed = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
@@ -782,7 +752,7 @@ class _SesionesScreenState extends State<SesionesScreen>
                                   final success = await provider
                                       .marcarSesionAtendida(sesion.sesionId);
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       SnackBar(
                                         content: Text(
                                           success
@@ -833,6 +803,7 @@ class _SesionesScreenState extends State<SesionesScreen>
                                 }
                               },
                               onReprogramar: () async {
+                                final messenger = ScaffoldMessenger.of(context);
                                 final picked = await showDatePicker(
                                   context: context,
                                   initialDate:
@@ -843,6 +814,7 @@ class _SesionesScreenState extends State<SesionesScreen>
                                 );
 
                                 if (picked != null) {
+                                  if (!mounted) return;
                                   final time = await showTimePicker(
                                     context: context,
                                     initialTime: TimeOfDay.fromDateTime(
@@ -865,9 +837,7 @@ class _SesionesScreenState extends State<SesionesScreen>
                                           nuevaFecha,
                                         );
                                     if (mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
+                                      messenger.showSnackBar(
                                         SnackBar(
                                           content: Text(
                                             success
@@ -943,12 +913,12 @@ class _SesionCard extends StatelessWidget {
   final bool showActions;
 
   const _SesionCard({
-    Key? key,
+    super.key,
     required this.sesion,
     required this.onMarcarAtendida,
     required this.onReprogramar,
     this.showActions = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
