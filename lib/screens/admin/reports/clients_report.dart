@@ -141,6 +141,27 @@ class ClientsReport extends StatelessWidget {
                                 ],
                               );
                             }),
+                            barTouchData: BarTouchData(
+                              touchTooltipData: BarTouchTooltipData(
+                                getTooltipColor: (_) => cs.primaryContainer,
+                                tooltipBorderRadius:
+                                    BorderRadius.circular(12),
+                                getTooltipItem: (
+                                  group,
+                                  groupIndex,
+                                  rod,
+                                  rodIndex,
+                                ) {
+                                  return BarTooltipItem(
+                                    '${rod.toY.toInt()} clientes',
+                                    TextStyle(
+                                      color: cs.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                             gridData: const FlGridData(show: false),
                             titlesData: FlTitlesData(
                               show: true,

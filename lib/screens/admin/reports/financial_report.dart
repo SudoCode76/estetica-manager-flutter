@@ -137,6 +137,28 @@ class FinancialReport extends StatelessWidget {
                                         chartData,
                                         cs,
                                       ),
+                                      barTouchData: BarTouchData(
+                                        touchTooltipData: BarTouchTooltipData(
+                                          getTooltipColor: (_) =>
+                                              cs.primaryContainer,
+                                          tooltipBorderRadius:
+                                              BorderRadius.circular(12),
+                                          getTooltipItem: (
+                                            group,
+                                            groupIndex,
+                                            rod,
+                                            rodIndex,
+                                          ) {
+                                            return BarTooltipItem(
+                                              'Bs ${rod.toY.toStringAsFixed(2)}',
+                                              TextStyle(
+                                                color: cs.onPrimaryContainer,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
                                       gridData: const FlGridData(show: false),
                                       titlesData: FlTitlesData(
                                         leftTitles: const AxisTitles(
