@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -919,34 +918,18 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                             ? maxWidth
                             : constraints.maxWidth,
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          Responsive.isSmallScreen(context) ? 20 : 28,
+                      child: Card(
+                        elevation: 2,
+                        color: colorScheme.surfaceContainer,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            Responsive.isSmallScreen(context) ? 20 : 28,
+                          ),
                         ),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(28),
-                              color: colorScheme.surface.withValues(
-                                alpha: 0.12,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 30,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                              border: Border.all(
-                                color: colorScheme.outline.withValues(
-                                  alpha: 0.06,
-                                ),
-                              ),
-                            ),
-                            padding: EdgeInsets.all(
-                              Responsive.isSmallScreen(context) ? 16 : 24,
-                            ),
+                        child: Padding(
+                          padding: EdgeInsets.all(
+                            Responsive.isSmallScreen(context) ? 16 : 24,
+                          ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -1285,37 +1268,25 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                                               : null,
                                                         ),
                                                       ),
-                                                      if (isSelected) ...[
-                                                        const SizedBox(
-                                                          width: 8,
-                                                        ),
-                                                        Container(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 6,
-                                                                vertical: 2,
-                                                              ),
-                                                          decoration: BoxDecoration(
-                                                            color: colorScheme
-                                                                .primaryContainer,
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  4,
-                                                                ),
-                                                          ),
-                                                          child: Text(
-                                                            '$cantidadSesiones sesión${cantidadSesiones > 1 ? "es" : ""}',
-                                                            style: TextStyle(
-                                                              fontSize: 10,
-                                                              color: colorScheme
-                                                                  .onPrimaryContainer,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
+                                                                       if (isSelected) ...[
+                                                                        const SizedBox(
+                                                                          width: 8,
+                                                                        ),
+                                                                        Chip(
+                                                                          label: Text(
+                                                                            '$cantidadSesiones ses.',
+                                                                            style: TextStyle(
+                                                                              fontSize: 10,
+                                                                              color: colorScheme.onPrimaryContainer,
+                                                                              fontWeight: FontWeight.bold,
+                                                                            ),
+                                                                          ),
+                                                                          padding: EdgeInsets.zero,
+                                                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                                          side: BorderSide.none,
+                                                                          backgroundColor: colorScheme.primaryContainer,
+                                                                        ),
+                                                                      ],
                                                     ],
                                                   ),
                                                   trailing: isSelected
@@ -1596,70 +1567,63 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                   },
                                 ),
                                 const SizedBox(height: 18),
-                                // Estado de pago y saldo (responsive)
+                                // Estado de pago y saldo (responsive chips)
                                 Wrap(
-                                  spacing: 12,
+                                  spacing: 8,
                                   runSpacing: 6,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
+                                    Chip(
+                                      avatar: Icon(
+                                        estadoPago == 'Completo'
+                                            ? Icons.check_circle_outline
+                                            : Icons.hourglass_empty,
+                                        size: 16,
                                         color: estadoPago == 'Completo'
-                                            ? Colors.green.withValues(
-                                                alpha: 0.12,
-                                              )
-                                            : Colors.orange.withValues(
-                                                alpha: 0.08,
-                                              ),
-                                        borderRadius: BorderRadius.circular(12),
+                                            ? colorScheme.onPrimaryContainer
+                                            : colorScheme.onTertiaryContainer,
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            'Estado de pago: ',
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.bodyMedium,
-                                          ),
-                                          Text(
-                                            estadoPago,
-                                            style: TextStyle(
-                                              color: estadoPago == 'Completo'
-                                                  ? Colors.green
-                                                  : Colors.orange,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .errorContainer
-                                            .withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'Saldo pendiente: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                      label: Text(
+                                        'Pago: $estadoPago',
                                         style: Theme.of(context)
                                             .textTheme
-                                            .bodyMedium
+                                            .labelMedium
                                             ?.copyWith(
                                               fontWeight: FontWeight.bold,
+                                              color: estadoPago == 'Completo'
+                                                  ? colorScheme
+                                                      .onPrimaryContainer
+                                                  : colorScheme
+                                                      .onTertiaryContainer,
                                             ),
                                       ),
+                                      backgroundColor: estadoPago == 'Completo'
+                                          ? colorScheme.primaryContainer
+                                          : colorScheme.tertiaryContainer,
+                                      side: BorderSide.none,
                                     ),
+                                    if (saldoPendiente > 0)
+                                      Chip(
+                                        avatar: Icon(
+                                          Icons.warning_amber,
+                                          size: 16,
+                                          color: colorScheme.onErrorContainer,
+                                        ),
+                                        label: Text(
+                                          'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: colorScheme
+                                                    .onErrorContainer,
+                                              ),
+                                        ),
+                                        backgroundColor:
+                                            colorScheme.errorContainer,
+                                        side: BorderSide.none,
+                                      ),
                                   ],
                                 ),
                                 const SizedBox(height: 24),
@@ -1778,16 +1742,15 @@ class _NewTicketScreenState extends State<NewTicketScreen> {
                                     ),
                                   ),
                                 ),
-                              ],
+                               ],
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
     );
   }
 }

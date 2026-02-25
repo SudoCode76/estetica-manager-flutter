@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/config/responsive.dart';
 import 'package:provider/provider.dart';
@@ -153,33 +152,19 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
     final headerPadding = isSmallScreen ? 16.0 : 24.0;
 
     return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+      backgroundColor: colorScheme.surfaceContainerHigh,
+      elevation: 6,
       insetPadding: EdgeInsets.symmetric(
         horizontal: Responsive.horizontalPadding(context),
         vertical: Responsive.verticalPadding(context),
       ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: dialogWidth),
-          decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(
-              color: colorScheme.outline.withValues(alpha: 0.2),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: isSmallScreen ? 20 : 30,
-                offset: Offset(0, isSmallScreen ? 5 : 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(borderRadius),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -448,7 +433,6 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
             ),
           ),
         ),
-      ),
     );
   }
 }

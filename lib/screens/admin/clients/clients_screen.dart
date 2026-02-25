@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:ui';
 import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/widgets/create_client_dialog.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
@@ -451,15 +450,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
         final fontSize = isSmallScreen ? 18.0 : 20.0;
 
         return Card(
-          margin: EdgeInsets.only(bottom: Responsive.spacing(context, 12)),
+          margin: EdgeInsets.only(bottom: Responsive.spacing(context, 10)),
           elevation: 2,
+          color: colorScheme.surfaceContainer,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 16),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: ListTile(
             contentPadding: EdgeInsets.symmetric(
               horizontal: isSmallScreen ? 12 : 16,
-              vertical: isSmallScreen ? 8 : 12,
+              vertical: isSmallScreen ? 8 : 10,
             ),
             leading: Container(
               width: avatarSize,
@@ -467,20 +467,20 @@ class _ClientsScreenState extends State<ClientsScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    colorScheme.primaryContainer,
-                    colorScheme.secondaryContainer,
+                    colorScheme.primary,
+                    colorScheme.secondary,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(isSmallScreen ? 10 : 12),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
                 child: Text(
                   nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
                   style: TextStyle(
                     fontSize: fontSize,
-                    color: colorScheme.onPrimaryContainer,
+                    color: colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -954,30 +954,16 @@ class _EditClientDialogState extends State<_EditClientDialog> {
     final textTheme = Theme.of(context).textTheme;
 
     return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
+      backgroundColor: colorScheme.surfaceContainerHigh,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
-          decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: colorScheme.outline.withValues(alpha: 0.2),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(32),
-            child: Column(
+          child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
@@ -1177,7 +1163,6 @@ class _EditClientDialogState extends State<_EditClientDialog> {
             ),
           ),
         ),
-      ),
     );
   }
 }

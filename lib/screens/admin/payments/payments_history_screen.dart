@@ -93,6 +93,7 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     // Calcular total global
     final totalHistorico = _clients.fold<double>(
@@ -109,7 +110,7 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const Icon(Icons.error_outline, size: 48),
                   const SizedBox(height: 8),
                   Text('Error: $_error'),
                   TextButton(
@@ -221,7 +222,9 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   side: BorderSide(
-                                    color: Colors.grey.withValues(alpha: 0.1),
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                 ),
                                 child: InkWell(
@@ -277,17 +280,17 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
                                                         vertical: 4,
                                                       ),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.orange
-                                                        .withValues(alpha: 0.1),
+                                                    color: cs.tertiaryContainer
+                                                        .withValues(alpha: 0.4),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           8,
                                                         ),
                                                   ),
-                                                  child: const Text(
+                                                  child: Text(
                                                     'Tiene deuda',
                                                     style: TextStyle(
-                                                      color: Colors.orange,
+                                                      color: cs.tertiary,
                                                       fontSize: 10,
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -302,17 +305,17 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
                                                         vertical: 4,
                                                       ),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.green
-                                                        .withValues(alpha: 0.1),
+                                                    color: cs.primaryContainer
+                                                        .withValues(alpha: 0.5),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           8,
                                                         ),
                                                   ),
-                                                  child: const Text(
+                                                  child: Text(
                                                     'Al día',
                                                     style: TextStyle(
-                                                      color: Colors.green,
+                                                      color: cs.primary,
                                                       fontSize: 10,
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -332,9 +335,9 @@ class _PaymentsHistoryScreenState extends State<PaymentsHistoryScreen> {
                                               ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Icon(
+                                         Icon(
                                           Icons.chevron_right,
-                                          color: Colors.grey,
+                                          color: cs.onSurfaceVariant,
                                         ),
                                       ],
                                     ),

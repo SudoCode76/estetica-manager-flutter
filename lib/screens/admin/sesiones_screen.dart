@@ -523,13 +523,13 @@ class _SesionesScreenState extends State<SesionesScreen>
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: TabBar(
               controller: _tabController,
               indicator: BoxDecoration(
                 color: colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
               labelColor: colorScheme.onPrimary,
               unselectedLabelColor: colorScheme.onSurfaceVariant,
@@ -570,7 +570,7 @@ class _SesionesScreenState extends State<SesionesScreen>
                   context,
                 ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide.none,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -790,8 +790,8 @@ class _SesionesScreenState extends State<SesionesScreen>
                                               : 'Error al marcar sesión',
                                         ),
                                         backgroundColor: success
-                                            ? Colors.green
-                                            : Colors.red,
+                                            ? colorScheme.primary
+                                            : colorScheme.error,
                                       ),
                                     );
 
@@ -875,8 +875,8 @@ class _SesionesScreenState extends State<SesionesScreen>
                                                 : 'Error al reprogramar',
                                           ),
                                           backgroundColor: success
-                                              ? Colors.green
-                                              : Colors.red,
+                                              ? colorScheme.primary
+                                              : colorScheme.error,
                                         ),
                                       );
                                       if (success) {
@@ -986,7 +986,7 @@ class _SesionCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1040,7 +1040,7 @@ class _SesionCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1144,12 +1144,11 @@ class _SesionCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: FilledButton.icon(
+                        child: FilledButton.icon(
                         onPressed: onMarcarAtendida,
                         icon: const Icon(Icons.check_circle, size: 18),
                         label: const Text('Atendida'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),

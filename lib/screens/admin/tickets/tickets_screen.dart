@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -866,214 +865,208 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         },
                         child: Stack(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.surface
-                                        .withValues(alpha: 0.65),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.06,
-                                        ),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                    ],
-                                    border: Border.all(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .outline
-                                          .withValues(alpha: 0.08),
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              elevation: 2,
+                              color: colorScheme.surfaceContainer,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          TicketDetailScreen(ticket: t),
                                     ),
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                TicketDetailScreen(ticket: t),
+                                  );
+                                  _reloadTicketsForCurrentFilters();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Avatar con gradiente
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              colorScheme.primary,
+                                              colorScheme.secondary,
+                                            ],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
                                           ),
-                                        );
-                                        _reloadTicketsForCurrentFilters();
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Row(
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            cliente.isNotEmpty
+                                                ? cliente[0].toUpperCase()
+                                                : '?',
+                                            style: textTheme.titleLarge
+                                                ?.copyWith(
+                                                  color: colorScheme.onPrimary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            CircleAvatar(
-                                              radius: 28,
-                                              backgroundColor: Theme.of(
-                                                context,
-                                              ).colorScheme.primaryContainer,
-                                              child: Text(
-                                                cliente.isNotEmpty
-                                                    ? cliente[0].toUpperCase()
-                                                    : '?',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .titleLarge
-                                                    ?.copyWith(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onPrimaryContainer,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                              ),
+                                            Text(
+                                              cliente,
+                                              style: textTheme.titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                             ),
-                                            const SizedBox(width: 16),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    cliente,
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .titleMedium
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              tratamientoTexto,
+                                              style: textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    color: colorScheme.primary,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            // Chips de estado
+                                            Wrap(
+                                              spacing: 6,
+                                              runSpacing: 4,
+                                              children: [
+                                                // Fecha/hora chip
+                                                Chip(
+                                                  avatar: Icon(
+                                                    Icons.access_time,
+                                                    size: 14,
+                                                    color: colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                  label: Text(
+                                                    '$fecha  $hora',
+                                                    style: textTheme.labelSmall
                                                         ?.copyWith(
-                                                          fontWeight:
-                                                              FontWeight.bold,
+                                                          color: colorScheme
+                                                              .onSurfaceVariant,
                                                         ),
                                                   ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    tratamientoTexto,
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyMedium
-                                                        ?.copyWith(
-                                                          color: Theme.of(
-                                                            context,
-                                                          ).colorScheme.primary,
-                                                        ),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons.access_time,
-                                                        size: 16,
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .onSurfaceVariant,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        '$fecha - $hora',
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.copyWith(
-                                                              color: Theme.of(context)
-                                                                  .colorScheme
-                                                                  .onSurfaceVariant,
-                                                            ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  // Mostrar pequeño icono del metodo si existe
-                                                  if (ultimoMetodo != null) ...[
-                                                    const SizedBox(height: 8),
-                                                    Row(
-                                                      children: [
-                                                        Icon(
-                                                          ultimoMetodo.toLowerCase() ==
-                                                                  'qr'
-                                                              ? Icons.qr_code_2
-                                                              : Icons.payments,
-                                                          size: 16,
-                                                          color: Theme.of(
-                                                            context,
-                                                          ).colorScheme.primary,
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 6,
-                                                        ),
-                                                        Text(
-                                                          ultimoMetodo.toLowerCase() ==
-                                                                  'qr'
-                                                              ? 'QR'
-                                                              : 'Efectivo',
-                                                          style: Theme.of(context)
-                                                              .textTheme
-                                                              .bodySmall
-                                                              ?.copyWith(
-                                                                color: Theme.of(context)
-                                                                    .colorScheme
-                                                                    .onSurfaceVariant,
-                                                              ),
-                                                        ),
-                                                      ],
+                                                  padding: EdgeInsets.zero,
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                  side: BorderSide.none,
+                                                  backgroundColor: colorScheme
+                                                      .surfaceContainerHigh,
+                                                ),
+                                                // Método de pago chip
+                                                if (ultimoMetodo != null)
+                                                  Chip(
+                                                    avatar: Icon(
+                                                      ultimoMetodo
+                                                                  .toLowerCase() ==
+                                                              'qr'
+                                                          ? Icons.qr_code_2
+                                                          : Icons.payments,
+                                                      size: 14,
+                                                      color: colorScheme
+                                                          .onPrimaryContainer,
                                                     ),
-                                                  ],
-                                                  if (tieneSaldo) ...[
-                                                    const SizedBox(height: 8),
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 4,
+                                                    label: Text(
+                                                      ultimoMetodo
+                                                                  .toLowerCase() ==
+                                                              'qr'
+                                                          ? 'QR'
+                                                          : 'Efectivo',
+                                                      style: textTheme
+                                                          .labelSmall
+                                                          ?.copyWith(
+                                                            color: colorScheme
+                                                                .onPrimaryContainer,
+                                                            fontWeight:
+                                                                FontWeight.bold,
                                                           ),
-                                                      decoration: BoxDecoration(
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .errorContainer,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              6,
-                                                            ),
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            Icons.warning_amber,
-                                                            size: 14,
-                                                            color: Theme.of(context)
-                                                                .colorScheme
+                                                    ),
+                                                    padding: EdgeInsets.zero,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                    side: BorderSide.none,
+                                                    backgroundColor: colorScheme
+                                                        .primaryContainer,
+                                                  ),
+                                                // Saldo pendiente chip
+                                                if (tieneSaldo)
+                                                  Chip(
+                                                    avatar: Icon(
+                                                      Icons.warning_amber,
+                                                      size: 14,
+                                                      color: colorScheme
+                                                          .onErrorContainer,
+                                                    ),
+                                                    label: Text(
+                                                      'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
+                                                      style: textTheme
+                                                          .labelSmall
+                                                          ?.copyWith(
+                                                            color: colorScheme
                                                                 .onErrorContainer,
+                                                            fontWeight:
+                                                                FontWeight.bold,
                                                           ),
-                                                          const SizedBox(
-                                                            width: 4,
-                                                          ),
-                                                          Text(
-                                                            'Saldo: Bs ${saldoPendiente.toStringAsFixed(2)}',
-                                                            style: Theme.of(context)
-                                                                .textTheme
-                                                                .labelSmall
-                                                                ?.copyWith(
-                                                                  color: Theme.of(
-                                                                    context,
-                                                                  ).colorScheme.onErrorContainer,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
                                                     ),
-                                                  ],
-                                                ],
-                                              ),
+                                                    padding: EdgeInsets.zero,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                    side: BorderSide.none,
+                                                    backgroundColor: colorScheme
+                                                        .errorContainer,
+                                                  ),
+                                                // Pagado chip (sin saldo)
+                                                if (!tieneSaldo)
+                                                  Chip(
+                                                    avatar: Icon(
+                                                      Icons.check_circle_outline,
+                                                      size: 14,
+                                                      color: colorScheme
+                                                          .onPrimaryContainer,
+                                                    ),
+                                                    label: Text(
+                                                      'Pagado',
+                                                      style: textTheme
+                                                          .labelSmall
+                                                          ?.copyWith(
+                                                            color: colorScheme
+                                                                .onPrimaryContainer,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                    ),
+                                                    padding: EdgeInsets.zero,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                    side: BorderSide.none,
+                                                    backgroundColor: colorScheme
+                                                        .primaryContainer,
+                                                  ),
+                                              ],
                                             ),
                                           ],
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -1082,10 +1075,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                 idStr.isNotEmpty)
                               Positioned.fill(
                                 child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
+                                  margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.35),
-                                    borderRadius: BorderRadius.circular(12),
+                                    color:
+                                        Colors.black.withValues(alpha: 0.35),
+                                    borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: const Center(
                                     child: SizedBox(

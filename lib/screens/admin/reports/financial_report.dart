@@ -123,10 +123,12 @@ class FinancialReport extends StatelessWidget {
                         ? SizedBox(
                             height: 180,
                             child: chartData.isEmpty
-                                ? const Center(
+                                ? Center(
                                     child: Text(
                                       'Sin movimientos',
-                                      style: TextStyle(color: Colors.grey),
+                                      style: TextStyle(
+                                        color: cs.onSurfaceVariant,
+                                      ),
                                     ),
                                   )
                                 : BarChart(
@@ -198,7 +200,7 @@ class FinancialReport extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: cs.surfaceContainerHighest.withAlpha(120),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
                               children: [
@@ -333,12 +335,12 @@ class FinancialReport extends StatelessWidget {
 
                 // Totales por método removidos de esta sección
                 if (topTratamientos.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Text(
                         "No se registraron ventas",
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: cs.onSurfaceVariant),
                       ),
                     ),
                   )
@@ -380,7 +382,7 @@ class FinancialReport extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
@@ -443,7 +445,7 @@ class FinancialReport extends StatelessWidget {
             backDrawRodData: BackgroundBarChartRodData(
               show: true,
               toY: _calculateMaxY(data),
-              color: Colors.grey.shade200,
+              color: cs.surfaceContainerHigh,
             ),
           ),
         ],

@@ -520,6 +520,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               (widget.isEmployee ? 'Empleado' : 'Administrador'))
         : (widget.isEmployee ? 'Empleado' : 'Administrador');
 
+    // Títulos dinámicos por índice
+    const screenTitles = [
+      'Tickets',
+      'Agenda de Sesiones',
+      'Clientes',
+      'Tratamientos',
+      'Pagos',
+      'Reportes',
+      'Empleados',
+    ];
+    final currentTitle = screenTitles[_selectedIndex.clamp(
+      0,
+      screenTitles.length - 1,
+    )];
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: MainDrawer(
@@ -544,74 +559,31 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         },
         onLogout: _logout,
       ),
-      body: SafeArea(
-        child: ScaffoldKeyInherited(
-          scaffoldKey: _scaffoldKey,
-          child: Column(
-            children: [
-              // Header global (menú + logo + título)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 360;
-                  final isVerySmall = constraints.maxWidth < 340;
-                  return Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      isCompact ? 8 : 16,
-                      isCompact ? 12 : 16,
-                      isCompact ? 8 : 16,
-                      8,
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.menu),
-                          onPressed: () =>
-                              _scaffoldKey.currentState?.openDrawer(),
-                          style: IconButton.styleFrom(
-                            minimumSize: Size(
-                              isCompact ? 36 : 40,
-                              isCompact ? 36 : 40,
-                            ),
-                            fixedSize: Size(
-                              isCompact ? 36 : 40,
-                              isCompact ? 36 : 40,
-                            ),
-                            backgroundColor:
-                                colorScheme.surfaceContainerHighest,
-                            padding: EdgeInsets.zero,
-                          ),
-                        ),
-                        SizedBox(width: isVerySmall ? 6 : (isCompact ? 8 : 12)),
-                        Icon(
-                          Icons.spa_rounded,
-                          color: colorScheme.primary,
-                          size: isVerySmall ? 20 : (isCompact ? 24 : 28),
-                        ),
-                        SizedBox(width: isVerySmall ? 4 : (isCompact ? 6 : 8)),
-                        Expanded(
-                          child: Text(
-                            'App Estética',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: isVerySmall
-                                      ? 16
-                                      : (isCompact ? 18 : null),
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              // Pantalla seleccionada
-              Expanded(child: _screens[_selectedIndex]),
-            ],
-          ),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          tooltip: 'Menú',
         ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.spa_rounded,
+              color: colorScheme.primary,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(currentTitle),
+          ],
+        ),
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: colorScheme.primary,
+        scrolledUnderElevation: 2,
+      ),
+      body: ScaffoldKeyInherited(
+        scaffoldKey: _scaffoldKey,
+        child: _screens[_selectedIndex],
       ),
       floatingActionButton: _selectedIndex == 0
           ? Builder(
@@ -622,7 +594,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 if (isCompact) {
                   return FloatingActionButton(
                     onPressed: () async {
-                      // obtener user id desde prefs y pasarlo a NewTicketScreen
                       final prefs = await SharedPreferences.getInstance();
                       final userJson = prefs.getString('user');
                       String? userIdStr;
@@ -636,6 +607,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           userIdStr = null;
                         }
                       }
+                      if (!context.mounted) return;
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -647,8 +619,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ),
                         ),
                       );
-                      if (result == true) {
-                        // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
+                      if (result == true && context.mounted) {
                         try {
                           await Provider.of<TicketProvider>(
                             context,
@@ -659,14 +630,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         }
                       }
                     },
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: const Icon(Icons.add),
+                    child: const Icon(Icons.add_rounded),
                   );
                 }
 
                 return FloatingActionButton.extended(
                   onPressed: () async {
-                    // obtener user id desde prefs y pasarlo a NewTicketScreen
                     final prefs = await SharedPreferences.getInstance();
                     final userJson = prefs.getString('user');
                     String? userIdStr;
@@ -680,6 +649,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         userIdStr = null;
                       }
                     }
+                    if (!context.mounted) return;
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -691,8 +661,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                       ),
                     );
-                    if (result == true) {
-                      // Refrescar globalmente usando los mismos filtros que la pantalla de tickets
+                    if (result == true && context.mounted) {
                       try {
                         await Provider.of<TicketProvider>(
                           context,
@@ -703,9 +672,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       }
                     }
                   },
-                  icon: const Icon(Icons.add),
+                  icon: const Icon(Icons.add_rounded),
                   label: const Text('Nuevo Ticket'),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
                 );
               },
             )

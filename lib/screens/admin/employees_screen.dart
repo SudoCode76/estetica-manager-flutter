@@ -149,6 +149,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       ),
     );
 
+          final colorScheme = Theme.of(context).colorScheme;
     if (ok != true) return;
 
     try {
@@ -157,9 +158,9 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       await _repo.eliminarUsuarioFunction(id.toString());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Empleado eliminado'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Empleado eliminado'),
+            backgroundColor: colorScheme.primary,
           ),
         );
         await _loadEmployees();
@@ -167,7 +168,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: colorScheme.error,
+          ),
         );
     }
   }
@@ -242,10 +246,13 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
                           itemCount: _filtered.length,
                           itemBuilder: (ctx, i) {
                             final e = _filtered[i];
-                            final confirmed = e['confirmed'] ?? false;
-                            final blocked = e['blocked'] ?? false;
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
+                              elevation: 2,
+                              color: cs.surfaceContainer,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                               child: ListTile(
                                 leading: CircleAvatar(
                                   child: Text(
@@ -293,6 +300,7 @@ class _EmployeeActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -306,8 +314,8 @@ class _EmployeeActions extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            leading: Icon(Icons.delete, color: cs.error),
+            title: Text('Eliminar', style: TextStyle(color: cs.error)),
             onTap: () {
               Navigator.pop(context);
               onDelete();
@@ -398,7 +406,10 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -407,8 +418,13 @@ class _EmployeeDialogState extends State<_EmployeeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isEdit = widget.employee != null;
     return Dialog(
+      backgroundColor: cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(

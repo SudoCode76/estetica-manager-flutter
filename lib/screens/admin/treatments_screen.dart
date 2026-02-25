@@ -701,7 +701,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen>
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: isNarrow ? 4 : 12, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: activo ? null : cs.surfaceContainerHighest.withValues(alpha: 0.6),
       child: ListTile(
         contentPadding: EdgeInsets.symmetric(
@@ -866,7 +866,7 @@ class _TreatmentsScreenState extends State<TreatmentsScreen>
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: isNarrow ? 4 : 12, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: activoTrat
           ? null
           : cs.surfaceContainerHighest.withValues(alpha: 0.6),

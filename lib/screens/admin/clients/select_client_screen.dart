@@ -221,10 +221,11 @@ class _SelectClientScreenState extends State<SelectClientScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Seleccionar cliente'),
-        elevation: 0,
         backgroundColor: cs.surface,
+        surfaceTintColor: cs.primary,
+        scrolledUnderElevation: 2,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -245,26 +246,16 @@ class _SelectClientScreenState extends State<SelectClientScreen>
               onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Buscar por nombre, apellido o teléfono',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear_rounded),
                         onPressed: () {
                           _searchController.clear();
                           _onSearchChanged('');
                         },
                       )
                     : null,
-                filled: true,
-                fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.06),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
               ),
             ),
           ),
@@ -404,30 +395,55 @@ class _SelectClientScreenState extends State<SelectClientScreen>
         final telefono = c['telefono']?.toString() ?? '';
         final initials = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
 
-        return ListTile(
-          onTap: () => Navigator.pop(context, c),
-          leading: CircleAvatar(
-            backgroundColor: cs.primaryContainer,
-            child: Text(
-              initials,
-              style: TextStyle(
-                color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.bold,
+        return Card(
+          elevation: 2,
+          color: cs.surfaceContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ListTile(
+            onTap: () => Navigator.pop(context, c),
+            leading: CircleAvatar(
+              backgroundColor: cs.primary,
+              child: Text(
+                initials,
+                style: TextStyle(
+                  color: cs.onPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-          title: Text(nombre.isNotEmpty ? nombre : 'Sin nombre'),
-          subtitle: Text(
-            telefono.isNotEmpty ? telefono : 'Sin teléfono',
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          tileColor: cs.surfaceContainerHighest.withValues(alpha: 0.02),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
+            title: Text(
+              nombre.isNotEmpty ? nombre : 'Sin nombre',
+              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            subtitle: telefono.isNotEmpty
+                ? Row(
+                    children: [
+                      Icon(
+                        Icons.phone_rounded,
+                        size: 12,
+                        color: cs.outline,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        telefono,
+                        style: tt.bodySmall?.copyWith(color: cs.outline),
+                      ),
+                    ],
+                  )
+                : Text(
+                    'Sin teléfono',
+                    style: tt.bodySmall?.copyWith(color: cs.outline),
+                  ),
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: cs.primary,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
           ),
         );
       },

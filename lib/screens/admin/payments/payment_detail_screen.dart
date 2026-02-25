@@ -164,9 +164,9 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pago registrado correctamente'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Pago registrado correctamente'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
         await _loadData();
@@ -176,7 +176,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al pagar: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         setState(() => _loading = false);
@@ -283,7 +283,9 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                   Icon(
                                     Icons.check_circle_outline,
                                     size: 64,
-                                    color: Colors.green.withValues(alpha: 0.5),
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
@@ -298,18 +300,18 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                child: Text(
-                                  'Selecciona tickets a pagar',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
+                               Padding(
+                                 padding: const EdgeInsets.symmetric(
+                                   horizontal: 4,
+                                 ),
+                                 child: Text(
+                                   'Selecciona tickets a pagar',
+                                   style: theme.textTheme.titleSmall?.copyWith(
+                                     fontWeight: FontWeight.bold,
+                                     color: colorScheme.onSurfaceVariant,
+                                   ),
+                                 ),
+                               ),
                               const SizedBox(height: 10),
                               ListView.separated(
                                 shrinkWrap: true,
@@ -350,12 +352,12 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                       decoration: BoxDecoration(
                                         color: isSelected
                                             ? colorScheme.primaryContainer
-                                            : Colors.white,
+                                            : colorScheme.surface,
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
                                           color: isSelected
                                               ? colorScheme.primary
-                                              : Colors.grey.shade300,
+                                              : colorScheme.outlineVariant,
                                           width: isSelected ? 2 : 1,
                                         ),
                                         boxShadow: isSelected
@@ -363,7 +365,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                             : [
                                                 BoxShadow(
                                                   color: Colors.black
-                                                      .withOpacity(0.03),
+                                                      .withValues(alpha: 0.03),
                                                   blurRadius: 4,
                                                   offset: const Offset(0, 2),
                                                 ),
@@ -382,20 +384,23 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                                   info,
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.bold,
-                                                    color: isSelected
-                                                        ? colorScheme.primary
-                                                        : Colors.black87,
+                                                  color: isSelected
+                                                      ? colorScheme.primary
+                                                      : colorScheme.onSurface,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   'Ticket ${_shortId(id.toString())}',
-                                                  style: TextStyle(
+                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     color: isSelected
                                                         ? colorScheme.primary
-                                                              .withOpacity(0.7)
-                                                        : Colors.grey,
+                                                              .withValues(
+                                                                alpha: 0.7,
+                                                              )
+                                                        : colorScheme
+                                                              .onSurfaceVariant,
                                                   ),
                                                 ),
                                               ],
@@ -407,9 +412,9 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                             children: [
                                               Text(
                                                 'Pendiente',
-                                                style: TextStyle(
+                                                 style: TextStyle(
                                                   fontSize: 10,
-                                                  color: Colors.grey.shade600,
+                                                  color: colorScheme.onSurfaceVariant,
                                                 ),
                                               ),
                                               Text(
@@ -561,7 +566,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                           itemCount: _historialPagos.length,
                                           separatorBuilder: (_, __) => Divider(
                                             height: 1,
-                                            color: Colors.grey.shade200,
+                                            color: colorScheme.outlineVariant,
                                           ),
                                           itemBuilder: (context, index) {
                                             final p = _historialPagos[index];
@@ -603,10 +608,10 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                               leading: CircleAvatar(
                                                 radius: 18,
                                                 backgroundColor:
-                                                    Colors.grey.shade100,
-                                                child: const Icon(
+                                                    colorScheme.surfaceContainerHigh,
+                                                child: Icon(
                                                   Icons.receipt,
-                                                  color: Colors.grey,
+                                                  color: colorScheme.onSurfaceVariant,
                                                   size: 18,
                                                 ),
                                               ),
@@ -626,7 +631,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                                     fechaStr,
                                                     style: TextStyle(
                                                       color:
-                                                          Colors.grey.shade600,
+                                                          colorScheme.onSurfaceVariant,
                                                       fontSize: 13,
                                                     ),
                                                   ),
@@ -638,7 +643,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                                     ),
                                                     style: TextStyle(
                                                       color:
-                                                          Colors.grey.shade700,
+                                                          colorScheme.onSurfaceVariant,
                                                       fontSize: 12,
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -653,18 +658,18 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                                                       vertical: 4,
                                                     ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.grey.shade50,
+                                                  color: colorScheme.surfaceContainerHighest,
                                                   borderRadius:
                                                       BorderRadius.circular(6),
                                                   border: Border.all(
-                                                    color: Colors.grey.shade200,
+                                                    color: colorScheme.outlineVariant,
                                                   ),
                                                 ),
                                                 child: Text(
                                                   shortTicketId,
                                                   style: TextStyle(
                                                     fontSize: 11,
-                                                    color: Colors.grey.shade700,
+                                                    color: colorScheme.onSurfaceVariant,
                                                     fontFamily: 'Monospace',
                                                   ),
                                                 ),

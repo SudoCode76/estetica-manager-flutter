@@ -183,8 +183,8 @@ class _TimeNavBarState extends State<TimeNavBar> {
     final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: cs.outlineVariant.withAlpha(120)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),

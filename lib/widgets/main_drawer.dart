@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:app_estetica/screens/about_screen.dart';
 
 class MainDrawer extends StatelessWidget {
@@ -34,230 +35,121 @@ class MainDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Drawer(
       child: Column(
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: colorScheme.primary),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isSmall = constraints.maxHeight < 150;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+          // ── Header con gradiente ───────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.secondary,
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomRight: Radius.circular(0),
+              ),
+            ),
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 20,
+              left: 20,
+              right: 20,
+              bottom: 20,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar + nombre + rol
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.account_circle,
-                          size: isSmall ? 36 : 48,
-                          color: colorScheme.onPrimary,
-                        ),
-                        SizedBox(width: isSmall ? 8 : 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                username,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      color: colorScheme.onPrimary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isSmall ? 14 : null,
-                                    ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                rolLabel,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: colorScheme.onPrimary.withValues(
-                                        alpha: 0.8,
-                                      ),
-                                      fontSize: isSmall ? 11 : null,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: isSmall ? 8 : 16),
-                    // Selector de sucursal
                     Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmall ? 8 : 12,
-                        vertical: isSmall ? 6 : 8,
-                      ),
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: colorScheme.onPrimary.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.4),
+                          width: 2,
+                        ),
                       ),
-                      child: isLoadingSucursales
-                          ? Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.onPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Cargando...',
-                                  style: TextStyle(
-                                    color: colorScheme.onPrimary,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : isEmployee
-                          // Para empleados: mostrar sucursal bloqueada
-                          ? Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  color: colorScheme.onPrimary,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    employeeSucursalName ?? 'Sin sucursal',
-                                    style: TextStyle(
-                                      color: colorScheme.onPrimary,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.lock,
-                                  size: 16,
-                                  color: colorScheme.onPrimary.withValues(
-                                    alpha: 0.6,
-                                  ),
-                                ),
-                              ],
-                            )
-                          // Para admin: dropdown editable
-                          : Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  color: colorScheme.onPrimary,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: sucursales.isEmpty
-                                      ? Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                'No hay sucursales disponibles',
-                                                style: TextStyle(
-                                                  color: colorScheme.onPrimary
-                                                      .withValues(alpha: 0.9),
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ),
-                                            IconButton(
-                                              onPressed: onRetryLoadSucursales,
-                                              icon: Icon(
-                                                Icons.refresh,
-                                                color: colorScheme.onPrimary,
-                                              ),
-                                              tooltip: 'Reintentar',
-                                            ),
-                                          ],
-                                        )
-                                      : DropdownButtonHideUnderline(
-                                          child: Builder(
-                                            builder: (context) {
-                                              final currentId =
-                                                  selectedSucursalId;
-                                              final validValue =
-                                                  currentId != null &&
-                                                      sucursales.any(
-                                                        (s) =>
-                                                            s['id'] ==
-                                                            currentId,
-                                                      )
-                                                  ? currentId
-                                                  : null;
-
-                                              return DropdownButton<int>(
-                                                value: validValue,
-                                                isExpanded: true,
-                                                dropdownColor:
-                                                    colorScheme.surface,
-                                                icon: Icon(
-                                                  Icons.arrow_drop_down,
-                                                  color: colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                                style: TextStyle(
-                                                  color: colorScheme.onSurface,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                                hint: Text(
-                                                  'Seleccionar sucursal',
-                                                  style: TextStyle(
-                                                    color: colorScheme.onPrimary
-                                                        .withValues(alpha: 0.7),
-                                                  ),
-                                                ),
-                                                items: sucursales.map((s) {
-                                                  return DropdownMenuItem<int>(
-                                                    value: s['id'],
-                                                    child: Text(
-                                                      s['nombreSucursal'] ??
-                                                          '-',
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                                onChanged: (value) {
-                                                  if (value != null) {
-                                                    final sucursal = sucursales
-                                                        .firstWhere(
-                                                          (s) =>
-                                                              s['id'] == value,
-                                                        );
-                                                    onSucursalChanged(
-                                                      value,
-                                                      sucursal['nombreSucursal'],
-                                                    );
-                                                  }
-                                                },
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                ),
-                              ],
+                      child: Icon(
+                        Icons.account_circle_rounded,
+                        size: 32,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            username,
+                            style: GoogleFonts.nunito(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onPrimary,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.onPrimary.withValues(
+                                alpha: 0.2,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              rolLabel,
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                );
-              },
+                ),
+                const SizedBox(height: 16),
+                // Selector de sucursal
+                _SucursalSelector(
+                  isLoadingSucursales: isLoadingSucursales,
+                  isEmployee: isEmployee,
+                  employeeSucursalName: employeeSucursalName,
+                  sucursales: sucursales,
+                  selectedSucursalId: selectedSucursalId,
+                  onSucursalChanged: onSucursalChanged,
+                  onRetryLoadSucursales: onRetryLoadSucursales,
+                  colorScheme: colorScheme,
+                ),
+              ],
             ),
           ),
+
+          // ── Items de navegación ────────────────────────────────────────────
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               children: [
-                // Tickets - disponible para todos
+                _SectionLabel(label: 'Principal', textTheme: textTheme),
                 _DrawerItem(
                   icon: Icons.receipt_long_outlined,
-                  selectedIcon: Icons.receipt_long,
+                  selectedIcon: Icons.receipt_long_rounded,
                   label: 'Tickets',
                   selected: selectedIndex == 0,
                   onTap: () {
@@ -265,10 +157,9 @@ class MainDrawer extends StatelessWidget {
                     Navigator.pop(context);
                   },
                 ),
-                // Agenda de Sesiones - disponible para todos
                 _DrawerItem(
                   icon: Icons.event_note_outlined,
-                  selectedIcon: Icons.event_note,
+                  selectedIcon: Icons.event_note_rounded,
                   label: 'Agenda de Sesiones',
                   selected: selectedIndex == 1,
                   onTap: () {
@@ -276,10 +167,9 @@ class MainDrawer extends StatelessWidget {
                     Navigator.pop(context);
                   },
                 ),
-                // Clientes - disponible para todos
                 _DrawerItem(
-                  icon: Icons.people_outline,
-                  selectedIcon: Icons.people,
+                  icon: Icons.people_outline_rounded,
+                  selectedIcon: Icons.people_rounded,
                   label: 'Clientes',
                   selected: selectedIndex == 2,
                   onTap: () {
@@ -287,11 +177,12 @@ class MainDrawer extends StatelessWidget {
                     Navigator.pop(context);
                   },
                 ),
-                // Las siguientes opciones SOLO para admin
                 if (!isEmployee) ...[
+                  const SizedBox(height: 8),
+                  _SectionLabel(label: 'Administración', textTheme: textTheme),
                   _DrawerItem(
-                    icon: Icons.spa,
-                    selectedIcon: Icons.spa,
+                    icon: Icons.spa_outlined,
+                    selectedIcon: Icons.spa_rounded,
                     label: 'Tratamientos',
                     selected: selectedIndex == 3,
                     onTap: () {
@@ -300,8 +191,8 @@ class MainDrawer extends StatelessWidget {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.payments,
-                    selectedIcon: Icons.payments_outlined,
+                    icon: Icons.payments_outlined,
+                    selectedIcon: Icons.payments_rounded,
                     label: 'Pagos',
                     selected: selectedIndex == 4,
                     onTap: () {
@@ -311,7 +202,7 @@ class MainDrawer extends StatelessWidget {
                   ),
                   _DrawerItem(
                     icon: Icons.insights_outlined,
-                    selectedIcon: Icons.bar_chart,
+                    selectedIcon: Icons.insights_rounded,
                     label: 'Reportes',
                     selected: selectedIndex == 5,
                     onTap: () {
@@ -320,8 +211,8 @@ class MainDrawer extends StatelessWidget {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.people_outline_rounded,
-                    selectedIcon: Icons.people_rounded,
+                    icon: Icons.badge_outlined,
+                    selectedIcon: Icons.badge_rounded,
                     label: 'Empleados',
                     selected: selectedIndex == 6,
                     onTap: () {
@@ -330,11 +221,11 @@ class MainDrawer extends StatelessWidget {
                     },
                   ),
                 ],
-
-                // Acerca de - colocado justo después de Tickets para máxima visibilidad
+                const SizedBox(height: 8),
+                _SectionLabel(label: 'Otros', textTheme: textTheme),
                 _DrawerItem(
-                  icon: Icons.info_outline,
-                  selectedIcon: Icons.info,
+                  icon: Icons.info_outline_rounded,
+                  selectedIcon: Icons.info_rounded,
                   label: 'Acerca de',
                   selected: false,
                   onTap: () {
@@ -345,58 +236,24 @@ class MainDrawer extends StatelessWidget {
                     );
                   },
                 ),
-
-                // Botón de reintento para cargar sucursales
-                if (!isEmployee) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: onRetryLoadSucursales,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Reintentar Cargar Sucursales'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
-          // AQUI ELIMINE EL BLOQUE "Acerca de (persistente)"
 
-          // Cerrar sesión al final
+          // ── Cerrar sesión ──────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: Icon(Icons.logout_rounded, color: colorScheme.error),
-                title: Text(
-                  'Cerrar Sesión',
-                  style: TextStyle(
-                    color: colorScheme.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  onLogout();
-                },
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: FilledButton.tonalIcon(
+              onPressed: () {
+                Navigator.pop(context);
+                onLogout();
+              },
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Cerrar Sesión'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                backgroundColor: colorScheme.errorContainer,
+                foregroundColor: colorScheme.error,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -409,6 +266,32 @@ class MainDrawer extends StatelessWidget {
   }
 }
 
+// ── Widget: etiqueta de sección ──────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final TextTheme textTheme;
+
+  const _SectionLabel({required this.label, required this.textTheme});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Text(
+        label.toUpperCase(),
+        style: GoogleFonts.nunito(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: colorScheme.outline,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Widget: item de drawer ───────────────────────────────────────────────────
 class _DrawerItem extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
@@ -427,42 +310,216 @@ class _DrawerItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Container(
-        decoration: BoxDecoration(
-          color: selected ? colorScheme.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: ListTile(
-          leading: Icon(
-            selected ? selectedIcon : icon,
-            color: selected
-                ? colorScheme.onPrimaryContainer
-                : colorScheme.onSurfaceVariant,
-            size: 24,
-          ),
-          title: Text(
-            label,
-            style: textTheme.bodyLarge?.copyWith(
-              color: selected
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurface,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Material(
+        color: selected
+            ? colorScheme.primaryContainer
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
           onTap: onTap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  selected ? selectedIcon : icon,
+                  color: selected
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurface,
+                  size: 22,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  label,
+                  style: GoogleFonts.nunito(
+                    fontSize: 15,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Widget: selector de sucursal ─────────────────────────────────────────────
+class _SucursalSelector extends StatelessWidget {
+  final bool isLoadingSucursales;
+  final bool isEmployee;
+  final String? employeeSucursalName;
+  final List<dynamic> sucursales;
+  final int? selectedSucursalId;
+  final Function(int id, String name) onSucursalChanged;
+  final VoidCallback onRetryLoadSucursales;
+  final ColorScheme colorScheme;
+
+  const _SucursalSelector({
+    required this.isLoadingSucursales,
+    required this.isEmployee,
+    this.employeeSucursalName,
+    required this.sucursales,
+    this.selectedSucursalId,
+    required this.onSucursalChanged,
+    required this.onRetryLoadSucursales,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.onPrimary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: isLoadingSucursales
+          ? Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.onPrimary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Cargando sucursales...',
+                  style: GoogleFonts.nunito(
+                    fontSize: 13,
+                    color: colorScheme.onPrimary,
+                  ),
+                ),
+              ],
+            )
+          : isEmployee
+          ? Row(
+              children: [
+                Icon(
+                  Icons.location_on_rounded,
+                  color: colorScheme.onPrimary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    employeeSucursalName ?? 'Sin sucursal',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(
+                  Icons.lock_rounded,
+                  size: 14,
+                  color: colorScheme.onPrimary.withValues(alpha: 0.6),
+                ),
+              ],
+            )
+          : sucursales.isEmpty
+          ? Row(
+              children: [
+                Icon(
+                  Icons.location_off_rounded,
+                  color: colorScheme.onPrimary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Sin sucursales',
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onRetryLoadSucursales,
+                  icon: Icon(Icons.refresh_rounded, color: colorScheme.onPrimary),
+                  tooltip: 'Reintentar',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Icon(
+                  Icons.location_on_rounded,
+                  color: colorScheme.onPrimary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: Builder(
+                      builder: (context) {
+                        final validValue = selectedSucursalId != null &&
+                                sucursales.any(
+                                  (s) => s['id'] == selectedSucursalId,
+                                )
+                            ? selectedSucursalId
+                            : null;
+
+                        return DropdownButton<int>(
+                          value: validValue,
+                          isExpanded: true,
+                          dropdownColor: colorScheme.surface,
+                          icon: Icon(
+                            Icons.arrow_drop_down_rounded,
+                            color: colorScheme.onPrimary,
+                          ),
+                          style: GoogleFonts.nunito(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface,
+                          ),
+                          hint: Text(
+                            'Seleccionar sucursal',
+                            style: GoogleFonts.nunito(
+                              fontSize: 13,
+                              color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                            ),
+                          ),
+                          items: sucursales.map((s) {
+                            return DropdownMenuItem<int>(
+                              value: s['id'],
+                              child: Text(s['nombreSucursal'] ?? '-'),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              final sucursal = sucursales.firstWhere(
+                                (s) => s['id'] == value,
+                              );
+                              onSucursalChanged(
+                                value,
+                                sucursal['nombreSucursal'],
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

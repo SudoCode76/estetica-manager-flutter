@@ -115,6 +115,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   Future<void> _eliminarTicket() async {
+    final colorScheme = Theme.of(context).colorScheme;
     // Mostrar diálogo de confirmación
     final confirmacion = await showDialog<bool>(
       context: context,
@@ -123,7 +124,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           icon: const Icon(
             Icons.warning_amber_rounded,
             size: 48,
-            color: Colors.red,
           ),
           title: const Text('¿Eliminar ticket?'),
           content: const Text(
@@ -135,9 +135,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Cancelar'),
             ),
-            FilledButton(
+          FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
               child: const Text('Eliminar'),
             ),
           ],
@@ -161,14 +163,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Row(
+            content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
+                Icon(Icons.check_circle, color: colorScheme.onPrimary),
                 SizedBox(width: 8),
                 Text('Ticket eliminado correctamente'),
               ],
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: colorScheme.primary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -177,14 +179,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Row(
+            content: Row(
               children: [
-                Icon(Icons.error, color: Colors.white),
+                Icon(Icons.error, color: colorScheme.onError),
                 SizedBox(width: 8),
                 Text('Error al eliminar el ticket'),
               ],
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -194,7 +196,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -474,10 +476,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           // Botón para eliminar ticket (solo visible para administradores)
           if (!_isEmployee)
             IconButton(
-              onPressed: isUpdating ? null : _eliminarTicket,
+          onPressed: isUpdating ? null : _eliminarTicket,
               tooltip: 'Eliminar ticket',
               icon: const Icon(Icons.delete_outline),
-              color: Colors.red,
+              color: colorScheme.error,
             ),
           // Botón único para enviar ticket por WhatsApp (texto o PDF)
           IconButton(
@@ -499,12 +501,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
                   child: Card(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: colorScheme.tertiaryContainer.withValues(alpha: 0.4),
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, color: Colors.orange),
+                          Icon(Icons.info_outline, color: colorScheme.tertiary),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -597,16 +599,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         ),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          // Fondo verde suave si está realizada, gris si no
+                        // Fondo verde suave si está realizada, gris si no
                           color: isRealizada
-                              ? Colors.green.withValues(alpha: 0.05)
+                              ? colorScheme.primaryContainer.withValues(alpha: 0.4)
                               : colorScheme.surfaceContainerHighest.withValues(
                                   alpha: 0.3,
                                 ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isRealizada
-                                ? Colors.green.withValues(alpha: 0.3)
+                                ? colorScheme.primary.withValues(alpha: 0.3)
                                 : colorScheme.outline.withValues(alpha: 0.2),
                           ),
                         ),
@@ -619,14 +621,14 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                 CircleAvatar(
                                   radius: 16,
                                   backgroundColor: isRealizada
-                                      ? Colors.green
+                                      ? colorScheme.primary
                                       : colorScheme.primary,
                                   child: Icon(
                                     isRealizada
                                         ? Icons.check
                                         : Icons.access_time,
                                     size: 16,
-                                    color: Colors.white,
+                                    color: colorScheme.onPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -680,14 +682,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: isRealizada
-                                          ? Colors.green
-                                          : Colors.orange,
-                                      borderRadius: BorderRadius.circular(4),
+                                          ? colorScheme.primary
+                                          : colorScheme.tertiary,
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
                                       isRealizada ? 'REALIZADA' : 'PENDIENTE',
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: isRealizada
+                                            ? colorScheme.onPrimary
+                                            : colorScheme.onTertiary,
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -801,9 +805,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   '$fechaStr • ${_labelForMetodo(metodo)}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.grey,
+                                    color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -831,7 +835,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       )
                     : FilledButton.icon(
                         onPressed: _chooseAndSendToWhatsApp,
-                        icon: const Icon(Icons.send, color: Colors.white),
+                        icon: Icon(Icons.send, color: colorScheme.onPrimary),
                         label: const Text('Enviar por WhatsApp'),
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(

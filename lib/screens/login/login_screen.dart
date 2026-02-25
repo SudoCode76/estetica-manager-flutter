@@ -154,9 +154,9 @@ class _LoginScreenState extends State<LoginScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              colorScheme.primaryContainer,
-              colorScheme.surface,
-              colorScheme.secondaryContainer,
+              colorScheme.primaryContainer,   // #EDD9FF
+              colorScheme.surface,            // #FDFAFF
+              colorScheme.tertiaryContainer,  // #FFD6EF
             ],
           ),
         ),

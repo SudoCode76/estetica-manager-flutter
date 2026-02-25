@@ -15,15 +15,15 @@ class ClientsReport extends StatelessWidget {
 
     final atendidos = (data['atendidos'] as num?)?.toInt() ?? 0;
     final nuevos = (data['nuevos'] as num?)?.toInt() ?? 0;
-    final recurrentesPct = (data['recurrentes_pct'] as num?)?.toDouble() ?? 0.0;
+    final recurrentesPct =
+        (data['recurrentes_pct'] as num?)?.toDouble() ?? 0.0;
 
     // Datos normalizados para el gráfico
     final rawChart = (data['chart_data'] as List?) ?? [];
     final List<Map<String, dynamic>> chartData = rawChart
         .map<Map<String, dynamic>>((e) {
-          final label = (e is Map && e['label'] != null)
-              ? e['label'].toString()
-              : '';
+          final label =
+              (e is Map && e['label'] != null) ? e['label'].toString() : '';
           final value = (e is Map && e['value'] is num)
               ? (e['value'] as num).toDouble()
               : 0.0;
@@ -55,7 +55,6 @@ class ClientsReport extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // CAMBIO DE ETIQUETA AQUÍ:
                     Text(
                       'CLIENTES CON TICKET',
                       style: TextStyle(
@@ -160,17 +159,18 @@ class ClientsReport extends StatelessWidget {
                                   getTitlesWidget: (val, meta) {
                                     final idx = val.toInt();
                                     if (idx >= 0 && idx < chartData.length) {
-                                      // Mostrar etiquetas espaciadas si son muchas
-                                      if (chartData.length > 7 && idx % 2 != 0)
+                                      if (chartData.length > 7 &&
+                                          idx % 2 != 0) {
                                         return const SizedBox.shrink();
+                                      }
                                       return Padding(
                                         padding: const EdgeInsets.only(
                                           top: 8.0,
                                         ),
                                         child: Text(
                                           chartData[idx]['label'] as String,
-                                          style: const TextStyle(
-                                            color: Colors.grey,
+                                          style: TextStyle(
+                                            color: cs.onSurfaceVariant,
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -210,7 +210,7 @@ class ClientsReport extends StatelessWidget {
                       Text(
                         'NUEVOS',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: cs.onSurfaceVariant,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -226,7 +226,6 @@ class ClientsReport extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Etiqueta dinámica
                           if (period == ReportPeriod.today)
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -234,14 +233,14 @@ class ClientsReport extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF3E8FF),
+                                color: cs.primaryContainer,
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text(
+                              child: Text(
                                 "HOY",
                                 style: TextStyle(
                                   fontSize: 9,
-                                  color: Color(0xFF9333EA),
+                                  color: cs.primary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -249,10 +248,10 @@ class ClientsReport extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'Registrados\nen este periodo',
                         style: TextStyle(
-                          color: Colors.grey,
+                          color: cs.onSurfaceVariant,
                           height: 1.2,
                           fontSize: 12,
                         ),
@@ -273,10 +272,10 @@ class ClientsReport extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         'RECURRENTES',
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: cs.onSurfaceVariant,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
@@ -290,8 +289,8 @@ class ClientsReport extends StatelessWidget {
                             Center(
                               child: Text(
                                 '${(recurrentesPct * 100).toInt()}%',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: cs.onSurface,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                 ),
@@ -302,8 +301,8 @@ class ClientsReport extends StatelessWidget {
                               height: 70,
                               child: CircularProgressIndicator(
                                 value: recurrentesPct,
-                                color: Colors.white,
-                                backgroundColor: Colors.white24,
+                                color: cs.primary,
+                                backgroundColor: cs.surfaceContainerHigh,
                                 strokeWidth: 6,
                               ),
                             ),
@@ -311,9 +310,12 @@ class ClientsReport extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Fidelización',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -355,10 +357,10 @@ class ClientsReport extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 if (topClients.isEmpty)
-                  const Center(
+                  Center(
                     child: Text(
                       "Sin datos",
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: cs.onSurfaceVariant),
                     ),
                   ),
                 ...topClients.asMap().entries.map((entry) {
@@ -377,8 +379,8 @@ class ClientsReport extends StatelessWidget {
                           children: [
                             Text(
                               idx.toString().padLeft(2, '0'),
-                              style: const TextStyle(
-                                color: Colors.grey,
+                              style: TextStyle(
+                                color: cs.onSurfaceVariant,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
