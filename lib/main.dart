@@ -1,3 +1,5 @@
+import 'package:app_estetica/repositories/app_config_repository.dart';
+import 'package:app_estetica/screens/blocked_screen.dart';
 import 'package:app_estetica/screens/login/login_screen.dart';
 import 'package:app_estetica/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -37,9 +39,48 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   // Provider global para TODA la app
   final SucursalProvider _globalSucursalProvider = SucursalProvider();
+
+  // Navegator key para poder navegar desde el observer de lifecycle
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Se ejecuta cada vez que la app vuelve de background.
+  /// Si el flag cambió a false, navega a BlockedScreen limpiando el stack.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAppEnabled();
+    }
+  }
+
+  Future<void> _checkAppEnabled() async {
+    final config = await AppConfigRepository().fetchConfig();
+    if (!config.enabled) {
+      final ctx = _navigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        Navigator.of(ctx).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => BlockedScreen(message: config.blockMessage),
+          ),
+          (route) => false,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +94,6 @@ class _MyAppState extends State<MyApp> {
       provider: _globalSucursalProvider,
       child: MultiProvider(
         providers: [
-          // Hacemos disponible SucursalProvider también vía provider package
           ChangeNotifierProvider<SucursalProvider>.value(
             value: _globalSucursalProvider,
           ),
@@ -77,8 +117,8 @@ class _MyAppState extends State<MyApp> {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.light,
+          navigatorKey: _navigatorKey,
           navigatorObservers: [routeObserver],
-          // Localizations needed for DateRangePicker, DatePicker and other widgets
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -107,24 +147,35 @@ class _RootState extends State<Root> {
   @override
   void initState() {
     super.initState();
-    _checkSession();
+    _checkAll();
   }
 
-  Future<void> _checkSession() async {
-    // Verificar sesión de Supabase
+  Future<void> _checkAll() async {
+    // 1. Verificar flag de disponibilidad de la app
+    final config = await AppConfigRepository().fetchConfig();
+    if (!config.enabled) {
+      if (mounted) {
+        setState(() {
+          _initial = BlockedScreen(message: config.blockMessage);
+          _checking = false;
+        });
+      }
+      return;
+    }
+
+    // 2. Verificar sesión de Supabase
     final supabaseUser = Supabase.instance.client.auth.currentUser;
 
     if (supabaseUser != null) {
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint(
           '=== Usuario autenticado en Supabase: ${supabaseUser.email} ===',
         );
+      }
 
-      // Obtener datos del usuario desde SharedPreferences o metadata
       final prefs = await SharedPreferences.getInstance();
       String? userType = prefs.getString('userType');
 
-      // Si no hay userType en prefs, obtenerlo de user_metadata
       if (userType == null || userType.isEmpty) {
         userType = supabaseUser.userMetadata?['tipo_usuario'];
         if (userType != null) {
