@@ -40,9 +40,10 @@ class FinancialReport extends StatelessWidget {
           final value = (e is Map && e['value'] is num)
               ? (e['value'] as num).toDouble()
               : 0.0;
-          // Traducir días de la semana en inglés cuando la granularidad es diaria
+          // Traducir días de la semana en inglés solo cuando aplica
           final translated =
-              (chartGranularity == ChartGranularity.daily)
+              (chartGranularity == ChartGranularity.daily &&
+                  period == ReportPeriod.week)
               ? _weekdayLabelEs(label)
               : label;
           return {'label': translated, 'value': value};
@@ -140,8 +141,7 @@ class FinancialReport extends StatelessWidget {
                                         touchTooltipData: BarTouchTooltipData(
                                           getTooltipColor: (_) =>
                                               cs.primaryContainer,
-                                          tooltipBorderRadius:
-                                              BorderRadius.circular(12),
+                                          tooltipRoundedRadius: 12,
                                           getTooltipItem: (
                                             group,
                                             groupIndex,

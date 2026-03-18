@@ -192,6 +192,17 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         }
 
         return Scaffold(
+          appBar: AppBar(
+            title: const Text('Empleados'),
+            backgroundColor: cs.surface,
+            actions: [
+              IconButton.filledTonal(
+                onPressed: _loadEmployees,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _showEmployeeDialog(),
             icon: const Icon(Icons.person_add),
@@ -201,31 +212,20 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        onChanged: (v) => setState(() => _search = v),
-                        decoration: InputDecoration(
-                          prefixIcon: Icon(Icons.search, color: cs.primary),
-                          hintText: 'Buscar por nombre o email',
-                          filled: true,
-                          fillColor: cs.surfaceContainerHighest.withValues(
-                            alpha: 0.5,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
+                child: TextField(
+                  onChanged: (v) => setState(() => _search = v),
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(Icons.search, color: cs.primary),
+                    hintText: 'Buscar por nombre o email',
+                    filled: true,
+                    fillColor: cs.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
                     ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: _loadEmployees,
-                      icon: const Icon(Icons.refresh_rounded),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
-                  ],
+                  ),
                 ),
               ),
               Expanded(
