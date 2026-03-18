@@ -141,7 +141,8 @@ class FinancialReport extends StatelessWidget {
                                         touchTooltipData: BarTouchTooltipData(
                                           getTooltipColor: (_) =>
                                               cs.primaryContainer,
-                                          tooltipRoundedRadius: 12,
+                                          tooltipBorderRadius:
+                                              BorderRadius.circular(12),
                                           getTooltipItem: (
                                             group,
                                             groupIndex,
