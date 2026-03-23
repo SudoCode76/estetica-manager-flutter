@@ -120,12 +120,26 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Tu usuario no tiene sucursal asignada. Contacta al administrador.',
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.white),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Aún no tienes una sucursal vinculada. Contacta con soporte técnico.',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
                 ),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 5),
+                backgroundColor: Colors.orange.shade700,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                duration: const Duration(seconds: 4),
               ),
             );
           }
