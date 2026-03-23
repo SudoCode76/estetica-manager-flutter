@@ -388,7 +388,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       builder: (BuildContext ctx) {
         return AlertDialog(
           icon: Icon(Icons.logout, color: colorScheme.error, size: 32),
-          title: const Text('Cerrar Sesión'),
+          title: const Text('Salir'),
           content: const Text('¿Estás seguro que deseas cerrar sesión?'),
           actions: [
             TextButton(
@@ -398,7 +398,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
               style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
-              child: const Text('Cerrar Sesión'),
+              child: const Text('Salir'),
             ),
           ],
         );
@@ -568,13 +568,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.spa_rounded,
-              color: colorScheme.primary,
-              size: 22,
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.spa_rounded,
+                color: colorScheme.primary,
+                size: 20,
+              ),
             ),
-            const SizedBox(width: 8),
-            Text(currentTitle),
+            const SizedBox(width: 12),
+            Text(
+              currentTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ],
         ),
         backgroundColor: colorScheme.surface,
