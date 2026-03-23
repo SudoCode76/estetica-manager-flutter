@@ -568,13 +568,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.spa_rounded,
-              color: colorScheme.primary,
-              size: 22,
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.spa_rounded,
+                color: colorScheme.primary,
+                size: 20,
+              ),
             ),
-            const SizedBox(width: 8),
-            Text(currentTitle),
+            const SizedBox(width: 12),
+            Text(
+              currentTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ],
         ),
         backgroundColor: colorScheme.surface,
