@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     SizedBox(height: isSmallScreen ? 4 : 8),
                     Text(
-                      'Ingresa tus credenciales para acceder',
+                      'Inicia sesión para continuar',
                       style:
                           (isSmallScreen
                                   ? textTheme.bodyMedium
@@ -397,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                     // Footer
                     Text(
-                      '© 2026 App Estetica',
+                      '© 2026 App Estética',
                       style:
                           (isSmallScreen
                                   ? textTheme.labelSmall
