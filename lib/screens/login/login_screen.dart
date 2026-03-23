@@ -397,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                     // Footer
                     Text(
-                      '© 2026 App Estética',
+                      '© 2026 App Estetica',
                       style:
                           (isSmallScreen
                                   ? textTheme.labelSmall
