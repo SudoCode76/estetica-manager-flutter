@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen>
         if (e.toString().contains('Credenciales inválidas') ||
             e.toString().contains('Invalid login credentials') ||
             e.toString().contains('invalid')) {
-          _errorMessage = 'Email o contraseña incorrectos.';
+          _errorMessage = 'Credenciales incorrectas. Verifique e intente nuevamente.';
         } else if (e.toString().contains('NetworkException') ||
             e.toString().contains('SocketException') ||
             e.toString().contains('Connection')) {
