@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            'Iniciar Sesión',
+                                            'Entrar',
                                             style:
                                                 (isSmallScreen
                                                         ? textTheme.labelMedium
