@@ -122,7 +122,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Tu usuario no tiene sucursal asignada. Contacta al administrador.',
+                  'Tu usuario no tiene una sucursal asignada. Por favor, contacta a tu administrador.',
                 ),
                 backgroundColor: Colors.orange,
                 duration: Duration(seconds: 5),
@@ -562,7 +562,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
-                        'No hay sucursal asignada. Contacte al administrador.',
+                        'No tienes sucursal asignada. Por favor, solicita una asignación.',
                       ),
                       behavior: SnackBarBehavior.floating,
                       backgroundColor: Colors.red,
