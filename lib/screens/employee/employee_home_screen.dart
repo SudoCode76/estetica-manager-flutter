@@ -353,7 +353,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Empleado',
+                    'Usuario',
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -411,7 +411,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Empleado',
+                              'Usuario',
                               style: textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onPrimary.withValues(
                                   alpha: 0.8,
@@ -596,7 +596,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 }
               },
               icon: const Icon(Icons.person_add),
-              label: const Text('Nuevo Cliente'),
+              label: const Text('New Client'),//Nuevo Cliente
               backgroundColor: Theme.of(context).colorScheme.primary,
             )
           : null,
