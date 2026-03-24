@@ -486,7 +486,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   _DrawerItem(
                     icon: Icons.info_outline,
                     selectedIcon: Icons.info,
-                    label: 'Acerca de',
+                    label: 'Sobre la app',
                     selected: false,
                     onTap: () {
                       Navigator.pop(context);
