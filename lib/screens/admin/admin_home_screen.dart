@@ -523,7 +523,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     // Títulos dinámicos por índice
     const screenTitles = [
       'Tickets',
-      'Agenda de Sesiones',
+      'Agenda',
       'Clientes',
       'Tratamientos',
       'Pagos',
