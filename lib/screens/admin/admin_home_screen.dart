@@ -673,7 +673,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     }
                   },
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('Nuevo Ticket'),
+                  label: const Text('Crear Ticket'),
                 );
               },
             )
