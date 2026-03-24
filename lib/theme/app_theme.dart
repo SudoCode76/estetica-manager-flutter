@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ── Paleta principal ────────────────────────────────────────────────────────
-  static const Color primaryColor = Color(0xFF7B2FBE);
+  static const Color primaryColor = Color(0xFF2B1442);//0xFF7B2FBE
   static const Color onPrimaryColor = Color(0xFFFFFFFF);
   static const Color primaryContainerColor = Color(0xFFEDD9FF);
   static const Color onPrimaryContainerColor = Color(0xFF2D0060);
