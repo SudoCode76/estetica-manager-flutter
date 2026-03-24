@@ -120,12 +120,26 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Tu usuario no tiene una sucursal asignada. Por favor, contacta a tu administrador.',
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.white),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Tu usuario no tiene una sucursal asignada. Por favor, contacta a tu administrador.',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
                 ),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 5),
+                backgroundColor: Colors.orange.shade700,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                duration: const Duration(seconds: 5),
               ),
             );
           }
@@ -339,7 +353,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Empleado',
+                    'Usuario',
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -397,7 +411,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Empleado',
+                              'Usuario',
                               style: textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onPrimary.withValues(
                                   alpha: 0.8,
@@ -582,7 +596,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 }
               },
               icon: const Icon(Icons.person_add),
-              label: const Text('Nuevo Cliente'),
+              label: const Text('New Client'),//Nuevo Cliente
               backgroundColor: Theme.of(context).colorScheme.primary,
             )
           : null,

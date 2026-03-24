@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     SizedBox(height: isSmallScreen ? 4 : 8),
                     Text(
-                      'Inicia sesión para continuar',
+                      'Ingresa tus credenciales para acceder',
                       style:
                           (isSmallScreen
                                   ? textTheme.bodyMedium
@@ -293,10 +293,10 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Por favor ingrese su contraseña';
+                                    return 'Por favor ingrese su contraseña';//pedir ingresar contrasenia
                                   }
                                   if (value.length < 4) {
-                                    return 'La contraseña debe tener al menos 4 caracteres';
+                                    return 'La contraseña debe tener al menos 4 caracteres';//cambio de cintra
                                   }
                                   return null;
                                 },
@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            'Iniciar Sesión',
+                                            'Entrar',
                                             style:
                                                 (isSmallScreen
                                                         ? textTheme.labelMedium
@@ -397,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                     // Footer
                     Text(
-                      '© 2026 App Estética',
+                      '© 2026 App Estetica',
                       style:
                           (isSmallScreen
                                   ? textTheme.labelSmall
