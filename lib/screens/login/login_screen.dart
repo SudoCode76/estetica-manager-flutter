@@ -293,10 +293,10 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Por favor ingrese su contraseña';
+                                    return 'Por favor ingrese su contraseña';//pedir ingresar contrasenia
                                   }
                                   if (value.length < 4) {
-                                    return 'La contraseña debe tener al menos 4 caracteres';
+                                    return 'La contraseña debe tener al menos 4 caracteres';//cambio de cintra
                                   }
                                   return null;
                                 },
