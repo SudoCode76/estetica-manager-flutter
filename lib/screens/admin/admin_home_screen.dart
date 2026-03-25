@@ -446,7 +446,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               CircularProgressIndicator(color: colorScheme.primary),
               const SizedBox(height: 16),
               Text(
-                'Cargando...',
+                'Cargando datos...',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
             ],
