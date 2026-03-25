@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 controller: _passwordController,
                                 obscureText: _obscurePassword,
                                 decoration: InputDecoration(
-                                  labelText: 'Contraseña',
+                                  labelText: 'Clave',
                                   hintText: 'Ingrese su contraseña',
                                   prefixIcon: const Icon(
                                     Icons.lock_outline_rounded,
