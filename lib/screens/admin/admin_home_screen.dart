@@ -459,7 +459,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (widget.isEmployee && _employeeSucursalId == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Error de Configuración'),
+          title: const Text('Sucursal No Asignada'),
           backgroundColor: colorScheme.errorContainer,
         ),
         body: Center(
