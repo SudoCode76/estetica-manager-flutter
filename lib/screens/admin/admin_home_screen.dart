@@ -446,7 +446,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               CircularProgressIndicator(color: colorScheme.primary),
               const SizedBox(height: 16),
               Text(
-                'Cargando...',
+                'Cargando datos...',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
             ],
@@ -459,7 +459,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     if (widget.isEmployee && _employeeSucursalId == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Error de Configuración'),
+          title: const Text('Sucursal No Asignada'),
           backgroundColor: colorScheme.errorContainer,
         ),
         body: Center(

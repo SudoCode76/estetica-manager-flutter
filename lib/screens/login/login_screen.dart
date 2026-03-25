@@ -246,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 decoration: InputDecoration(
                                   labelText: 'Email',
-                                  hintText: 'nombre@ejemplo.com',
+                                  hintText: 'tu@email.com',
                                   prefixIcon: Icon(
                                     Icons.email_outlined,
                                     size: isSmallScreen ? 20 : 24,
