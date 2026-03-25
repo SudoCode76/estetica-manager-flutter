@@ -282,7 +282,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Sin Sucursal Asignada',
+                  'Sucursal No Asignada',
                   style: textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.error,
@@ -291,7 +291,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Tu cuenta de empleado no tiene una sucursal asignada. Por favor, contacta al administrador para que te asigne una sucursal.',
+                  'Tu cuenta de empleado no tiene sucursal asignada. Por favor, contacta al administrador.',
                   style: textTheme.bodyLarge?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
