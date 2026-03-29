@@ -596,7 +596,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 }
               },
               icon: const Icon(Icons.person_add),
-              label: const Text('New Client'),//Nuevo Cliente
+              label: const Text('Nuevo Cliente'),
               backgroundColor: Theme.of(context).colorScheme.primary,
             )
           : null,
