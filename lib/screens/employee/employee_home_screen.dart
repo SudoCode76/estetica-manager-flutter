@@ -58,8 +58,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               // Normalizar nombre
               final nombre =
                   attrs['nombreSucursal'] ??
-                  attrs['nombre'] ??
-                  attrs['nombre_sucursal'];
+                      attrs['nombre'] ??
+                      attrs['nombre_sucursal'];
               return {'id': attrs['id'], 'nombreSucursal': nombre};
             }
             // Si ya vino plano con id + campos
@@ -353,7 +353,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Usuario',
+                    'Empleado',
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -411,7 +411,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Usuario',
+                              'Empleado',
                               style: textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onPrimary.withValues(
                                   alpha: 0.8,
@@ -500,7 +500,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   _DrawerItem(
                     icon: Icons.info_outline,
                     selectedIcon: Icons.info,
-                    label: 'Sobre la app',
+                    label: 'Acerca de',
                     selected: false,
                     onTap: () {
                       Navigator.pop(context);
@@ -590,15 +590,15 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   _sucursalProvider!.selectedSucursalId!,
                 );
 
-                if (result != null) {
-                  // Refrescar clientes - simplemente rebuild todo
-                  setState(() {});
-                }
-              },
-              icon: const Icon(Icons.person_add),
-              label: const Text('New Client'),//Nuevo Cliente
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            )
+          if (result != null) {
+            // Refrescar clientes - simplemente rebuild todo
+            setState(() {});
+          }
+        },
+        icon: const Icon(Icons.person_add),
+        label: const Text('Nuevo cliente'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      )
           : null,
     );
   }
