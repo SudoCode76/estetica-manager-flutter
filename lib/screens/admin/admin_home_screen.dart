@@ -583,7 +583,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             const SizedBox(width: 12),
             Text(
               currentTitle,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 19),
             ),
           ],
         ),
