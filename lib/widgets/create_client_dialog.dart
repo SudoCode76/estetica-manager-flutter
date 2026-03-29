@@ -13,9 +13,8 @@ class CreateClientDialog extends StatefulWidget {
 
   /// Muestra el diálogo y retorna el cliente creado o null
   static Future<Map<String, dynamic>?> show(
-    BuildContext context,
-    int sucursalId,
-  ) async {
+      int sucursalId,
+      ) async {
     return await showDialog<Map<String, dynamic>?>(
       context: context,
       barrierDismissible: true,
@@ -74,7 +73,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
         'telefono': _telefonoController.text.trim(),
         'estadoCliente': true,
         'sucursal_id':
-            widget.sucursalId, // SIEMPRE incluir la sucursal (clave DB)
+        widget.sucursalId, // SIEMPRE incluir la sucursal (clave DB)
       };
 
       debugPrint(
@@ -151,6 +150,20 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
     final iconSize = isSmallScreen ? 24.0 : 32.0;
     final headerPadding = isSmallScreen ? 16.0 : 24.0;
 
+    // Estilos de texto para inputs (solo UI)
+    final labelStyle = textTheme.bodyMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+      fontSize: isSmallScreen ? 13 : 14,
+    );
+    final hintStyle = textTheme.bodyMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+      fontSize: isSmallScreen ? 13 : 14,
+    );
+    final helperStyle = textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+      fontSize: isSmallScreen ? 12 : 12,
+    );
+
     return Dialog(
       backgroundColor: colorScheme.surfaceContainerHigh,
       elevation: 6,
@@ -165,274 +178,287 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
         borderRadius: BorderRadius.circular(borderRadius),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: dialogWidth),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header con gradiente
-                Container(
-                  padding: EdgeInsets.all(headerPadding),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primaryContainer,
-                        colorScheme.secondaryContainer,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header con gradiente
+              Container(
+                padding: EdgeInsets.all(headerPadding),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primaryContainer,
+                      colorScheme.secondaryContainer,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surface.withValues(alpha: 0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.person_add_rounded,
-                          size: iconSize,
-                          color: colorScheme.onPrimaryContainer,
-                        ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface.withValues(alpha: 0.28),
+                        shape: BoxShape.circle,
                       ),
-                      SizedBox(width: Responsive.spacing(context, 16)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Nuevo Cliente',
-                              style:
-                                  (isSmallScreen
-                                          ? textTheme.titleLarge
-                                          : textTheme.headlineSmall)
-                                      ?.copyWith(
-                                        color: colorScheme.onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                      child: Icon(
+                        Icons.person_add_rounded,
+                        size: iconSize,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    SizedBox(width: Responsive.spacing(context, 16)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Registrar cliente',
+                            style:
+                            (isSmallScreen
+                                ? textTheme.titleLarge
+                                : textTheme.headlineSmall)
+                                ?.copyWith(
+                              color: colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
                             ),
-                            SizedBox(height: Responsive.spacing(context, 4)),
-                            Text(
-                              'Registrar información del cliente',
-                              style:
-                                  (isSmallScreen
-                                          ? textTheme.labelSmall
-                                          : textTheme.bodySmall)
-                                      ?.copyWith(
-                                        color: colorScheme.onPrimaryContainer
-                                            .withValues(alpha: 0.8),
-                                      ),
+                          ),
+                          SizedBox(height: Responsive.spacing(context, 4)),
+                          Text(
+                            'Completa los datos para guardarlo',
+                            style:
+                            (isSmallScreen
+                                ? textTheme.labelSmall
+                                : textTheme.bodySmall)
+                                ?.copyWith(
+                              color: colorScheme.onPrimaryContainer
+                                  .withValues(alpha: 0.82),
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Formulario
+              Padding(
+                padding: dialogPadding,
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Campo Nombre
+                      TextFormField(
+                        controller: _nombreController,
+                        autofocus: !isSmallScreen,
+                        style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                        decoration: InputDecoration(
+                          labelText: 'Nombre *',
+                          hintText: 'Ej: María Fernanda',
+                          labelStyle: labelStyle,
+                          hintStyle: hintStyle,
+                          helperStyle: helperStyle,
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          prefixIcon: Container(
+                            margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                            padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withValues(
+                                alpha: 0.45,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10 : 12,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.person_outline,
+                              color: colorScheme.primary,
+                              size: isSmallScreen ? 18 : 20,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              isSmallScreen ? 12 : 16,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.45),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12 : 16,
+                            vertical: isSmallScreen ? 12 : 16,
+                          ),
                         ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Ingresa el nombre'
+                            : null,
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      SizedBox(height: Responsive.spacing(context, 16)),
+
+                      // Campo Apellido
+                      TextFormField(
+                        controller: _apellidoController,
+                        style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                        decoration: InputDecoration(
+                          labelText: 'Apellido (opcional)',
+                          hintText: 'Ej: González',
+                          labelStyle: labelStyle,
+                          hintStyle: hintStyle,
+                          helperStyle: helperStyle,
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          prefixIcon: Container(
+                            margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                            padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer.withValues(
+                                alpha: 0.45,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10 : 12,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.badge_outlined,
+                              color: colorScheme.secondary,
+                              size: isSmallScreen ? 18 : 20,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              isSmallScreen ? 12 : 16,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.45),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12 : 16,
+                            vertical: isSmallScreen ? 12 : 16,
+                          ),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      SizedBox(height: Responsive.spacing(context, 16)),
+
+                      // Campo Teléfono
+                      TextFormField(
+                        controller: _telefonoController,
+                        style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                        decoration: InputDecoration(
+                          labelText: 'Teléfono (opcional)',
+                          hintText: 'Ej: 71234567',
+                          helperText: 'Solo números',
+                          labelStyle: labelStyle,
+                          hintStyle: hintStyle,
+                          helperStyle: helperStyle,
+                          floatingLabelBehavior: FloatingLabelBehavior.auto,
+                          prefixIcon: Container(
+                            margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                            padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.tertiaryContainer.withValues(
+                                alpha: 0.45,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10 : 12,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.phone_outlined,
+                              color: colorScheme.tertiary,
+                              size: isSmallScreen ? 18 : 20,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              isSmallScreen ? 12 : 16,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.45),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12 : 16,
+                            vertical: isSmallScreen ? 12 : 16,
+                          ),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        validator: (v) {
+                          if (v != null && v.isNotEmpty) {
+                            final num = int.tryParse(v);
+                            if (num == null) return 'Usa solo números';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: isSmallScreen ? 20 : 24),
+
+                      // Botones
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isSmallScreen ? 12 : 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    isSmallScreen ? 12 : 16,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                'Cancelar',
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 13 : 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: Responsive.spacing(context, 12)),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: _crearCliente,
+                              icon: Icon(
+                                Icons.check_rounded,
+                                size: isSmallScreen ? 18 : 20,
+                              ),
+                              label: Text(
+                                'Guardar',
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 13 : 14,
+                                ),
+                              ),
+                              style: FilledButton.styleFrom(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isSmallScreen ? 12 : 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    isSmallScreen ? 12 : 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-
-                // Formulario
-                Padding(
-                  padding: dialogPadding,
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Campo Nombre
-                        TextFormField(
-                          controller: _nombreController,
-                          autofocus:
-                              !isSmallScreen, // No autofocus en pantallas pequeñas
-                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                          decoration: InputDecoration(
-                            labelText: 'Nombre *',
-                            hintText: 'Ej: María',
-                            prefixIcon: Container(
-                              margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(
-                                  alpha: 0.5,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  isSmallScreen ? 10 : 12,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.person_outline,
-                                color: colorScheme.primary,
-                                size: isSmallScreen ? 18 : 20,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                isSmallScreen ? 12 : 16,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 12 : 16,
-                              vertical: isSmallScreen ? 12 : 16,
-                            ),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'El nombre es requerido'
-                              : null,
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        SizedBox(height: Responsive.spacing(context, 16)),
-
-                        // Campo Apellido
-                        TextFormField(
-                          controller: _apellidoController,
-                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                          decoration: InputDecoration(
-                            labelText: 'Apellido',
-                            hintText: 'Ej: González',
-                            prefixIcon: Container(
-                              margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer
-                                    .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(
-                                  isSmallScreen ? 10 : 12,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.badge_outlined,
-                                color: colorScheme.secondary,
-                                size: isSmallScreen ? 18 : 20,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                isSmallScreen ? 12 : 16,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 12 : 16,
-                              vertical: isSmallScreen ? 12 : 16,
-                            ),
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        SizedBox(height: Responsive.spacing(context, 16)),
-
-                        // Campo Teléfono
-                        TextFormField(
-                          controller: _telefonoController,
-                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
-                          decoration: InputDecoration(
-                            labelText: 'Teléfono',
-                            hintText: 'Ej: 71234567',
-                            prefixIcon: Container(
-                              margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer.withValues(
-                                  alpha: 0.5,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  isSmallScreen ? 10 : 12,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.phone_outlined,
-                                color: colorScheme.tertiary,
-                                size: isSmallScreen ? 18 : 20,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                isSmallScreen ? 12 : 16,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 12 : 16,
-                              vertical: isSmallScreen ? 12 : 16,
-                            ),
-                          ),
-                          keyboardType: TextInputType.phone,
-                          validator: (v) {
-                            if (v != null && v.isNotEmpty) {
-                              final num = int.tryParse(v);
-                              if (num == null) return 'Ingrese solo números';
-                            }
-                            return null;
-                          },
-                        ),
-                        SizedBox(height: isSmallScreen ? 20 : 24),
-
-                        // Botones
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: OutlinedButton.styleFrom(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isSmallScreen ? 12 : 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      isSmallScreen ? 12 : 16,
-                                    ),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Cancelar',
-                                  style: TextStyle(
-                                    fontSize: isSmallScreen ? 13 : 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: Responsive.spacing(context, 12)),
-                            Expanded(
-                              flex: 2,
-                              child: FilledButton.icon(
-                                onPressed: _crearCliente,
-                                icon: Icon(
-                                  Icons.check_rounded,
-                                  size: isSmallScreen ? 18 : 20,
-                                ),
-                                label: Text(
-                                  'Registrar',
-                                  style: TextStyle(
-                                    fontSize: isSmallScreen ? 13 : 14,
-                                  ),
-                                ),
-                                style: FilledButton.styleFrom(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: isSmallScreen ? 12 : 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      isSmallScreen ? 12 : 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
     );
   }
 }
