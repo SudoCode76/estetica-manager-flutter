@@ -200,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                     // Título
                     Text(
-                      'Bienvenido',
+                      'Bienvenido/a',
                       style:
                           (isSmallScreen
                                   ? textTheme.headlineMedium
@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     SizedBox(height: isSmallScreen ? 4 : 8),
                     Text(
-                      'Ingresa tus credenciales para acceder',
+                      'Inicia sesión con tus credenciales',
                       style:
                           (isSmallScreen
                                   ? textTheme.bodyMedium
