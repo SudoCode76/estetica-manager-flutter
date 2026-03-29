@@ -569,7 +569,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 color: colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(8),
@@ -577,7 +577,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               child: Icon(
                 Icons.spa_rounded,
                 color: colorScheme.primary,
-                size: 20,
+                size: 22,
               ),
             ),
             const SizedBox(width: 12),
