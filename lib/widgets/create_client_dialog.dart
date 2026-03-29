@@ -13,6 +13,7 @@ class CreateClientDialog extends StatefulWidget {
 
   /// Muestra el diálogo y retorna el cliente creado o null
   static Future<Map<String, dynamic>?> show(
+      BuildContext context,
       int sucursalId,
       ) async {
     return await showDialog<Map<String, dynamic>?>(
@@ -59,7 +60,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
             children: [
               CircularProgressIndicator(color: colorScheme.primary),
               const SizedBox(height: 16),
-              Text('Registrando cliente...', style: textTheme.bodyLarge),
+              Text('Guardando cliente...', style: textTheme.bodyLarge),
             ],
           ),
         ),
@@ -101,7 +102,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
               children: [
                 Icon(Icons.check_circle, color: colorScheme.onPrimary),
                 const SizedBox(width: 12),
-                const Text('Cliente registrado exitosamente'),
+                const Text('Cliente guardado correctamente'),
               ],
             ),
             backgroundColor: colorScheme.primary,
@@ -124,7 +125,9 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
               children: [
                 Icon(Icons.error, color: colorScheme.onError),
                 const SizedBox(width: 12),
-                Expanded(child: Text('Error: ${e.toString()}')),
+                Expanded(
+                  child: Text('No se pudo guardar el cliente: ${e.toString()}'),
+                ),
               ],
             ),
             backgroundColor: colorScheme.error,
@@ -149,20 +152,6 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
     final borderRadius = isSmallScreen ? 20.0 : 32.0;
     final iconSize = isSmallScreen ? 24.0 : 32.0;
     final headerPadding = isSmallScreen ? 16.0 : 24.0;
-
-    // Estilos de texto para inputs (solo UI)
-    final labelStyle = textTheme.bodyMedium?.copyWith(
-      color: colorScheme.onSurfaceVariant,
-      fontSize: isSmallScreen ? 13 : 14,
-    );
-    final hintStyle = textTheme.bodyMedium?.copyWith(
-      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-      fontSize: isSmallScreen ? 13 : 14,
-    );
-    final helperStyle = textTheme.bodySmall?.copyWith(
-      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-      fontSize: isSmallScreen ? 12 : 12,
-    );
 
     return Dialog(
       backgroundColor: colorScheme.surfaceContainerHigh,
@@ -199,7 +188,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                     Container(
                       padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                       decoration: BoxDecoration(
-                        color: colorScheme.surface.withValues(alpha: 0.28),
+                        color: colorScheme.surface.withValues(alpha: 0.3),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -226,14 +215,14 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                           ),
                           SizedBox(height: Responsive.spacing(context, 4)),
                           Text(
-                            'Completa los datos para guardarlo',
+                            'Completa la información para guardarla',
                             style:
                             (isSmallScreen
                                 ? textTheme.labelSmall
                                 : textTheme.bodySmall)
                                 ?.copyWith(
                               color: colorScheme.onPrimaryContainer
-                                  .withValues(alpha: 0.82),
+                                  .withValues(alpha: 0.8),
                             ),
                           ),
                         ],
@@ -254,21 +243,18 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                       // Campo Nombre
                       TextFormField(
                         controller: _nombreController,
-                        autofocus: !isSmallScreen,
+                        autofocus:
+                        !isSmallScreen, // No autofocus en pantallas pequeñas
                         style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
                         decoration: InputDecoration(
                           labelText: 'Nombre *',
                           hintText: 'Ej: María Fernanda',
-                          labelStyle: labelStyle,
-                          hintStyle: hintStyle,
-                          helperStyle: helperStyle,
-                          floatingLabelBehavior: FloatingLabelBehavior.auto,
                           prefixIcon: Container(
                             margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
                             padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                             decoration: BoxDecoration(
                               color: colorScheme.primaryContainer.withValues(
-                                alpha: 0.45,
+                                alpha: 0.5,
                               ),
                               borderRadius: BorderRadius.circular(
                                 isSmallScreen ? 10 : 12,
@@ -287,7 +273,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                           ),
                           filled: true,
                           fillColor: colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.45),
+                              .withValues(alpha: 0.5),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: isSmallScreen ? 12 : 16,
                             vertical: isSmallScreen ? 12 : 16,
@@ -307,16 +293,12 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                         decoration: InputDecoration(
                           labelText: 'Apellido (opcional)',
                           hintText: 'Ej: González',
-                          labelStyle: labelStyle,
-                          hintStyle: hintStyle,
-                          helperStyle: helperStyle,
-                          floatingLabelBehavior: FloatingLabelBehavior.auto,
                           prefixIcon: Container(
                             margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
                             padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                             decoration: BoxDecoration(
                               color: colorScheme.secondaryContainer.withValues(
-                                alpha: 0.45,
+                                alpha: 0.5,
                               ),
                               borderRadius: BorderRadius.circular(
                                 isSmallScreen ? 10 : 12,
@@ -335,7 +317,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                           ),
                           filled: true,
                           fillColor: colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.45),
+                              .withValues(alpha: 0.5),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: isSmallScreen ? 12 : 16,
                             vertical: isSmallScreen ? 12 : 16,
@@ -352,17 +334,12 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                         decoration: InputDecoration(
                           labelText: 'Teléfono (opcional)',
                           hintText: 'Ej: 71234567',
-                          helperText: 'Solo números',
-                          labelStyle: labelStyle,
-                          hintStyle: hintStyle,
-                          helperStyle: helperStyle,
-                          floatingLabelBehavior: FloatingLabelBehavior.auto,
                           prefixIcon: Container(
                             margin: EdgeInsets.all(isSmallScreen ? 6 : 8),
                             padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
                             decoration: BoxDecoration(
                               color: colorScheme.tertiaryContainer.withValues(
-                                alpha: 0.45,
+                                alpha: 0.5,
                               ),
                               borderRadius: BorderRadius.circular(
                                 isSmallScreen ? 10 : 12,
@@ -381,7 +358,7 @@ class _CreateClientDialogState extends State<CreateClientDialog> {
                           ),
                           filled: true,
                           fillColor: colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.45),
+                              .withValues(alpha: 0.5),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: isSmallScreen ? 12 : 16,
                             vertical: isSmallScreen ? 12 : 16,
