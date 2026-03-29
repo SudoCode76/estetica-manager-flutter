@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
 import 'package:app_estetica/providers/reports_provider.dart';
 
-/// Selector de tiempo reutilizable (día / rango / mes / año) para pantallas
-/// que necesitan filtrar por fechas (ej: Tickets).
+/// Selector de fechas reutilizable (día / rango / mes / año) para pantallas
+/// que necesitan filtrar resultados por fecha (por ejemplo: reportes o tickets).
 class TimeNavBar extends StatefulWidget {
   const TimeNavBar({
     super.key,
@@ -55,15 +55,16 @@ class _TimeNavBarState extends State<TimeNavBar> {
 
   IconData get _modeIcon {
     if (_mode == ReportDateMode.yearPick) return Icons.event_repeat_rounded;
-    if (_mode == ReportDateMode.monthPick)
+    if (_mode == ReportDateMode.monthPick) {
       return Icons.calendar_view_month_rounded;
+    }
     if (_mode == ReportDateMode.dateRange) return Icons.date_range_rounded;
     return Icons.calendar_today_rounded;
   }
 
   String _buildLabel(BuildContext context) {
     if (_mode == ReportDateMode.yearPick && widget.selectedYear != null) {
-      return 'Año ${widget.selectedYear}';
+      return 'Año: ${widget.selectedYear}';
     }
     if (_mode == ReportDateMode.monthPick && widget.selectedMonth != null) {
       return DateFormat('MMMM yyyy', 'es').format(widget.selectedMonth!);
@@ -105,6 +106,9 @@ class _TimeNavBarState extends State<TimeNavBar> {
       firstDate: DateTime(2020),
       lastDate: today,
       locale: const Locale('es'),
+      helpText: 'Elegir fecha',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
     );
     if (picked != null) widget.onDateChanged(picked);
   }
@@ -114,10 +118,10 @@ class _TimeNavBarState extends State<TimeNavBar> {
     final today = DateTime(now.year, now.month, now.day);
     final initialRange =
         widget.selectedRange ??
-        DateTimeRange(
-          start: today.subtract(const Duration(days: 6)),
-          end: today,
-        );
+            DateTimeRange(
+              start: today.subtract(const Duration(days: 6)),
+              end: today,
+            );
 
     final picked = await showDateRangePicker(
       context: context,
@@ -125,6 +129,10 @@ class _TimeNavBarState extends State<TimeNavBar> {
       firstDate: DateTime(2020),
       lastDate: today,
       locale: const Locale('es'),
+      helpText: 'Elegir rango de fechas',
+      cancelText: 'Cancelar',
+      confirmText: 'Aplicar',
+      saveText: 'Aplicar',
     );
     if (picked != null) widget.onRangeChanged(picked);
   }
@@ -137,6 +145,10 @@ class _TimeNavBarState extends State<TimeNavBar> {
       initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: DateTime(now.year, now.month),
+      headerColor: Theme.of(context).colorScheme.primaryContainer,
+      headerTextColor: Theme.of(context).colorScheme.onPrimaryContainer,
+      confirmWidget: const Text('Aplicar'),
+      cancelWidget: const Text('Cancelar'),
     );
     if (picked != null) widget.onMonthChanged(picked.year, picked.month);
   }
@@ -150,7 +162,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
       builder: (ctx) {
         DateTime selectedDt = DateTime(initialYear);
         return AlertDialog(
-          title: const Text('Seleccionar año'),
+          title: const Text('Elegir año'),
           contentPadding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
           content: SizedBox(
             width: 280,
@@ -169,7 +181,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
+              child: const Text('Cerrar'),
             ),
           ],
         );
@@ -199,15 +211,32 @@ class _TimeNavBarState extends State<TimeNavBar> {
             ),
             onPressed: _isDayMode
                 ? () => widget.onDateChanged(
-                    widget.selectedDate.subtract(const Duration(days: 1)),
-                  )
+              widget.selectedDate.subtract(const Duration(days: 1)),
+            )
                 : null,
+            tooltip: _isDayMode ? 'Día anterior' : 'No disponible',
             visualDensity: VisualDensity.compact,
             splashRadius: 20,
           ),
           Expanded(
             child: GestureDetector(
-              onTap: () => _pickDay(context),
+              onTap: () {
+                switch (_mode) {
+                  case ReportDateMode.singleDay:
+                  case ReportDateMode.period:
+                    _pickDay(context);
+                    break;
+                  case ReportDateMode.dateRange:
+                    _pickRange(context);
+                    break;
+                  case ReportDateMode.monthPick:
+                    _pickMonth(context);
+                    break;
+                  case ReportDateMode.yearPick:
+                    _pickYear(context);
+                    break;
+                }
+              },
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -230,7 +259,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
           ),
           PopupMenuButton<ReportDateMode>(
             icon: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-            tooltip: 'Cambiar tipo de período',
+            tooltip: 'Cambiar filtro de fecha',
             onSelected: (mode) {
               setState(() => _mode = mode);
               switch (mode) {
@@ -263,7 +292,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Seleccionar día',
+                      'Día específico',
                       style: TextStyle(
                         color: _mode == ReportDateMode.singleDay
                             ? cs.primary
@@ -290,7 +319,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Seleccionar rango',
+                      'Rango de fechas',
                       style: TextStyle(
                         color: _mode == ReportDateMode.dateRange
                             ? cs.primary
@@ -317,7 +346,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Seleccionar mes',
+                      'Mes completo',
                       style: TextStyle(
                         color: _mode == ReportDateMode.monthPick
                             ? cs.primary
@@ -344,7 +373,7 @@ class _TimeNavBarState extends State<TimeNavBar> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Seleccionar año',
+                      'Año completo',
                       style: TextStyle(
                         color: _mode == ReportDateMode.yearPick
                             ? cs.primary
@@ -367,9 +396,10 @@ class _TimeNavBarState extends State<TimeNavBar> {
             ),
             onPressed: _canGoForward
                 ? () => widget.onDateChanged(
-                    widget.selectedDate.add(const Duration(days: 1)),
-                  )
+              widget.selectedDate.add(const Duration(days: 1)),
+            )
                 : null,
+            tooltip: _canGoForward ? 'Día siguiente' : 'No disponible',
             visualDensity: VisualDensity.compact,
             splashRadius: 20,
           ),
