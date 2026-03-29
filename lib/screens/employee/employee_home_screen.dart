@@ -353,7 +353,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Usuario',
+                    'Empleado',
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -411,7 +411,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              'Usuario',
+                              'Empleado',
                               style: textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onPrimary.withValues(
                                   alpha: 0.8,
