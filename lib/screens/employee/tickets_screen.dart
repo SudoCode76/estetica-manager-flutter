@@ -12,7 +12,7 @@ class _EmployeeTicketsScreenState extends State<EmployeeTicketsScreen> {
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Pantalla de Tickets - En desarrollo',
+        'Pantalla de Pruebas - En desarrollo', //Tickets
         style: TextStyle(fontSize: 18),
       ),
     );
