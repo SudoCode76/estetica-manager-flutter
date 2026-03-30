@@ -12,7 +12,7 @@ class _EmployeeClientsScreenState extends State<EmployeeClientsScreen> {
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Pantalla de Clients no estaba en Desarrollo',
+        'Pantalla de Clientes - En desarrollo',
         style: TextStyle(fontSize: 18),
       ),
     );

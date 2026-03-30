@@ -58,8 +58,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               // Normalizar nombre
               final nombre =
                   attrs['nombreSucursal'] ??
-                  attrs['nombre'] ??
-                  attrs['nombre_sucursal'];
+                      attrs['nombre'] ??
+                      attrs['nombre_sucursal'];
               return {'id': attrs['id'], 'nombreSucursal': nombre};
             }
             // Si ya vino plano con id + campos
@@ -296,7 +296,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Sin Sucursal Asignada',
+                  'Sucursal No Asignada',
                   style: textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.error,
@@ -305,7 +305,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Tu cuenta de empleado no tiene una sucursal asignada. Por favor, contacta al administrador para que te asigne una sucursal.',
+                  'Tu cuenta de empleado no tiene sucursal asignada. Por favor, contacta al administrador.',
                   style: textTheme.bodyLarge?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -500,7 +500,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   _DrawerItem(
                     icon: Icons.info_outline,
                     selectedIcon: Icons.info,
-                    label: 'Sobre la app',
+                    label: 'Acerca de',
                     selected: false,
                     onTap: () {
                       Navigator.pop(context);

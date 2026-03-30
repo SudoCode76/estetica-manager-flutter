@@ -246,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 decoration: InputDecoration(
                                   labelText: 'Email',
-                                  hintText: 'nombre@ejemplo.com',
+                                  hintText: 'tu@email.com',
                                   prefixIcon: Icon(
                                     Icons.email_outlined,
                                     size: isSmallScreen ? 20 : 24,
@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 controller: _passwordController,
                                 obscureText: _obscurePassword,
                                 decoration: InputDecoration(
-                                  labelText: 'Contraseña',
+                                  labelText: 'Clave',
                                   hintText: 'Ingrese su contraseña',
                                   prefixIcon: const Icon(
                                     Icons.lock_outline_rounded,

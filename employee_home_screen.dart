@@ -1,0 +1,1 @@
+// Restored content of employee_home_screen.dart
