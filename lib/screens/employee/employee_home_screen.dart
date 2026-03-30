@@ -63,6 +63,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               return {'id': attrs['id'], 'nombreSucursal': nombre};
             }
             // Si ya vino plano con id + campos
+            //comentario
             final id = d['id'] ?? d['ID'];
             final nombre =
                 d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
