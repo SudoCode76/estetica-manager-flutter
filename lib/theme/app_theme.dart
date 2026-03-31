@@ -13,12 +13,12 @@ class AppTheme {
   static const Color secondaryContainerColor = Color(0xFFF3E5FF);
   static const Color onSecondaryContainerColor = Color(0xFF2D0060);
 
-  static const Color tertiaryColor = Color(0xFFC2185B);
+  static const Color tertiaryColor = Color(0xFF2E1E24);//0xFFC2185B
   static const Color onTertiaryColor = Color(0xFFFFFFFF);
   static const Color tertiaryContainerColor = Color(0xFFFFD6EF);
   static const Color onTertiaryContainerColor = Color(0xFF5C0030);
 
-  static const Color errorColor = Color(0xFFBA1A1A);
+  static const Color errorColor = Color(0xFFE48888);//0xFFBA1A1A
   static const Color onErrorColor = Color(0xFFFFFFFF);
   static const Color errorContainerColor = Color(0xFFFFDAD6);
   static const Color onErrorContainerColor = Color(0xFF410002);

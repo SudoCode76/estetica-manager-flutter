@@ -6,7 +6,7 @@ class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
   static const _website = 'https://keybusy-software.vercel.app/';
-  static const _whatsappNumber = '+59162994685';
+  static const _whatsappNumber = '+59175472634'; //59162994685
 
   Future<void> _openWebsite(BuildContext context) async {
     final uri = Uri.parse(_website);

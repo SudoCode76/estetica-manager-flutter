@@ -63,6 +63,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               return {'id': attrs['id'], 'nombreSucursal': nombre};
             }
             // Si ya vino plano con id + campos
+            //comentario
             final id = d['id'] ?? d['ID'];
             final nombre =
                 d['nombreSucursal'] ?? d['nombre'] ?? d['nombre_sucursal'];
@@ -590,15 +591,15 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                   _sucursalProvider!.selectedSucursalId!,
                 );
 
-          if (result != null) {
-            // Refrescar clientes - simplemente rebuild todo
-            setState(() {});
-          }
-        },
-        icon: const Icon(Icons.person_add),
-        label: const Text('Nuevo cliente'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      )
+                if (result != null) {
+                  // Refrescar clientes - simplemente rebuild todo
+                  setState(() {});
+                }
+              },
+              icon: const Icon(Icons.person_add),
+              label: const Text('Nuevo Cliente'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            )
           : null,
     );
   }
