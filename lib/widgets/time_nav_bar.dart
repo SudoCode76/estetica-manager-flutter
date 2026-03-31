@@ -118,10 +118,10 @@ class _TimeNavBarState extends State<TimeNavBar> {
     final today = DateTime(now.year, now.month, now.day);
     final initialRange =
         widget.selectedRange ??
-            DateTimeRange(
-              start: today.subtract(const Duration(days: 6)),
-              end: today,
-            );
+        DateTimeRange(
+          start: today.subtract(const Duration(days: 6)),
+          end: today,
+        );
 
     final picked = await showDateRangePicker(
       context: context,
@@ -145,10 +145,6 @@ class _TimeNavBarState extends State<TimeNavBar> {
       initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: DateTime(now.year, now.month),
-      headerColor: Theme.of(context).colorScheme.primaryContainer,
-      headerTextColor: Theme.of(context).colorScheme.onPrimaryContainer,
-      confirmWidget: const Text('Aplicar'),
-      cancelWidget: const Text('Cancelar'),
     );
     if (picked != null) widget.onMonthChanged(picked.year, picked.month);
   }
@@ -211,8 +207,8 @@ class _TimeNavBarState extends State<TimeNavBar> {
             ),
             onPressed: _isDayMode
                 ? () => widget.onDateChanged(
-              widget.selectedDate.subtract(const Duration(days: 1)),
-            )
+                    widget.selectedDate.subtract(const Duration(days: 1)),
+                  )
                 : null,
             tooltip: _isDayMode ? 'Día anterior' : 'No disponible',
             visualDensity: VisualDensity.compact,
@@ -396,8 +392,8 @@ class _TimeNavBarState extends State<TimeNavBar> {
             ),
             onPressed: _canGoForward
                 ? () => widget.onDateChanged(
-              widget.selectedDate.add(const Duration(days: 1)),
-            )
+                    widget.selectedDate.add(const Duration(days: 1)),
+                  )
                 : null,
             tooltip: _canGoForward ? 'Día siguiente' : 'No disponible',
             visualDensity: VisualDensity.compact,
