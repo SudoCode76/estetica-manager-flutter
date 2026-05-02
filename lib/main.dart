@@ -13,8 +13,10 @@ import 'package:app_estetica/repositories/auth_repository.dart';
 import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/repositories/cliente_repository.dart';
 import 'package:app_estetica/repositories/reports_repository.dart';
+import 'package:app_estetica/repositories/finance_repository.dart';
 import 'package:app_estetica/navigation/route_observer.dart';
 import 'package:app_estetica/providers/reports_provider.dart';
+import 'package:app_estetica/providers/finance_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_estetica/config/supabase_config.dart';
 
@@ -48,6 +50,7 @@ class _MyAppState extends State<MyApp> {
     final authRepo = AuthRepository();
     final catalogRepo = CatalogRepository();
     final clienteRepo = ClienteRepository();
+    final financeRepo = FinanceRepository();
 
     return SucursalInherited(
       provider: _globalSucursalProvider,
@@ -62,6 +65,7 @@ class _MyAppState extends State<MyApp> {
           Provider<CatalogRepository>.value(value: catalogRepo),
           Provider<ClienteRepository>.value(value: clienteRepo),
           Provider<ReportsRepository>.value(value: ReportsRepository()),
+          Provider<FinanceRepository>.value(value: financeRepo),
 
           // Providers que dependen de repos
           ChangeNotifierProvider<TicketProvider>(
@@ -69,6 +73,9 @@ class _MyAppState extends State<MyApp> {
           ),
           ChangeNotifierProvider<ReportsProvider>(
             create: (_) => ReportsProvider(),
+          ),
+          ChangeNotifierProvider<FinanceProvider>(
+            create: (_) => FinanceProvider(repo: financeRepo),
           ),
         ],
         child: MaterialApp(

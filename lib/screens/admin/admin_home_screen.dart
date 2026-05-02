@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'dart:async';
 import 'package:app_estetica/screens/admin/reports/reports_screen.dart';
+import 'package:app_estetica/screens/admin/finance/finance_screen.dart';
 import 'package:app_estetica/widgets/main_drawer.dart';
 
 class AdminHomeScreen extends StatefulWidget {
@@ -63,6 +64,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     ReportsScreen(
       key: ValueKey('reports_${_sucursalProvider?.selectedSucursalId}'),
     ),
+    const FinanceScreen(),
     EmployeesScreen(
       key: ValueKey('employees_${_sucursalProvider?.selectedSucursalId}'),
     ),
@@ -528,12 +530,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       'Tratamientos',
       'Pagos',
       'Reportes',
+      'Finanzas',
       'Empleados',
     ];
-    final currentTitle = screenTitles[_selectedIndex.clamp(
-      0,
-      screenTitles.length - 1,
-    )];
+    final currentTitle =
+        screenTitles[_selectedIndex.clamp(0, screenTitles.length - 1)];
 
     return Scaffold(
       key: _scaffoldKey,
@@ -568,11 +569,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.spa_rounded,
-              color: colorScheme.primary,
-              size: 22,
-            ),
+            Icon(Icons.spa_rounded, color: colorScheme.primary, size: 22),
             const SizedBox(width: 8),
             Text(currentTitle),
           ],

@@ -47,10 +47,7 @@ class MainDrawer extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  colorScheme.primary,
-                  colorScheme.secondary,
-                ],
+                colors: [colorScheme.primary, colorScheme.secondary],
               ),
               borderRadius: const BorderRadius.only(
                 bottomRight: Radius.circular(0),
@@ -211,12 +208,22 @@ class MainDrawer extends StatelessWidget {
                     },
                   ),
                   _DrawerItem(
-                    icon: Icons.badge_outlined,
-                    selectedIcon: Icons.badge_rounded,
-                    label: 'Empleados',
+                    icon: Icons.account_balance_wallet_outlined,
+                    selectedIcon: Icons.account_balance_wallet_rounded,
+                    label: 'Finanzas',
                     selected: selectedIndex == 6,
                     onTap: () {
                       onIndexChanged(6);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.badge_outlined,
+                    selectedIcon: Icons.badge_rounded,
+                    label: 'Empleados',
+                    selected: selectedIndex == 7,
+                    onTap: () {
+                      onIndexChanged(7);
                       Navigator.pop(context);
                     },
                   ),
@@ -314,9 +321,7 @@ class _DrawerItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
-        color: selected
-            ? colorScheme.primaryContainer
-            : Colors.transparent,
+        color: selected ? colorScheme.primaryContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -450,7 +455,10 @@ class _SucursalSelector extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: onRetryLoadSucursales,
-                  icon: Icon(Icons.refresh_rounded, color: colorScheme.onPrimary),
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    color: colorScheme.onPrimary,
+                  ),
                   tooltip: 'Reintentar',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -469,7 +477,8 @@ class _SucursalSelector extends StatelessWidget {
                   child: DropdownButtonHideUnderline(
                     child: Builder(
                       builder: (context) {
-                        final validValue = selectedSucursalId != null &&
+                        final validValue =
+                            selectedSucursalId != null &&
                                 sucursales.any(
                                   (s) => s['id'] == selectedSucursalId,
                                 )
@@ -493,7 +502,9 @@ class _SucursalSelector extends StatelessWidget {
                             'Seleccionar sucursal',
                             style: GoogleFonts.nunito(
                               fontSize: 13,
-                              color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                              color: colorScheme.onPrimary.withValues(
+                                alpha: 0.8,
+                              ),
                             ),
                           ),
                           items: sucursales.map((s) {
