@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/providers/finance_provider.dart';
-import 'package:app_estetica/providers/reports_provider.dart';
 import 'package:app_estetica/widgets/finance_date_nav_bar.dart';
 
 class FinanceScreen extends StatefulWidget {
@@ -15,7 +14,11 @@ class FinanceScreen extends StatefulWidget {
 }
 
 class _FinanceScreenState extends State<FinanceScreen> {
+  static const int _movementsPageSize = 10;
   bool _requested = false;
+  bool _showIngresosPorSucursal = true;
+  bool _showEgresosPorSucursal = true;
+  int _movementsPage = 0;
 
   @override
   void didChangeDependencies() {
@@ -46,6 +49,21 @@ class _FinanceScreenState extends State<FinanceScreen> {
             (dashboard['egresos_por_sucursal'] as List?) ?? [];
         final movimientosRecientes =
             (dashboard['movimientos_recientes'] as List?) ?? [];
+        final totalMovementPages = movimientosRecientes.isEmpty
+            ? 1
+            : (movimientosRecientes.length / _movementsPageSize).ceil();
+        final safeMovementPage = _movementsPage.clamp(
+          0,
+          totalMovementPages - 1,
+        );
+        final startIndex = safeMovementPage * _movementsPageSize;
+        final endIndex = (startIndex + _movementsPageSize).clamp(
+          0,
+          movimientosRecientes.length,
+        );
+        final pagedMovements = movimientosRecientes.isEmpty
+            ? const []
+            : movimientosRecientes.sublist(startIndex, endIndex);
 
         if (provider.isLoading && !_hasData(dashboard)) {
           return const Center(child: CircularProgressIndicator());
@@ -58,16 +76,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Controla ingresos, egresos y movimientos por periodo.',
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   FilledButton.icon(
                     onPressed: provider.isSavingExpense
                         ? null
@@ -93,11 +103,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
               ),
               const SizedBox(height: 16),
               _SummaryCard(
-                title: 'Ingresos Totales',
-                subtitle: _buildSubtitle(provider),
-                amount: totalIngresos,
-                icon: Icons.account_balance_wallet_rounded,
-                accentColor: cs.primary,
+                totalIngresos: totalIngresos,
+                totalEgresos: totalEgresos,
               ),
               const SizedBox(height: 16),
               _BranchTotalsSection(
@@ -105,6 +112,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 icon: Icons.trending_up_rounded,
                 items: ingresosPorSucursal,
                 emptyText: 'No hay ingresos registrados todavía.',
+                expanded: _showIngresosPorSucursal,
+                onToggle: () {
+                  setState(() {
+                    _showIngresosPorSucursal = !_showIngresosPorSucursal;
+                  });
+                },
               ),
               const SizedBox(height: 16),
               _BranchTotalsSection(
@@ -113,9 +126,34 @@ class _FinanceScreenState extends State<FinanceScreen> {
                 items: egresosPorSucursal,
                 emptyText: 'No hay egresos registrados todavía.',
                 totalOverride: totalEgresos,
+                expanded: _showEgresosPorSucursal,
+                onToggle: () {
+                  setState(() {
+                    _showEgresosPorSucursal = !_showEgresosPorSucursal;
+                  });
+                },
               ),
               const SizedBox(height: 16),
-              _RecentMovementsSection(items: movimientosRecientes),
+              _RecentMovementsSection(
+                items: pagedMovements,
+                currentPage: safeMovementPage,
+                totalPages: totalMovementPages,
+                totalItems: movimientosRecientes.length,
+                onPreviousPage: safeMovementPage > 0
+                    ? () {
+                        setState(() {
+                          _movementsPage = safeMovementPage - 1;
+                        });
+                      }
+                    : null,
+                onNextPage: safeMovementPage < totalMovementPages - 1
+                    ? () {
+                        setState(() {
+                          _movementsPage = safeMovementPage + 1;
+                        });
+                      }
+                    : null,
+              ),
               if (provider.error != null) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -144,20 +182,6 @@ class _FinanceScreenState extends State<FinanceScreen> {
     final egresos = (dashboard['egresos_por_sucursal'] as List?) ?? [];
     final movimientos = (dashboard['movimientos_recientes'] as List?) ?? [];
     return ingresos.isNotEmpty || egresos.isNotEmpty || movimientos.isNotEmpty;
-  }
-
-  String _buildSubtitle(FinanceProvider provider) {
-    switch (provider.dateMode) {
-      case ReportDateMode.singleDay:
-      case ReportDateMode.period:
-        return 'Ingresos consolidados del día seleccionado';
-      case ReportDateMode.dateRange:
-        return 'Ingresos consolidados del rango seleccionado';
-      case ReportDateMode.monthPick:
-        return 'Ingresos consolidados del mes seleccionado';
-      case ReportDateMode.yearPick:
-        return 'Ingresos consolidados del año seleccionado';
-    }
   }
 
   Future<void> _showRegisterExpenseDialog(BuildContext context) async {
@@ -476,24 +500,14 @@ class _RegisterExpenseDialogState extends State<_RegisterExpenseDialog> {
 }
 
 class _SummaryCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final double amount;
-  final IconData icon;
-  final Color accentColor;
+  final double totalIngresos;
+  final double totalEgresos;
 
-  const _SummaryCard({
-    required this.title,
-    required this.subtitle,
-    required this.amount,
-    required this.icon,
-    required this.accentColor,
-  });
+  const _SummaryCard({required this.totalIngresos, required this.totalEgresos});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -511,27 +525,30 @@ class _SummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: cs.onPrimaryContainer.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  _currency(amount),
-                  style: textTheme.displaySmall?.copyWith(
-                    color: cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryMetric(
+                        label: 'Ingresos Totales',
+                        amount: totalIngresos,
+                        amountColor: cs.onPrimaryContainer,
+                        labelColor: cs.onPrimaryContainer.withValues(
+                          alpha: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _SummaryMetric(
+                        label: 'Egresos Totales',
+                        amount: totalEgresos,
+                        amountColor: cs.onTertiaryContainer,
+                        labelColor: cs.onTertiaryContainer.withValues(
+                          alpha: 0.8,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -543,10 +560,54 @@ class _SummaryCard extends StatelessWidget {
               color: cs.surface.withValues(alpha: 0.75),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: accentColor, size: 28),
+            child: Icon(
+              Icons.account_balance_wallet_rounded,
+              color: cs.primary,
+              size: 28,
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SummaryMetric extends StatelessWidget {
+  final String label;
+  final double amount;
+  final Color amountColor;
+  final Color labelColor;
+
+  const _SummaryMetric({
+    required this.label,
+    required this.amount,
+    required this.amountColor,
+    required this.labelColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: textTheme.titleMedium?.copyWith(
+            color: labelColor,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          _currency(amount),
+          style: textTheme.headlineMedium?.copyWith(
+            color: amountColor,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -557,6 +618,8 @@ class _BranchTotalsSection extends StatelessWidget {
   final List items;
   final String emptyText;
   final double? totalOverride;
+  final bool expanded;
+  final VoidCallback onToggle;
 
   const _BranchTotalsSection({
     required this.title,
@@ -564,6 +627,8 @@ class _BranchTotalsSection extends StatelessWidget {
     required this.items,
     required this.emptyText,
     this.totalOverride,
+    required this.expanded,
+    required this.onToggle,
   });
 
   @override
@@ -599,41 +664,63 @@ class _BranchTotalsSection extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: onToggle,
+                icon: Icon(
+                  expanded
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: cs.primary,
+                ),
+                tooltip: expanded ? 'Contraer' : 'Expandir',
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (items.isEmpty)
-            Text(
-              emptyText,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-            )
-          else
-            ...items.map((item) {
-              final map = item as Map;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        map['sucursal_nombre']?.toString() ?? 'Sin sucursal',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: items.isEmpty
+                  ? Text(
+                      emptyText,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
                       ),
+                    )
+                  : Column(
+                      children: items.map((item) {
+                        final map = item as Map;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  map['sucursal_nombre']?.toString() ??
+                                      'Sin sucursal',
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              Text(
+                                _currency(
+                                  (map['total'] as num?)?.toDouble() ?? 0.0,
+                                ),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
-                    Text(
-                      _currency((map['total'] as num?)?.toDouble() ?? 0.0),
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+            ),
+            crossFadeState: expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 180),
+          ),
         ],
       ),
     );
@@ -649,8 +736,20 @@ class _BranchTotalsSection extends StatelessWidget {
 
 class _RecentMovementsSection extends StatelessWidget {
   final List items;
+  final int currentPage;
+  final int totalPages;
+  final int totalItems;
+  final VoidCallback? onPreviousPage;
+  final VoidCallback? onNextPage;
 
-  const _RecentMovementsSection({required this.items});
+  const _RecentMovementsSection({
+    required this.items,
+    required this.currentPage,
+    required this.totalPages,
+    required this.totalItems,
+    this.onPreviousPage,
+    this.onNextPage,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -675,6 +774,15 @@ class _RecentMovementsSection extends StatelessWidget {
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
+              const Spacer(),
+              if (totalItems > 0)
+                Text(
+                  'Pagina ${currentPage + 1} de $totalPages',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -685,7 +793,7 @@ class _RecentMovementsSection extends StatelessWidget {
                 context,
               ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             )
-          else
+          else ...[
             ...items.map((item) {
               final map = item as Map;
               final isIngreso = map['tipo'] == 'ingreso';
@@ -781,6 +889,33 @@ class _RecentMovementsSection extends StatelessWidget {
                 ),
               );
             }),
+            if (totalPages > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: onPreviousPage,
+                      icon: const Icon(Icons.chevron_left_rounded),
+                      label: const Text('Anterior'),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '$totalItems movimientos',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: onNextPage,
+                      icon: const Icon(Icons.chevron_right_rounded),
+                      label: const Text('Siguiente'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );

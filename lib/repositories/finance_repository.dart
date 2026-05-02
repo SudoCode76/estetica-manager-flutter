@@ -10,7 +10,7 @@ class FinanceRepository {
   Future<Map<String, dynamic>> getDashboard({
     required DateTime start,
     required DateTime end,
-    int recentLimit = 12,
+    int recentLimit = 100,
   }) async {
     try {
       final resp = await _client.rpc(

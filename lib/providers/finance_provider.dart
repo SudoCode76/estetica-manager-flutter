@@ -4,6 +4,7 @@ import 'package:app_estetica/providers/reports_provider.dart';
 
 class FinanceProvider extends ChangeNotifier {
   final FinanceRepository _repo;
+  static const int _recentLimit = 100;
 
   FinanceProvider({required FinanceRepository repo}) : _repo = repo;
 
@@ -130,6 +131,7 @@ class FinanceProvider extends ChangeNotifier {
       _dashboard = await _repo.getDashboard(
         start: start.toUtc(),
         end: end.toUtc(),
+        recentLimit: _recentLimit,
       );
     } catch (e) {
       _error = e.toString();
