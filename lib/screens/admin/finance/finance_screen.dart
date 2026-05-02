@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:app_estetica/providers/sucursal_provider.dart';
+import 'package:app_estetica/repositories/catalog_repository.dart';
 import 'package:app_estetica/providers/finance_provider.dart';
 import 'package:app_estetica/providers/reports_provider.dart';
 import 'package:app_estetica/widgets/finance_date_nav_bar.dart';
@@ -55,6 +57,33 @@ class _FinanceScreenState extends State<FinanceScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Controla ingresos, egresos y movimientos por periodo.',
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: provider.isSavingExpense
+                        ? null
+                        : () => _showRegisterExpenseDialog(context),
+                    icon: provider.isSavingExpense
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_card_rounded),
+                    label: const Text('Registrar egreso'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
               FinanceDateNavBar(
                 provider: provider,
                 onDateChanged: provider.fetchDashboardForDate,
@@ -129,6 +158,320 @@ class _FinanceScreenState extends State<FinanceScreen> {
       case ReportDateMode.yearPick:
         return 'Ingresos consolidados del año seleccionado';
     }
+  }
+
+  Future<void> _showRegisterExpenseDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _RegisterExpenseDialog(),
+    );
+
+    if (result == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Egreso registrado correctamente')),
+      );
+    }
+  }
+}
+
+class _RegisterExpenseDialog extends StatefulWidget {
+  const _RegisterExpenseDialog();
+
+  @override
+  State<_RegisterExpenseDialog> createState() => _RegisterExpenseDialogState();
+}
+
+class _RegisterExpenseDialogState extends State<_RegisterExpenseDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _categoryController = TextEditingController();
+
+  DateTime _expenseDate = DateTime.now();
+  int? _selectedSucursalId;
+  List<dynamic> _sucursales = [];
+  List<Map<String, dynamic>> _categorySuggestions = [];
+  bool _loadingSucursales = true;
+  bool _loadingSuggestions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSucursales();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    _categoryController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSucursales() async {
+    final catalogRepo = context.read<CatalogRepository>();
+    final sucursalProvider = context.read<SucursalProvider>();
+
+    try {
+      final sucursales = await catalogRepo.getSucursales();
+      if (!mounted) return;
+      setState(() {
+        _sucursales = sucursales;
+        _selectedSucursalId = sucursalProvider.selectedSucursalId;
+        _loadingSucursales = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingSucursales = false;
+      });
+    }
+  }
+
+  Future<void> _searchCategories(String query) async {
+    setState(() {
+      _loadingSuggestions = true;
+    });
+
+    try {
+      final suggestions = await context
+          .read<FinanceProvider>()
+          .searchExpenseCategories(query);
+      if (!mounted) return;
+      setState(() {
+        _categorySuggestions = suggestions;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _categorySuggestions = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingSuggestions = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickExpenseDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expenseDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year, now.month, now.day),
+      locale: const Locale('es'),
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() {
+      _expenseDate = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        now.hour,
+        now.minute,
+      );
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final amount = double.tryParse(
+      _amountController.text.trim().replaceAll(',', '.'),
+    );
+    if (amount == null || amount <= 0 || _selectedSucursalId == null) {
+      return;
+    }
+
+    try {
+      await context.read<FinanceProvider>().registerExpense(
+        amount: amount,
+        description: _descriptionController.text.trim(),
+        sucursalId: _selectedSucursalId!,
+        categoryName: _categoryController.text.trim(),
+        expenseDate: _expenseDate,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo registrar el egreso: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final provider = context.watch<FinanceProvider>();
+
+    return AlertDialog(
+      title: const Text('Registrar egreso'),
+      content: SizedBox(
+        width: 520,
+        child: _loadingSucursales
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Monto',
+                          prefixText: 'Bs ',
+                        ),
+                        validator: (value) {
+                          final amount = double.tryParse(
+                            value?.trim().replaceAll(',', '.') ?? '',
+                          );
+                          if (amount == null || amount <= 0) {
+                            return 'Ingresa un monto válido';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _descriptionController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Descripción',
+                          hintText:
+                              'Ej. compra de insumos, alquiler, movilidad',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'La descripción es obligatoria';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _selectedSucursalId,
+                        decoration: const InputDecoration(
+                          labelText: 'Sucursal',
+                        ),
+                        items: _sucursales.map<DropdownMenuItem<int>>((s) {
+                          return DropdownMenuItem<int>(
+                            value: s['id'] as int,
+                            child: Text(s['nombreSucursal']?.toString() ?? '-'),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSucursalId = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) return 'Selecciona una sucursal';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: _pickExpenseDate,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Fecha del egreso',
+                            suffixIcon: Icon(Icons.calendar_today_rounded),
+                          ),
+                          child: Text(
+                            DateFormat('dd/MM/yyyy', 'es').format(_expenseDate),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _categoryController,
+                        decoration: const InputDecoration(
+                          labelText: 'Categoría',
+                          hintText: 'Ej. Insumos, Alquiler, Sueldos',
+                        ),
+                        onChanged: _searchCategories,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'La categoría es obligatoria';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (_loadingSuggestions) ...[
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(minHeight: 2),
+                      ],
+                      if (_categorySuggestions.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'Sugerencias',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _categorySuggestions.map((item) {
+                            final name = item['nombre']?.toString() ?? '';
+                            return ActionChip(
+                              label: Text(name),
+                              backgroundColor: cs.surfaceContainerHigh,
+                              onPressed: () {
+                                setState(() {
+                                  _categoryController.text = name;
+                                  _categorySuggestions = [];
+                                });
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Si la categoría no existe, se creará automáticamente.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: provider.isSavingExpense
+              ? null
+              : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: provider.isSavingExpense ? null : _submit,
+          child: provider.isSavingExpense
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Guardar'),
+        ),
+      ],
+    );
   }
 }
 

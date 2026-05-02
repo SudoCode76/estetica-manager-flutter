@@ -8,6 +8,7 @@ class FinanceProvider extends ChangeNotifier {
   FinanceProvider({required FinanceRepository repo}) : _repo = repo;
 
   bool _isLoading = false;
+  bool _isSavingExpense = false;
   String? _error;
   ReportDateMode _dateMode = ReportDateMode.singleDay;
   DateTime _selectedDate = DateTime.now();
@@ -23,6 +24,7 @@ class FinanceProvider extends ChangeNotifier {
   };
 
   bool get isLoading => _isLoading;
+  bool get isSavingExpense => _isSavingExpense;
   String? get error => _error;
   ReportDateMode get dateMode => _dateMode;
   DateTime get selectedDate => _selectedDate;
@@ -133,6 +135,37 @@ class FinanceProvider extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchExpenseCategories(String query) {
+    return _repo.searchExpenseCategories(query);
+  }
+
+  Future<void> registerExpense({
+    required double amount,
+    required String description,
+    required int sucursalId,
+    required String categoryName,
+    required DateTime expenseDate,
+  }) async {
+    if (_isSavingExpense) return;
+
+    _isSavingExpense = true;
+    notifyListeners();
+
+    try {
+      await _repo.registerExpense(
+        amount: amount,
+        description: description,
+        sucursalId: sucursalId,
+        categoryName: categoryName,
+        expenseDate: expenseDate,
+      );
+      await refreshCurrent();
+    } finally {
+      _isSavingExpense = false;
       notifyListeners();
     }
   }

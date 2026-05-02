@@ -54,6 +54,71 @@ class FinanceRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> searchExpenseCategories(
+    String query, {
+    int limit = 8,
+  }) async {
+    try {
+      final resp = await _client.rpc(
+        'buscar_categorias_egreso',
+        params: {'p_query': query, 'p_limit': limit},
+      );
+
+      if (resp is! List) {
+        return <Map<String, dynamic>>[];
+      }
+
+      return resp.map<Map<String, dynamic>>((item) {
+        final map = item is Map<String, dynamic>
+            ? item
+            : Map<String, dynamic>.from(item as Map);
+        return {'id': map['id'], 'nombre': map['nombre']?.toString() ?? ''};
+      }).toList();
+    } catch (e, stack) {
+      debugPrint('FinanceRepository.searchExpenseCategories ERROR: $e');
+      debugPrint('$stack');
+      rethrow;
+    }
+  }
+
+  Future<void> registerExpense({
+    required double amount,
+    required String description,
+    required int sucursalId,
+    required String categoryName,
+    required DateTime expenseDate,
+  }) async {
+    try {
+      final resp = await _client.rpc(
+        'registrar_egreso',
+        params: {
+          'p_monto': amount,
+          'p_descripcion': description,
+          'p_sucursal_id': sucursalId,
+          'p_categoria_nombre': categoryName,
+          'p_fecha_egreso': expenseDate.toIso8601String(),
+        },
+      );
+
+      if (resp is Map) {
+        final data = Map<String, dynamic>.from(resp);
+        final success = data['success'] == true;
+        if (!success) {
+          throw Exception(
+            data['error']?.toString() ?? 'No se pudo registrar el egreso',
+          );
+        }
+        return;
+      }
+
+      throw Exception('Respuesta inválida al registrar egreso');
+    } catch (e, stack) {
+      debugPrint('FinanceRepository.registerExpense ERROR: $e');
+      debugPrint('$stack');
+      rethrow;
+    }
+  }
+
   Map<String, dynamic> _emptyDashboard() {
     return {
       'total_ingresos': 0.0,
