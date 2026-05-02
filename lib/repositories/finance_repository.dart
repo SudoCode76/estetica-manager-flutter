@@ -33,8 +33,14 @@ class FinanceRepository {
       final egresosPorSucursal = _normalizeBranchTotals(
         data['egresos_por_sucursal'],
       );
+      final topCategoriasGastos = _normalizeBreakdown(
+        data['top_categorias_gastos'],
+      );
       final movimientosRecientes = _normalizeRecentMovements(
         data['movimientos_recientes'],
+      );
+      final transaccionesPorDia = _normalizeTransactionsByDay(
+        data['transacciones_por_dia'],
       );
 
       final totalIngresos = _toDouble(data['total_ingresos']);
@@ -45,7 +51,9 @@ class FinanceRepository {
         'total_egresos': totalEgresos,
         'ingresos_por_sucursal': ingresosPorSucursal,
         'egresos_por_sucursal': egresosPorSucursal,
+        'top_categorias_gastos': topCategoriasGastos,
         'movimientos_recientes': movimientosRecientes,
+        'transacciones_por_dia': transaccionesPorDia,
       };
     } catch (e, stack) {
       debugPrint('FinanceRepository.getDashboard ERROR: $e');
@@ -119,14 +127,85 @@ class FinanceRepository {
     }
   }
 
+  Future<int> resolveExpenseCategoryId(String categoryName) async {
+    try {
+      final resp = await _client.rpc(
+        'resolver_categoria_egreso',
+        params: {'p_nombre': categoryName},
+      );
+
+      if (resp is int) return resp;
+      if (resp is num) return resp.toInt();
+      throw Exception('No se pudo resolver la categoría');
+    } catch (e, stack) {
+      debugPrint('FinanceRepository.resolveExpenseCategoryId ERROR: $e');
+      debugPrint('$stack');
+      rethrow;
+    }
+  }
+
+  Future<void> updateExpense({
+    required String expenseId,
+    required double amount,
+    required String description,
+    required int sucursalId,
+    required String categoryName,
+    required DateTime expenseDate,
+  }) async {
+    try {
+      final categoryId = await resolveExpenseCategoryId(categoryName);
+      await _client
+          .from('egreso')
+          .update({
+            'monto': amount,
+            'descripcion': description,
+            'sucursal_id': sucursalId,
+            'categoria_id': categoryId,
+            'fecha_egreso': expenseDate.toIso8601String(),
+          })
+          .eq('id', expenseId);
+    } catch (e, stack) {
+      debugPrint('FinanceRepository.updateExpense ERROR: $e');
+      debugPrint('$stack');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteExpense(String expenseId) async {
+    try {
+      await _client.from('egreso').delete().eq('id', expenseId);
+    } catch (e, stack) {
+      debugPrint('FinanceRepository.deleteExpense ERROR: $e');
+      debugPrint('$stack');
+      rethrow;
+    }
+  }
+
   Map<String, dynamic> _emptyDashboard() {
     return {
       'total_ingresos': 0.0,
       'total_egresos': 0.0,
       'ingresos_por_sucursal': <Map<String, dynamic>>[],
       'egresos_por_sucursal': <Map<String, dynamic>>[],
+      'top_categorias_gastos': <Map<String, dynamic>>[],
       'movimientos_recientes': <Map<String, dynamic>>[],
+      'transacciones_por_dia': <Map<String, dynamic>>[],
     };
+  }
+
+  List<Map<String, dynamic>> _normalizeBreakdown(dynamic raw) {
+    if (raw is! List) return <Map<String, dynamic>>[];
+
+    return raw.map<Map<String, dynamic>>((item) {
+      final map = item is Map<String, dynamic>
+          ? item
+          : Map<String, dynamic>.from(item as Map);
+
+      return {
+        'label': map['label']?.toString() ?? '',
+        'amount': _toDouble(map['amount']),
+      };
+    }).toList();
   }
 
   List<Map<String, dynamic>> _normalizeBranchTotals(dynamic raw) {
@@ -162,6 +241,28 @@ class FinanceRepository {
         'descripcion': map['descripcion']?.toString() ?? '',
         'metodo_pago': map['metodo_pago']?.toString(),
         'referencia_id': map['referencia_id']?.toString(),
+        'categoria_nombre': map['categoria_nombre']?.toString(),
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _normalizeTransactionsByDay(dynamic raw) {
+    if (raw is! List) return <Map<String, dynamic>>[];
+
+    return raw.map<Map<String, dynamic>>((item) {
+      final map = item is Map<String, dynamic>
+          ? item
+          : Map<String, dynamic>.from(item as Map);
+      final movimientos = _normalizeRecentMovements(map['movimientos']);
+
+      return {
+        'key': map['key']?.toString() ?? '',
+        'fecha': map['fecha']?.toString(),
+        'total': _toDouble(map['total']),
+        'cantidad': (map['cantidad'] as num?)?.toInt() ?? movimientos.length,
+        'ingresos_count': (map['ingresos_count'] as num?)?.toInt() ?? 0,
+        'egresos_count': (map['egresos_count'] as num?)?.toInt() ?? 0,
+        'movimientos': movimientos,
       };
     }).toList();
   }

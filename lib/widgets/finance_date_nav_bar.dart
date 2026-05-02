@@ -1,8 +1,10 @@
+import 'package:app_estetica/providers/finance_provider.dart';
+import 'package:app_estetica/providers/reports_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';
-import 'package:app_estetica/providers/finance_provider.dart';
-import 'package:app_estetica/providers/reports_provider.dart';
+
+enum FinanceQuickPreset { today, week, month }
 
 class FinanceDateNavBar extends StatelessWidget {
   const FinanceDateNavBar({
@@ -26,6 +28,51 @@ class FinanceDateNavBar extends StatelessWidget {
   bool get _isDayMode =>
       provider.dateMode == ReportDateMode.singleDay ||
       provider.dateMode == ReportDateMode.period;
+
+  FinanceQuickPreset? get _activePreset {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (_isDayMode) {
+      final selected = DateTime(
+        provider.selectedDate.year,
+        provider.selectedDate.month,
+        provider.selectedDate.day,
+      );
+      if (selected == today) return FinanceQuickPreset.today;
+    }
+
+    if (_isRangeMode && provider.selectedRange != null) {
+      final weekStart = today.subtract(Duration(days: today.weekday - 1));
+      final weekEnd = DateTime(today.year, today.month, today.day, 23, 59, 59);
+      final range = provider.selectedRange!;
+      final selectedStart = DateTime(
+        range.start.year,
+        range.start.month,
+        range.start.day,
+      );
+      final selectedEnd = DateTime(
+        range.end.year,
+        range.end.month,
+        range.end.day,
+        23,
+        59,
+        59,
+      );
+      if (selectedStart == weekStart && selectedEnd == weekEnd) {
+        return FinanceQuickPreset.week;
+      }
+    }
+
+    if (_isMonthMode && provider.selectedMonth != null) {
+      if (provider.selectedMonth!.year == now.year &&
+          provider.selectedMonth!.month == now.month) {
+        return FinanceQuickPreset.month;
+      }
+    }
+
+    return null;
+  }
 
   bool get _canGoForward {
     if (!_isDayMode) return false;
@@ -71,63 +118,139 @@ class FinanceDateNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final activePreset = _activePreset;
 
     return Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outlineVariant.withAlpha(120)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: Row(
-        children: [
-          _FinanceNavIconButton(
-            icon: Icons.chevron_left_rounded,
-            tooltip: 'Día anterior',
-            onPressed: _isDayMode
-                ? () => onDateChanged(
-                    provider.selectedDate.subtract(const Duration(days: 1)),
-                  )
-                : null,
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _pickDay(context),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(_modeIcon, size: 15, color: cs.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      _buildLabel(context),
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          _FinanceModeMenuButton(
-            activeMode: provider.dateMode,
-            onPickDay: () => _pickDay(context),
-            onPickRange: () => _pickRange(context),
-            onPickMonth: () => _pickMonth(context),
-            onPickYear: () => _pickYear(context),
-          ),
-          _FinanceNavIconButton(
-            icon: Icons.chevron_right_rounded,
-            tooltip: 'Día siguiente',
-            onPressed: _canGoForward
-                ? () => onDateChanged(
-                    provider.selectedDate.add(const Duration(days: 1)),
-                  )
-                : null,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: cs.outlineVariant.withAlpha(110)),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _FinanceNavIconButton(
+              icon: Icons.chevron_left_rounded,
+              tooltip: 'Día anterior',
+              onPressed: _isDayMode
+                  ? () => onDateChanged(
+                      provider.selectedDate.subtract(const Duration(days: 1)),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 6),
+            SegmentedButton<FinanceQuickPreset>(
+              emptySelectionAllowed: true,
+              showSelectedIcon: false,
+              selected: activePreset != null
+                  ? <FinanceQuickPreset>{activePreset}
+                  : <FinanceQuickPreset>{},
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+                textStyle: WidgetStateProperty.all(
+                  Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              segments: const [
+                ButtonSegment(
+                  value: FinanceQuickPreset.today,
+                  label: Text('Hoy'),
+                ),
+                ButtonSegment(
+                  value: FinanceQuickPreset.week,
+                  label: Text('Semana'),
+                ),
+                ButtonSegment(
+                  value: FinanceQuickPreset.month,
+                  label: Text('Mes'),
+                ),
+              ],
+              onSelectionChanged: (selection) {
+                if (selection.isEmpty) return;
+                final selected = selection.first;
+                final now = DateTime.now();
+                switch (selected) {
+                  case FinanceQuickPreset.today:
+                    onDateChanged(now);
+                  case FinanceQuickPreset.week:
+                    final today = DateTime(now.year, now.month, now.day);
+                    onRangeChanged(
+                      DateTimeRange(
+                        start: today.subtract(
+                          Duration(days: today.weekday - 1),
+                        ),
+                        end: today,
+                      ),
+                    );
+                  case FinanceQuickPreset.month:
+                    onMonthChanged(now.year, now.month);
+                }
+              },
+            ),
+            const SizedBox(width: 10),
+            _CompactDateLabel(
+              icon: _modeIcon,
+              label: _buildLabel(context),
+              onTap: () {
+                if (_isDayMode) {
+                  _pickDay(context);
+                  return;
+                }
+                if (_isRangeMode) {
+                  _pickRange(context);
+                  return;
+                }
+                if (_isMonthMode) {
+                  _pickMonth(context);
+                  return;
+                }
+                _pickYear(context);
+              },
+            ),
+            const SizedBox(width: 8),
+            _FinanceQuickIconButton(
+              icon: Icons.calendar_today_rounded,
+              tooltip: 'Elegir día',
+              onPressed: () => _pickDay(context),
+            ),
+            const SizedBox(width: 6),
+            _FinanceQuickIconButton(
+              icon: Icons.date_range_rounded,
+              tooltip: 'Elegir rango',
+              onPressed: () => _pickRange(context),
+            ),
+            const SizedBox(width: 6),
+            _FinanceQuickIconButton(
+              icon: Icons.event_repeat_rounded,
+              tooltip: 'Elegir año',
+              onPressed: () => _pickYear(context),
+            ),
+            const SizedBox(width: 6),
+            _FinanceNavIconButton(
+              icon: Icons.chevron_right_rounded,
+              tooltip: 'Día siguiente',
+              onPressed: _canGoForward
+                  ? () => onDateChanged(
+                      provider.selectedDate.add(const Duration(days: 1)),
+                    )
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -220,101 +343,33 @@ class FinanceDateNavBar extends StatelessWidget {
   }
 }
 
-enum _FinanceDateMode { day, range, month, year }
-
-class _FinanceModeMenuButton extends StatelessWidget {
-  const _FinanceModeMenuButton({
-    required this.activeMode,
-    required this.onPickDay,
-    required this.onPickRange,
-    required this.onPickMonth,
-    required this.onPickYear,
+class _CompactDateLabel extends StatelessWidget {
+  const _CompactDateLabel({
+    required this.icon,
+    required this.label,
+    required this.onTap,
   });
 
-  final ReportDateMode activeMode;
-  final VoidCallback onPickDay;
-  final VoidCallback onPickRange;
-  final VoidCallback onPickMonth;
-  final VoidCallback onPickYear;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    return PopupMenuButton<_FinanceDateMode>(
-      icon: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-      onSelected: (mode) {
-        switch (mode) {
-          case _FinanceDateMode.day:
-            onPickDay();
-          case _FinanceDateMode.range:
-            onPickRange();
-          case _FinanceDateMode.month:
-            onPickMonth();
-          case _FinanceDateMode.year:
-            onPickYear();
-        }
-      },
-      itemBuilder: (_) => [
-        _menuItem(
-          context,
-          value: _FinanceDateMode.day,
-          icon: Icons.calendar_today_rounded,
-          label: 'Seleccionar día',
-          active: activeMode == ReportDateMode.singleDay,
+    return ActionChip(
+      avatar: Icon(icon, size: 16, color: cs.primary),
+      label: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 150),
+        child: Text(
+          label,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
         ),
-        _menuItem(
-          context,
-          value: _FinanceDateMode.range,
-          icon: Icons.date_range_rounded,
-          label: 'Seleccionar rango',
-          active: activeMode == ReportDateMode.dateRange,
-        ),
-        _menuItem(
-          context,
-          value: _FinanceDateMode.month,
-          icon: Icons.calendar_view_month_rounded,
-          label: 'Seleccionar mes',
-          active: activeMode == ReportDateMode.monthPick,
-        ),
-        _menuItem(
-          context,
-          value: _FinanceDateMode.year,
-          icon: Icons.event_repeat_rounded,
-          label: 'Seleccionar año',
-          active: activeMode == ReportDateMode.yearPick,
-        ),
-      ],
-    );
-  }
-
-  PopupMenuItem<_FinanceDateMode> _menuItem(
-    BuildContext context, {
-    required _FinanceDateMode value,
-    required IconData icon,
-    required String label,
-    required bool active,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    return PopupMenuItem<_FinanceDateMode>(
-      value: value,
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: active ? cs.primary : cs.onSurfaceVariant,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? cs.primary : cs.onSurface,
-            ),
-          ),
-        ],
       ),
+      onPressed: onTap,
     );
   }
 }
@@ -337,6 +392,30 @@ class _FinanceNavIconButton extends StatelessWidget {
       tooltip: tooltip,
       icon: Icon(icon),
       visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _FinanceQuickIconButton extends StatelessWidget {
+  const _FinanceQuickIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton.filledTonal(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 18, color: cs.primary),
+      visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(backgroundColor: cs.secondaryContainer),
     );
   }
 }

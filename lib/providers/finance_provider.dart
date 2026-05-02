@@ -171,4 +171,48 @@ class FinanceProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> updateExpense({
+    required String expenseId,
+    required double amount,
+    required String description,
+    required int sucursalId,
+    required String categoryName,
+    required DateTime expenseDate,
+  }) async {
+    if (_isSavingExpense) return;
+
+    _isSavingExpense = true;
+    notifyListeners();
+
+    try {
+      await _repo.updateExpense(
+        expenseId: expenseId,
+        amount: amount,
+        description: description,
+        sucursalId: sucursalId,
+        categoryName: categoryName,
+        expenseDate: expenseDate,
+      );
+      await refreshCurrent();
+    } finally {
+      _isSavingExpense = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteExpense(String expenseId) async {
+    if (_isSavingExpense) return;
+
+    _isSavingExpense = true;
+    notifyListeners();
+
+    try {
+      await _repo.deleteExpense(expenseId);
+      await refreshCurrent();
+    } finally {
+      _isSavingExpense = false;
+      notifyListeners();
+    }
+  }
 }
