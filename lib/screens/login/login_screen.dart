@@ -2,6 +2,7 @@ import 'package:app_estetica/screens/admin/admin_home_screen.dart';
 import 'package:app_estetica/services/supabase_auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:app_estetica/config/responsive.dart';
+import 'package:app_estetica/widgets/app_ui.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -137,29 +138,14 @@ class _LoginScreenState extends State<LoginScreen>
     final isSmallScreen = Responsive.isSmallScreen(context);
     final screenWidth = Responsive.width(context);
 
-    // Tamaños responsivos
-    final logoSize = isSmallScreen ? 80.0 : 120.0;
-    final logoIconSize = isSmallScreen ? 40.0 : 60.0;
-    final titleSpacing = isSmallScreen ? 24.0 : 48.0;
-    final cardPadding = isSmallScreen ? 20.0 : 32.0;
-    final cardBorderRadius = isSmallScreen ? 20.0 : 28.0;
+    final titleSpacing = isSmallScreen ? 22.0 : 38.0;
+    final cardPadding = isSmallScreen ? 20.0 : 30.0;
     final maxCardWidth = screenWidth < 360
         ? screenWidth - 32
         : (screenWidth < 600 ? screenWidth - 48 : 450.0);
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primaryContainer,   // #EDD9FF
-              colorScheme.surface,            // #FDFAFF
-              colorScheme.tertiaryContainer,  // #FFD6EF
-            ],
-          ),
-        ),
+      body: AppScaffoldSurface(
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -172,35 +158,26 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Logo/Icon con Material 3
                     Hero(
                       tag: 'app_logo',
                       child: Container(
-                        width: logoSize,
-                        height: logoSize,
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
                           color: colorScheme.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: colorScheme.primary.withValues(alpha: 0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(
                           Icons.spa_rounded,
-                          size: logoIconSize,
+                          size: 28,
                           color: colorScheme.onPrimary,
                         ),
                       ),
                     ),
                     SizedBox(height: titleSpacing),
 
-                    // Título
                     Text(
-                      'Bienvenido',
+                      'App Estética',
                       style:
                           (isSmallScreen
                                   ? textTheme.headlineMedium
@@ -213,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     SizedBox(height: isSmallScreen ? 4 : 8),
                     Text(
-                      'Inicia sesión para continuar',
+                      'Gestiona sesiones, clientes y pagos',
                       style:
                           (isSmallScreen
                                   ? textTheme.bodyMedium
@@ -223,21 +200,27 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     SizedBox(height: titleSpacing),
 
-                    // Formulario en Card Material 3
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(cardBorderRadius),
-                      ),
-                      child: Container(
-                        constraints: BoxConstraints(maxWidth: maxCardWidth),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: maxCardWidth),
+                      child: AppCard(
                         padding: EdgeInsets.all(cardPadding),
                         child: Form(
                           key: _formKey,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // Campo Email
+                              Text(
+                                'Inicio de sesión',
+                                style: textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Accede con tu cuenta asignada',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
@@ -248,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   labelText: 'Email',
                                   hintText: 'nombre@ejemplo.com',
                                   prefixIcon: Icon(
-                                    Icons.email_outlined,
+                                    Icons.alternate_email_rounded,
                                     size: isSmallScreen ? 20 : 24,
                                   ),
                                   contentPadding: EdgeInsets.symmetric(
@@ -266,9 +249,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   return null;
                                 },
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 18),
 
-                              // Campo Password
                               TextFormField(
                                 controller: _passwordController,
                                 obscureText: _obscurePassword,
@@ -302,16 +284,20 @@ class _LoginScreenState extends State<LoginScreen>
                                 },
                               ),
 
-                              // Error Message
                               if (_errorMessage != null) ...[
-                                SizedBox(height: isSmallScreen ? 16 : 24),
+                                SizedBox(height: isSmallScreen ? 16 : 22),
                                 Container(
                                   padding: EdgeInsets.all(
                                     isSmallScreen ? 12 : 16,
                                   ),
                                   decoration: BoxDecoration(
                                     color: colorScheme.errorContainer,
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: colorScheme.error.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -339,9 +325,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               ],
 
-                              SizedBox(height: isSmallScreen ? 24 : 32),
+                              SizedBox(height: isSmallScreen ? 24 : 30),
 
-                              // Botón de Login Material 3
                               FilledButton(
                                 onPressed: _isLoading ? null : _login,
                                 style: FilledButton.styleFrom(
@@ -366,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            'Iniciar Sesión',
+                                            'Entrar',
                                             style:
                                                 (isSmallScreen
                                                         ? textTheme.labelMedium
@@ -395,9 +380,8 @@ class _LoginScreenState extends State<LoginScreen>
 
                     SizedBox(height: isSmallScreen ? 16 : 32),
 
-                    // Footer
                     Text(
-                      '© 2026 App Estética',
+                      '2026 App Estética',
                       style:
                           (isSmallScreen
                                   ? textTheme.labelSmall

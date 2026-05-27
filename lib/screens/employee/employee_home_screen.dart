@@ -363,10 +363,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [colorScheme.primary, colorScheme.primaryContainer],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                color: colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(color: colorScheme.outlineVariant),
                 ),
               ),
               child: Column(
@@ -391,7 +390,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                             Text(
                               username,
                               style: textTheme.titleMedium?.copyWith(
-                                color: colorScheme.onPrimary,
+                                color: colorScheme.onSurface,
                                 fontWeight: FontWeight.bold,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -399,9 +398,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                             Text(
                               'Empleado',
                               style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onPrimary.withValues(
-                                  alpha: 0.8,
-                                ),
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -410,7 +407,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Divider(color: Colors.white24, height: 1),
+                  Divider(color: colorScheme.outlineVariant, height: 1),
                   const SizedBox(height: 12),
                   // Selector de sucursal BLOQUEADO para empleados
                   Container(
@@ -419,17 +416,15 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.surface.withValues(alpha: 0.2),
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.3),
-                      ),
+                      border: Border.all(color: colorScheme.outlineVariant),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.location_on,
-                          color: colorScheme.onPrimary,
+                          color: colorScheme.onSurfaceVariant,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -437,7 +432,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                           child: Text(
                             sucursalNombre,
                             style: TextStyle(
-                              color: colorScheme.onPrimary,
+                              color: colorScheme.onSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -447,7 +442,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                         Icon(
                           Icons.lock,
                           size: 16,
-                          color: colorScheme.onPrimary.withValues(alpha: 0.6),
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ],
                     ),

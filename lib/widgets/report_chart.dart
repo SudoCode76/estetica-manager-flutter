@@ -152,24 +152,14 @@ class ReportChart extends StatelessWidget {
             LineChartBarData(
               spots: spots,
               isCurved: true,
-              gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).colorScheme.primary,
-                  Theme.of(context).colorScheme.primary.withAlpha(180),
-                ],
-              ),
+              color: Theme.of(context).colorScheme.primary,
               barWidth: 3,
               dotData: FlDotData(show: true),
               belowBarData: BarAreaData(
                 show: true,
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.12),
-                    Colors.transparent,
-                  ],
-                ),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.08),
               ),
             ),
           ],

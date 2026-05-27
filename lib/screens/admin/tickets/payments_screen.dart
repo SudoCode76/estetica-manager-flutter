@@ -200,15 +200,9 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primaryContainer,
-                    colorScheme.surfaceContainerHighest.withAlpha(
-                      (0.9 * 255).round(),
-                    ),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant),
               ),
               child: Row(
                 children: [
@@ -219,7 +213,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                         Text(
                           'TOTAL POR COBRAR',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
+                            color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -227,7 +221,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                         Text(
                           'Bs ${total.toStringAsFixed(2)}',
                           style: theme.textTheme.displaySmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer,
+                            color: colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

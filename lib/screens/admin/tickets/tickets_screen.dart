@@ -8,6 +8,7 @@ import 'package:app_estetica/providers/sucursal_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:app_estetica/providers/ticket_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:app_estetica/widgets/app_ui.dart';
 
 class TicketsScreen extends StatefulWidget {
   const TicketsScreen({super.key});
@@ -410,230 +411,286 @@ class _TicketsScreenState extends State<TicketsScreen> {
     final providerError = ticketProvider.error;
 
     final filteredTickets = _computeFilteredTickets(providerTickets);
+    final totalVenta = filteredTickets.fold<double>(
+      0,
+      (sum, item) => sum + ((item['monto_total'] as num?)?.toDouble() ?? 0),
+    );
+    final pendientes = filteredTickets.where((item) {
+      final saldo = (item['saldo_pendiente'] as num?)?.toDouble() ?? 0;
+      return saldo > 0;
+    }).length;
 
     return SafeArea(
       child: Column(
         children: [
-          // Barra local removida: el header global ahora vive en AdminHomeScreen
-          // Barra de búsqueda y acciones
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: SearchBar(
-                        controller: _searchController,
-                        hintText: 'Buscar por cliente o tratamiento',
-                        leading: const Icon(Icons.search),
-                        trailing: search.isNotEmpty
-                            ? [
-                                IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    filterTicketsBySearch('');
-                                  },
-                                ),
-                              ]
-                            : null,
-                        onChanged: filterTicketsBySearch,
-                        elevation: const WidgetStatePropertyAll(1),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: AppCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _showHistoryMode ? 'Historial' : 'Hoy',
+                              style: textTheme.labelMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${filteredTickets.length} tickets',
+                              style: textTheme.headlineMedium?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _onRefreshPressed,
+                        icon: const Icon(Icons.refresh_rounded),
+                        tooltip: 'Actualizar',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.16),
+                          foregroundColor: colorScheme.onPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            sortAscending = !sortAscending;
+                          });
+                        },
+                        icon: Icon(
+                          sortAscending
+                              ? Icons.arrow_upward_rounded
+                              : Icons.arrow_downward_rounded,
+                        ),
+                        tooltip: sortAscending
+                            ? 'Más antiguo primero'
+                            : 'Más nuevo primero',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.16),
+                          foregroundColor: colorScheme.onPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _TicketMetricCard(
+                          label: 'Ventas',
+                          value: 'Bs ${totalVenta.toStringAsFixed(0)}',
+                          color: colorScheme.surfaceContainerHigh,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _TicketMetricCard(
+                          label: 'Pendientes',
+                          value: '$pendientes',
+                          color: colorScheme.surfaceContainerHigh,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SearchBar(
+                    controller: _searchController,
+                    hintText: 'Buscar cliente o tratamiento',
+                    leading: const Icon(Icons.search_rounded),
+                    trailing: search.isNotEmpty
+                        ? [
+                            IconButton(
+                              icon: const Icon(Icons.clear_rounded),
+                              onPressed: () {
+                                _searchController.clear();
+                                filterTicketsBySearch('');
+                              },
+                            ),
+                          ]
+                        : null,
+                    onChanged: filterTicketsBySearch,
+                    elevation: const WidgetStatePropertyAll(0),
+                    backgroundColor: WidgetStatePropertyAll(
+                      colorScheme.surfaceContainer,
+                    ),
+                    shape: WidgetStatePropertyAll(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    // Botón de ordenamiento
-                    IconButton.filledTonal(
-                      onPressed: () {
-                        setState(() {
-                          sortAscending = !sortAscending;
-                        });
-                      },
-                      icon: Icon(
-                        sortAscending
-                            ? Icons.arrow_upward
-                            : Icons.arrow_downward,
-                      ),
-                      tooltip: sortAscending
-                          ? 'Ordenar: Más antiguo primero'
-                          : 'Ordenar: Más nuevo primero',
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size(56, 56),
-                        padding: const EdgeInsets.all(16),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _onRefreshPressed,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text(''),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(56, 56),
-                        padding: const EdgeInsets.all(16),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
 
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // Controles de Historial -> Reemplazado por TimeNavBar
-                TimeNavBar(
-                  mode: _showHistoryMode
-                      ? ReportDateMode.dateRange
-                      : ReportDateMode.singleDay,
-                  selectedDate: _selectedDate,
-                  selectedRange: _rangeStart != null && _rangeEnd != null
-                      ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!)
-                      : null,
-                  selectedMonth: null,
-                  selectedYear: null,
-                  onDateChanged: (d) async {
-                    // Al seleccionar día mostramos tickets de ese día
-                    final start = DateTime(d.year, d.month, d.day);
-                    final end = DateTime(d.year, d.month, d.day, 23, 59, 59);
-                    final now = DateTime.now();
-                    final today = DateTime(now.year, now.month, now.day);
-                    final isToday = d.year == today.year &&
-                        d.month == today.month &&
-                        d.day == today.day;
-                    setState(() {
-                      _selectedDate = d;
-                      _rangeStart = start;
-                      _rangeEnd = end;
-                      // Activar modo histórico si la fecha seleccionada NO es hoy
-                      _showHistoryMode = !isToday;
-                      errorMsg = null;
-                    });
-                    if (_sucursalProvider?.selectedSucursalId == null) {
-                      setState(
-                        () => errorMsg = 'Seleccione una sucursal primero',
-                      );
-                      return;
-                    }
-                    try {
-                      final tp = Provider.of<TicketProvider>(
-                        context,
-                        listen: false,
-                      );
-                      await tp.fetchTicketsByRange(
-                        start: start,
-                        end: end,
-                        sucursalId: _sucursalProvider!.selectedSucursalId!,
-                      );
-                      if (kDebugMode) {
-                        debugPrint(
-                            'TicketsScreen: fetchTicketsByRange start=$start end=$end returned=${tp.tickets.length}');
+                  TimeNavBar(
+                    mode: _showHistoryMode
+                        ? ReportDateMode.dateRange
+                        : ReportDateMode.singleDay,
+                    selectedDate: _selectedDate,
+                    selectedRange: _rangeStart != null && _rangeEnd != null
+                        ? DateTimeRange(start: _rangeStart!, end: _rangeEnd!)
+                        : null,
+                    selectedMonth: null,
+                    selectedYear: null,
+                    onDateChanged: (d) async {
+                      // Al seleccionar día mostramos tickets de ese día
+                      final start = DateTime(d.year, d.month, d.day);
+                      final end = DateTime(d.year, d.month, d.day, 23, 59, 59);
+                      final now = DateTime.now();
+                      final today = DateTime(now.year, now.month, now.day);
+                      final isToday =
+                          d.year == today.year &&
+                          d.month == today.month &&
+                          d.day == today.day;
+                      setState(() {
+                        _selectedDate = d;
+                        _rangeStart = start;
+                        _rangeEnd = end;
+                        // Activar modo histórico si la fecha seleccionada NO es hoy
+                        _showHistoryMode = !isToday;
+                        errorMsg = null;
+                      });
+                      if (_sucursalProvider?.selectedSucursalId == null) {
+                        setState(
+                          () => errorMsg = 'Seleccione una sucursal primero',
+                        );
+                        return;
                       }
-                    } catch (e) {
-                      setState(() => errorMsg = 'Error al cargar historial: $e');
-                    }
-                  },
-                  onRangeChanged: (r) async {
-                    DateTime start = r.start;
-                    DateTime end = r.end;
-                    if (start.isAfter(end)) {
-                      final tmp = start;
-                      start = end;
-                      end = tmp;
-                    }
-                    setState(() {
-                      _selectedDate = start;
-                      _rangeStart = start;
-                      _rangeEnd = end;
-                      _showHistoryMode = true;
-                      errorMsg = null;
-                    });
-                    if (_sucursalProvider?.selectedSucursalId == null) {
-                      setState(
-                        () => errorMsg = 'Seleccione una sucursal primero',
-                      );
-                      return;
-                    }
-                    try {
-                      final tp = Provider.of<TicketProvider>(
-                        context,
-                        listen: false,
-                      );
-                      await tp.fetchTicketsByRange(
-                        start: start,
-                        end: end,
-                        sucursalId: _sucursalProvider!.selectedSucursalId!,
-                      );
-                    } catch (e) {
-                      setState(
-                        () => errorMsg = 'Error al cargar historial: $e',
-                      );
-                    }
-                  },
-                  onMonthChanged: (year, month) async {
-                    final start = DateTime(year, month, 1);
-                    final end = DateTime(year, month + 1, 0, 23, 59, 59);
-                    setState(() {
-                      _selectedDate = start;
-                      _rangeStart = start;
-                      _rangeEnd = end;
-                      _showHistoryMode = true;
-                      errorMsg = null;
-                    });
-                    if (_sucursalProvider?.selectedSucursalId == null) {
-                      setState(
-                        () => errorMsg = 'Seleccione una sucursal primero',
-                      );
-                      return;
-                    }
-                    try {
-                      final tp = Provider.of<TicketProvider>(
-                        context,
-                        listen: false,
-                      );
-                      await tp.fetchTicketsByRange(
-                        start: start,
-                        end: end,
-                        sucursalId: _sucursalProvider!.selectedSucursalId!,
-                      );
-                    } catch (e) {
-                      setState(
-                        () => errorMsg = 'Error al cargar historial: $e',
-                      );
-                    }
-                  },
-                  onYearChanged: (y) async {
-                    final start = DateTime(y, 1, 1);
-                    final end = DateTime(y, 12, 31, 23, 59, 59);
-                    setState(() {
-                      _selectedDate = start;
-                      _rangeStart = start;
-                      _rangeEnd = end;
-                      _showHistoryMode = true;
-                      errorMsg = null;
-                    });
-                    if (_sucursalProvider?.selectedSucursalId == null) {
-                      setState(
-                        () => errorMsg = 'Seleccione una sucursal primero',
-                      );
-                      return;
-                    }
-                    try {
-                      await Provider.of<TicketProvider>(
-                        context,
-                        listen: false,
-                      ).fetchTicketsByRange(
-                        start: start,
-                        end: end,
-                        sucursalId: _sucursalProvider!.selectedSucursalId!,
-                      );
-                    } catch (e) {
-                      setState(
-                        () => errorMsg = 'Error al cargar historial: $e',
-                      );
-                    }
-                  },
-                ),
-
-                const SizedBox(height: 16),
-              ],
+                      try {
+                        final tp = Provider.of<TicketProvider>(
+                          context,
+                          listen: false,
+                        );
+                        await tp.fetchTicketsByRange(
+                          start: start,
+                          end: end,
+                          sucursalId: _sucursalProvider!.selectedSucursalId!,
+                        );
+                        if (kDebugMode) {
+                          debugPrint(
+                            'TicketsScreen: fetchTicketsByRange start=$start end=$end returned=${tp.tickets.length}',
+                          );
+                        }
+                      } catch (e) {
+                        setState(
+                          () => errorMsg = 'Error al cargar historial: $e',
+                        );
+                      }
+                    },
+                    onRangeChanged: (r) async {
+                      DateTime start = r.start;
+                      DateTime end = r.end;
+                      if (start.isAfter(end)) {
+                        final tmp = start;
+                        start = end;
+                        end = tmp;
+                      }
+                      setState(() {
+                        _selectedDate = start;
+                        _rangeStart = start;
+                        _rangeEnd = end;
+                        _showHistoryMode = true;
+                        errorMsg = null;
+                      });
+                      if (_sucursalProvider?.selectedSucursalId == null) {
+                        setState(
+                          () => errorMsg = 'Seleccione una sucursal primero',
+                        );
+                        return;
+                      }
+                      try {
+                        final tp = Provider.of<TicketProvider>(
+                          context,
+                          listen: false,
+                        );
+                        await tp.fetchTicketsByRange(
+                          start: start,
+                          end: end,
+                          sucursalId: _sucursalProvider!.selectedSucursalId!,
+                        );
+                      } catch (e) {
+                        setState(
+                          () => errorMsg = 'Error al cargar historial: $e',
+                        );
+                      }
+                    },
+                    onMonthChanged: (year, month) async {
+                      final start = DateTime(year, month, 1);
+                      final end = DateTime(year, month + 1, 0, 23, 59, 59);
+                      setState(() {
+                        _selectedDate = start;
+                        _rangeStart = start;
+                        _rangeEnd = end;
+                        _showHistoryMode = true;
+                        errorMsg = null;
+                      });
+                      if (_sucursalProvider?.selectedSucursalId == null) {
+                        setState(
+                          () => errorMsg = 'Seleccione una sucursal primero',
+                        );
+                        return;
+                      }
+                      try {
+                        final tp = Provider.of<TicketProvider>(
+                          context,
+                          listen: false,
+                        );
+                        await tp.fetchTicketsByRange(
+                          start: start,
+                          end: end,
+                          sucursalId: _sucursalProvider!.selectedSucursalId!,
+                        );
+                      } catch (e) {
+                        setState(
+                          () => errorMsg = 'Error al cargar historial: $e',
+                        );
+                      }
+                    },
+                    onYearChanged: (y) async {
+                      final start = DateTime(y, 1, 1);
+                      final end = DateTime(y, 12, 31, 23, 59, 59);
+                      setState(() {
+                        _selectedDate = start;
+                        _rangeStart = start;
+                        _rangeEnd = end;
+                        _showHistoryMode = true;
+                        errorMsg = null;
+                      });
+                      if (_sucursalProvider?.selectedSucursalId == null) {
+                        setState(
+                          () => errorMsg = 'Seleccione una sucursal primero',
+                        );
+                        return;
+                      }
+                      try {
+                        await Provider.of<TicketProvider>(
+                          context,
+                          listen: false,
+                        ).fetchTicketsByRange(
+                          start: start,
+                          end: end,
+                          sucursalId: _sucursalProvider!.selectedSucursalId!,
+                        );
+                      } catch (e) {
+                        setState(
+                          () => errorMsg = 'Error al cargar historial: $e',
+                        );
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
 
@@ -865,15 +922,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
                         },
                         child: Stack(
                           children: [
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              elevation: 2,
-                              color: colorScheme.surfaceContainer,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(32),
                                 onTap: () async {
                                   await Navigator.push(
                                     context,
@@ -884,8 +936,9 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                   );
                                   _reloadTicketsForCurrentFilters();
                                 },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
+                                child: AppCard(
+                                  padding: const EdgeInsets.all(18),
+                                  color: colorScheme.surfaceContainer,
                                   child: Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -895,15 +948,10 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                         width: 52,
                                         height: 52,
                                         decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              colorScheme.primary,
-                                              colorScheme.secondary,
-                                            ],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
+                                          color: colorScheme.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
                                           ),
-                                          shape: BoxShape.circle,
                                         ),
                                         child: Center(
                                           child: Text(
@@ -936,7 +984,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                               tratamientoTexto,
                                               style: textTheme.bodyMedium
                                                   ?.copyWith(
-                                                    color: colorScheme.primary,
+                                                    color: colorScheme
+                                                        .onSurfaceVariant,
                                                   ),
                                             ),
                                             const SizedBox(height: 8),
@@ -973,8 +1022,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                 if (ultimoMetodo != null)
                                                   Chip(
                                                     avatar: Icon(
-                                                      ultimoMetodo
-                                                                  .toLowerCase() ==
+                                                      ultimoMetodo.toLowerCase() ==
                                                               'qr'
                                                           ? Icons.qr_code_2
                                                           : Icons.payments,
@@ -983,8 +1031,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                           .onPrimaryContainer,
                                                     ),
                                                     label: Text(
-                                                      ultimoMetodo
-                                                                  .toLowerCase() ==
+                                                      ultimoMetodo.toLowerCase() ==
                                                               'qr'
                                                           ? 'QR'
                                                           : 'Efectivo',
@@ -1003,7 +1050,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                             .shrinkWrap,
                                                     side: BorderSide.none,
                                                     backgroundColor: colorScheme
-                                                        .primaryContainer,
+                                                        .secondaryContainer,
                                                   ),
                                                 // Saldo pendiente chip
                                                 if (tieneSaldo)
@@ -1031,13 +1078,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                             .shrinkWrap,
                                                     side: BorderSide.none,
                                                     backgroundColor: colorScheme
-                                                        .errorContainer,
+                                                        .tertiaryContainer,
                                                   ),
                                                 // Pagado chip (sin saldo)
                                                 if (!tieneSaldo)
                                                   Chip(
                                                     avatar: Icon(
-                                                      Icons.check_circle_outline,
+                                                      Icons
+                                                          .check_circle_outline,
                                                       size: 14,
                                                       color: colorScheme
                                                           .onPrimaryContainer,
@@ -1059,7 +1107,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                                             .shrinkWrap,
                                                     side: BorderSide.none,
                                                     backgroundColor: colorScheme
-                                                        .primaryContainer,
+                                                        .secondaryContainer,
                                                   ),
                                               ],
                                             ),
@@ -1077,8 +1125,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
                                 child: Container(
                                   margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Colors.black.withValues(alpha: 0.35),
+                                    color: Colors.black.withValues(alpha: 0.35),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: const Center(
@@ -1099,6 +1146,56 @@ class _TicketsScreenState extends State<TicketsScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TicketMetricCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _TicketMetricCard({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleLarge?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -465,14 +465,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
               width: avatarSize,
               height: avatarSize,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primary,
-                    colorScheme.secondary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: colorScheme.primary,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
@@ -488,8 +481,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
             ),
             title: Text(
               nombre,
-              style: (isSmallScreen ? textTheme.titleSmall : textTheme.titleMedium)
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style:
+                  (isSmallScreen ? textTheme.titleSmall : textTheme.titleMedium)
+                      ?.copyWith(fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Row(
@@ -503,10 +497,11 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 Flexible(
                   child: Text(
                     telefono,
-                    style: (isSmallScreen
-                            ? textTheme.bodySmall
-                            : textTheme.bodyMedium)
-                        ?.copyWith(color: colorScheme.onSurfaceVariant),
+                    style:
+                        (isSmallScreen
+                                ? textTheme.bodySmall
+                                : textTheme.bodyMedium)
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -550,10 +545,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       ),
                       PopupMenuItem(
                         onTap: () {
-                          Future.delayed(
-                            Duration.zero,
-                            () => _deleteClient(c),
-                          );
+                          Future.delayed(Duration.zero, () => _deleteClient(c));
                         },
                         child: Row(
                           children: [
@@ -608,7 +600,10 @@ class _ClientsScreenState extends State<ClientsScreen> {
                     trailing: [
                       if (_searchController.text.isNotEmpty)
                         IconButton(
-                          icon: Icon(Icons.clear, size: isSmallScreen ? 20 : 24),
+                          icon: Icon(
+                            Icons.clear,
+                            size: isSmallScreen ? 20 : 24,
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             search = '';
@@ -643,8 +638,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed:
-                              _isEmployee ? null : _showCreateClientDialog,
+                          onPressed: _isEmployee
+                              ? null
+                              : _showCreateClientDialog,
                           icon: const Icon(Icons.person_add, size: 18),
                           label: const Text(
                             'Nuevo',
@@ -725,12 +721,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
           Expanded(
             child: isLoading
                 ? Center(
-                    child: CircularProgressIndicator(color: colorScheme.primary),
+                    child: CircularProgressIndicator(
+                      color: colorScheme.primary,
+                    ),
                   )
                 : errorMsg != null
                 ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
+                      padding: EdgeInsets.all(
+                        Responsive.horizontalPadding(context),
+                      ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -742,10 +742,11 @@ class _ClientsScreenState extends State<ClientsScreen> {
                           SizedBox(height: Responsive.spacing(context, 16)),
                           Text(
                             errorMsg!,
-                            style: (isSmallScreen
-                                    ? textTheme.bodyMedium
-                                    : textTheme.bodyLarge)
-                                ?.copyWith(color: colorScheme.error),
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.bodyMedium
+                                        : textTheme.bodyLarge)
+                                    ?.copyWith(color: colorScheme.error),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -755,7 +756,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
                 : filteredClients.isEmpty
                 ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(Responsive.horizontalPadding(context)),
+                      padding: EdgeInsets.all(
+                        Responsive.horizontalPadding(context),
+                      ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -769,10 +772,13 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             search.isEmpty
                                 ? 'No hay clientes en esta sucursal'
                                 : 'No se encontraron clientes',
-                            style: (isSmallScreen
-                                    ? textTheme.bodyMedium
-                                    : textTheme.bodyLarge)
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.bodyMedium
+                                        : textTheme.bodyLarge)
+                                    ?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: Responsive.spacing(context, 8)),
@@ -780,17 +786,25 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             search.isEmpty
                                 ? 'Registra el primer cliente'
                                 : 'Intenta con otro término de búsqueda',
-                            style: (isSmallScreen
-                                    ? textTheme.bodySmall
-                                    : textTheme.bodyMedium)
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style:
+                                (isSmallScreen
+                                        ? textTheme.bodySmall
+                                        : textTheme.bodyMedium)
+                                    ?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
                             textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
                   )
-                : _buildClientList(context, colorScheme, textTheme, isSmallScreen),
+                : _buildClientList(
+                    context,
+                    colorScheme,
+                    textTheme,
+                    isSmallScreen,
+                  ),
           ),
 
           // ── Paginador — siempre al fondo, FUERA del Expanded ─────────────
@@ -956,213 +970,209 @@ class _EditClientDialogState extends State<_EditClientDialog> {
     return Dialog(
       backgroundColor: colorScheme.surfaceContainerHigh,
       elevation: 6,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(32),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(32),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
           child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primaryContainer,
-                        colorScheme.secondaryContainer,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  border: Border(
+                    bottom: BorderSide(color: colorScheme.outlineVariant),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surface.withValues(alpha: 0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.edit_rounded,
-                          size: 32,
-                          color: colorScheme.onPrimaryContainer,
-                        ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Editar Cliente',
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      child: Icon(
+                        Icons.edit_rounded,
+                        size: 32,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Editar Cliente',
+                            style: textTheme.headlineSmall?.copyWith(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Actualizar información del cliente',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onPrimaryContainer
-                                    .withValues(alpha: 0.8),
-                              ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Actualizar información del cliente',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: _nombreController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          labelText: 'Nombre *',
+                          hintText: 'Ej: María',
+                          prefixIcon: Container(
+                            margin: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withValues(
+                                alpha: 0.5,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.person_outline,
+                              color: colorScheme.primary,
+                              size: 20,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
                         ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'El nombre es requerido'
+                            : null,
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _apellidoController,
+                        decoration: InputDecoration(
+                          labelText: 'Apellido',
+                          hintText: 'Ej: González',
+                          prefixIcon: Container(
+                            margin: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer.withValues(
+                                alpha: 0.5,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.badge_outlined,
+                              color: colorScheme.secondary,
+                              size: 20,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _telefonoController,
+                        decoration: InputDecoration(
+                          labelText: 'Teléfono',
+                          hintText: 'Ej: 71234567',
+                          prefixIcon: Container(
+                            margin: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colorScheme.tertiaryContainer.withValues(
+                                alpha: 0.5,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.phone_outlined,
+                              color: colorScheme.tertiary,
+                              size: 20,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          filled: true,
+                          fillColor: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: const Text('Cancelar'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: _editarCliente,
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: const Text('Guardar'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextFormField(
-                          controller: _nombreController,
-                          autofocus: true,
-                          decoration: InputDecoration(
-                            labelText: 'Nombre *',
-                            hintText: 'Ej: María',
-                            prefixIcon: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer
-                                    .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.person_outline,
-                                color: colorScheme.primary,
-                                size: 20,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'El nombre es requerido'
-                              : null,
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _apellidoController,
-                          decoration: InputDecoration(
-                            labelText: 'Apellido',
-                            hintText: 'Ej: González',
-                            prefixIcon: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.secondaryContainer
-                                    .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.badge_outlined,
-                                color: colorScheme.secondary,
-                                size: 20,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _telefonoController,
-                          decoration: InputDecoration(
-                            labelText: 'Teléfono',
-                            hintText: 'Ej: 71234567',
-                            prefixIcon: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer
-                                    .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.phone_outlined,
-                                color: colorScheme.tertiary,
-                                size: 20,
-                              ),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                ),
-                                child: const Text('Cancelar'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: _editarCliente,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                ),
-                                child: const Text('Guardar'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
     );
   }
 }

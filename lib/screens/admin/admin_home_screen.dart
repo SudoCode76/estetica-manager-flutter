@@ -18,6 +18,7 @@ import 'dart:async';
 import 'package:app_estetica/screens/admin/reports/reports_screen.dart';
 import 'package:app_estetica/screens/admin/finance/finance_screen.dart';
 import 'package:app_estetica/widgets/main_drawer.dart';
+import 'package:app_estetica/widgets/app_ui.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final bool isEmployee;
@@ -569,18 +570,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.spa_rounded, color: colorScheme.primary, size: 22),
-            const SizedBox(width: 8),
-            Text(currentTitle),
+            AppBadge(
+              label: currentTitle,
+              icon: Icons.spa_rounded,
+              tone: AppBadgeTone.neutral,
+            ),
           ],
         ),
         backgroundColor: colorScheme.surface,
-        surfaceTintColor: colorScheme.primary,
-        scrolledUnderElevation: 2,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
       ),
-      body: ScaffoldKeyInherited(
-        scaffoldKey: _scaffoldKey,
-        child: _screens[_selectedIndex],
+      body: AppScaffoldSurface(
+        child: ScaffoldKeyInherited(
+          scaffoldKey: _scaffoldKey,
+          child: _screens[_selectedIndex],
+        ),
       ),
       floatingActionButton: _selectedIndex == 0
           ? Builder(

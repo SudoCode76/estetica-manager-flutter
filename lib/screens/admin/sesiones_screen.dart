@@ -461,17 +461,9 @@ class _SesionesScreenState extends State<SesionesScreen>
               margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colorScheme.primaryContainer,
-                    colorScheme.primaryContainer.withValues(alpha: 0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colorScheme.primary.withValues(alpha: 0.2),
-                  width: 1,
-                ),
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant),
               ),
               child: Row(
                 children: [
@@ -1144,7 +1136,7 @@ class _SesionCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: FilledButton.icon(
+                      child: FilledButton.icon(
                         onPressed: onMarcarAtendida,
                         icon: const Icon(Icons.check_circle, size: 18),
                         label: const Text('Atendida'),

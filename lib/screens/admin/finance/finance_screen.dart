@@ -158,10 +158,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     child: _AmountStatCard(
                       title: 'Ingresos',
                       amount: totalIngresos,
-                      amountColor: const Color(0xFF2FBD78),
-                      backgroundColor: const Color(0xFFE7FFF2),
+                      amountColor: cs.primary,
+                      backgroundColor: cs.surfaceContainerHighest,
                       icon: Icons.south_rounded,
-                      iconColor: const Color(0xFF2FBD78),
+                      iconColor: cs.primary,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -169,10 +169,10 @@ class _FinanceScreenState extends State<FinanceScreen> {
                     child: _AmountStatCard(
                       title: 'Gastos',
                       amount: totalEgresos,
-                      amountColor: const Color(0xFFF05058),
-                      backgroundColor: const Color(0xFFFFECEC),
+                      amountColor: cs.error,
+                      backgroundColor: cs.errorContainer,
                       icon: Icons.north_rounded,
-                      iconColor: const Color(0xFFF05058),
+                      iconColor: cs.error,
                     ),
                   ),
                 ],
@@ -303,7 +303,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: cs.errorContainer,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: cs.error.withValues(alpha: 0.2)),
                   ),
                   child: Text(
                     'No se pudo actualizar Finanzas: ${provider.error}',
@@ -867,93 +868,119 @@ class _BalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final balance = totalIngresos - totalEgresos;
-    final balanceColor = balance >= 0 ? cs.onPrimaryContainer : cs.error;
+    final balanceColor = balance >= 0 ? cs.onSurface : cs.error;
 
     return Material(
       color: Colors.transparent,
-      elevation: 6,
-      shadowColor: cs.shadow.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(32),
+      elevation: 0,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(26),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE2C8FF), Color(0xFFFFC7E9)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(32),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.outlineVariant),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 340;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 9,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: cs.outlineVariant),
+                        ),
+                        child: Text(
+                          periodLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(Icons.insights_rounded, color: cs.error, size: 24),
+                  ],
+                ),
+                SizedBox(height: compact ? 20 : 28),
+                Text(
+                  'Balance actual',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
                   ),
-                  decoration: BoxDecoration(
-                    color: cs.secondaryContainer.withValues(alpha: 0.82),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+                ),
+                const SizedBox(height: 10),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
                   child: Text(
-                    periodLabel,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: cs.onSecondaryContainer,
+                    _signedCurrency(balance),
+                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      color: balanceColor,
                       fontWeight: FontWeight.w900,
+                      fontSize: compact ? 40 : 50,
+                      height: 0.96,
+                      letterSpacing: -1.2,
                     ),
                   ),
                 ),
-                const Spacer(),
-                Icon(Icons.insights_rounded, color: cs.error, size: 24),
-              ],
-            ),
-            const SizedBox(height: 28),
-            Text(
-              'Balance actual',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: cs.onPrimaryContainer.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _signedCurrency(balance),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                color: balanceColor,
-                fontWeight: FontWeight.w900,
-                fontSize: 50,
-                height: 0.96,
-                letterSpacing: -1.2,
-              ),
-            ),
-            const SizedBox(height: 22),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: cs.surface.withValues(alpha: 0.68),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.balance_rounded, color: balanceColor, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    balance >= 0 ? 'Resultado positivo' : 'Resultado negativo',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: balanceColor,
-                      fontWeight: FontWeight.w900,
+                const SizedBox(height: 22),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: cs.outlineVariant),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.balance_rounded,
+                            color: balanceColor,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            balance >= 0
+                                ? 'Resultado positivo'
+                                : 'Resultado negativo',
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: balanceColor,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                  ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -981,39 +1008,52 @@ class _AmountStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 2,
+      elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(icon, color: iconColor),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _currency(amount),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: amountColor,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 170;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Icon(icon, color: iconColor),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _currency(amount),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: amountColor,
+                      fontWeight: FontWeight.w900,
+                      fontSize: compact ? 18 : 22,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1065,42 +1105,48 @@ class _RoundedSegmentedContainer<T> extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant),
       ),
-      child: Row(
-        children: values.map((item) {
-          final selected = item == value;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(item),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: selected ? cs.surface : Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: selected
-                      ? [
-                          BoxShadow(
-                            color: cs.shadow.withValues(alpha: 0.05),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  labelBuilder(item).toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: selected ? cs.onSurface : cs.onSurfaceVariant,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 320;
+          return Row(
+            children: values.map((item) {
+              final selected = item == value;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(item),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: EdgeInsets.symmetric(
+                      vertical: compact ? 12 : 14,
+                      horizontal: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected ? cs.surface : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      border: selected
+                          ? Border.all(color: cs.outlineVariant)
+                          : null,
+                    ),
+                    child: Text(
+                      labelBuilder(item).toUpperCase(),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        fontSize: compact ? 14 : null,
+                        color: selected ? cs.onSurface : cs.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            }).toList(),
           );
-        }).toList(),
+        },
       ),
     );
   }
@@ -1123,8 +1169,8 @@ class _BreakdownCard extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: items.isEmpty
@@ -1163,9 +1209,9 @@ class _BreakdownCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            minHeight: 10,
+                            minHeight: 8,
                             value: ratio.clamp(0.0, 1.0),
                             backgroundColor: cs.surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation<Color>(
@@ -1200,8 +1246,8 @@ class _BranchBreakdownCard extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: items.isEmpty
@@ -1236,20 +1282,20 @@ class _BranchBreakdownCard extends StatelessWidget {
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w900,
-                                    color: const Color(0xFF5A66F0),
+                                    color: cs.primary,
                                   ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            minHeight: 10,
+                            minHeight: 8,
                             value: ratio.clamp(0.0, 1.0),
                             backgroundColor: cs.surfaceContainerHighest,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF5A66F0),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              cs.primary,
                             ),
                           ),
                         ),
@@ -1292,67 +1338,106 @@ class _DayTransactionGroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final totalColor = group.total >= 0
-        ? const Color(0xFF5A66F0)
-        : const Color(0xFFF05058);
+    final totalColor = group.total >= 0 ? cs.primary : cs.error;
 
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
           InkWell(
             onTap: onToggle,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 74,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          DateFormat(
-                            'MMM',
-                            'es',
-                          ).format(group.date).toUpperCase(),
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: const Color(0xFF6C76F4),
-                                fontWeight: FontWeight.w900,
-                              ),
-                        ),
-                        Text(
-                          DateFormat('dd').format(group.date),
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w900),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 360;
+                  if (compact) {
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 66,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: cs.outlineVariant),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    DateFormat(
+                                      'MMM',
+                                      'es',
+                                    ).format(group.date).toUpperCase(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                  ),
+                                  Text(
+                                    DateFormat('dd').format(group.date),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(fontWeight: FontWeight.w900),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      _signedCurrency(group.total),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            color: totalColor,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    isExpanded
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
                         Text(
                           '${group.items.length} transacción${group.items.length == 1 ? '' : 'es'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${group.items.length} movimiento${group.items.length == 1 ? '' : 's'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyLarge
                               ?.copyWith(
                                 color: cs.onSurfaceVariant,
@@ -1360,30 +1445,99 @@ class _DayTransactionGroupCard extends StatelessWidget {
                               ),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    );
+                  }
+
+                  return Row(
                     children: [
-                      Text(
-                        _signedCurrency(group.total),
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: totalColor,
-                              fontWeight: FontWeight.w900,
+                      Container(
+                        width: 74,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: cs.outlineVariant),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              DateFormat(
+                                'MMM',
+                                'es',
+                              ).format(group.date).toUpperCase(),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                             ),
+                            Text(
+                              DateFormat('dd').format(group.date),
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Icon(
-                        isExpanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        color: cs.onSurfaceVariant,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${group.items.length} transacción${group.items.length == 1 ? '' : 'es'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${group.items.length} movimiento${group.items.length == 1 ? '' : 's'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 130),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _signedCurrency(group.total),
+                                style: Theme.of(context).textTheme.headlineSmall
+                                    ?.copyWith(
+                                      color: totalColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Icon(
+                              isExpanded
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
@@ -1394,21 +1548,17 @@ class _DayTransactionGroupCard extends StatelessWidget {
               child: Column(
                 children: group.items.map((movement) {
                   final isIngreso = movement['tipo'] == 'ingreso';
-                  final iconColor = isIngreso
-                      ? const Color(0xFF24B9D6)
-                      : const Color(0xFFF27A47);
+                  final iconColor = isIngreso ? cs.primary : cs.error;
                   final bgColor = isIngreso
-                      ? const Color(0xFFE8F8FD)
-                      : const Color(0xFFFFEEE8);
+                      ? cs.surfaceContainerHighest
+                      : cs.errorContainer;
                   final amount = (movement['monto'] as num?)?.toDouble() ?? 0.0;
                   final amountText = isIngreso
                       ? '+${_currency(amount)}'
                       : '-${_currency(amount)}';
                   final title = _buildMovementTitle(movement);
                   final subtitle = _buildMovementSubtitle(movement);
-                  final amountColor = isIngreso
-                      ? const Color(0xFF5A66F0)
-                      : const Color(0xFFF05058);
+                  final amountColor = isIngreso ? cs.primary : cs.error;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1420,7 +1570,8 @@ class _DayTransactionGroupCard extends StatelessWidget {
                           height: 46,
                           decoration: BoxDecoration(
                             color: bgColor,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cs.outlineVariant),
                           ),
                           child: Icon(
                             isIngreso
@@ -1580,13 +1731,14 @@ class _CompactPaginationBar extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: cs.secondaryContainer,
-            borderRadius: BorderRadius.circular(999),
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: cs.outlineVariant),
           ),
           child: Text(
             '$totalItems días · ${currentPage + 1}/$totalPages',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: cs.onSecondaryContainer,
+              color: cs.onSurface,
               fontWeight: FontWeight.w800,
             ),
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:app_estetica/screens/about_screen.dart';
+import 'package:app_estetica/widgets/app_ui.dart';
 
 class MainDrawer extends StatelessWidget {
   final String username;
@@ -38,236 +39,220 @@ class MainDrawer extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Drawer(
-      child: Column(
-        children: [
-          // ── Header con gradiente ───────────────────────────────────────────
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [colorScheme.primary, colorScheme.secondary],
+      child: AppScaffoldSurface(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 16,
+                left: 16,
+                right: 16,
+                bottom: 16,
               ),
-              borderRadius: const BorderRadius.only(
-                bottomRight: Radius.circular(0),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainer,
+                border: Border(
+                  bottom: BorderSide(color: colorScheme.outlineVariant),
+                ),
               ),
-            ),
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 20,
-              left: 20,
-              right: 20,
-              bottom: 20,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Avatar + nombre + rol
-                Row(
+              child: AppCard(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.4),
-                          width: 2,
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.account_circle_rounded,
+                            size: 28,
+                            color: colorScheme.onPrimary,
+                          ),
                         ),
-                      ),
-                      child: Icon(
-                        Icons.account_circle_rounded,
-                        size: 32,
-                        color: colorScheme.onPrimary,
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                username,
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              AppBadge(
+                                label: rolLabel,
+                                tone: isEmployee
+                                    ? AppBadgeTone.neutral
+                                    : AppBadgeTone.info,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            username,
-                            style: GoogleFonts.nunito(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: colorScheme.onPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.onPrimary.withValues(
-                                alpha: 0.2,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              rolLabel,
-                              style: GoogleFonts.nunito(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onPrimary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 16),
+                    _SucursalSelector(
+                      isLoadingSucursales: isLoadingSucursales,
+                      isEmployee: isEmployee,
+                      employeeSucursalName: employeeSucursalName,
+                      sucursales: sucursales,
+                      selectedSucursalId: selectedSucursalId,
+                      onSucursalChanged: onSucursalChanged,
+                      onRetryLoadSucursales: onRetryLoadSucursales,
+                      colorScheme: colorScheme,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // Selector de sucursal
-                _SucursalSelector(
-                  isLoadingSucursales: isLoadingSucursales,
-                  isEmployee: isEmployee,
-                  employeeSucursalName: employeeSucursalName,
-                  sucursales: sucursales,
-                  selectedSucursalId: selectedSucursalId,
-                  onSucursalChanged: onSucursalChanged,
-                  onRetryLoadSucursales: onRetryLoadSucursales,
-                  colorScheme: colorScheme,
-                ),
-              ],
+              ),
             ),
-          ),
 
-          // ── Items de navegación ────────────────────────────────────────────
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              children: [
-                _SectionLabel(label: 'Principal', textTheme: textTheme),
-                _DrawerItem(
-                  icon: Icons.receipt_long_outlined,
-                  selectedIcon: Icons.receipt_long_rounded,
-                  label: 'Tickets',
-                  selected: selectedIndex == 0,
-                  onTap: () {
-                    onIndexChanged(0);
-                    Navigator.pop(context);
-                  },
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 8,
                 ),
-                _DrawerItem(
-                  icon: Icons.event_note_outlined,
-                  selectedIcon: Icons.event_note_rounded,
-                  label: 'Agenda de Sesiones',
-                  selected: selectedIndex == 1,
-                  onTap: () {
-                    onIndexChanged(1);
-                    Navigator.pop(context);
-                  },
-                ),
-                _DrawerItem(
-                  icon: Icons.people_outline_rounded,
-                  selectedIcon: Icons.people_rounded,
-                  label: 'Clientes',
-                  selected: selectedIndex == 2,
-                  onTap: () {
-                    onIndexChanged(2);
-                    Navigator.pop(context);
-                  },
-                ),
-                if (!isEmployee) ...[
+                children: [
+                  _SectionLabel(label: 'Principal', textTheme: textTheme),
+                  _DrawerItem(
+                    icon: Icons.receipt_long_outlined,
+                    selectedIcon: Icons.receipt_long_rounded,
+                    label: 'Tickets',
+                    selected: selectedIndex == 0,
+                    onTap: () {
+                      onIndexChanged(0);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.event_note_outlined,
+                    selectedIcon: Icons.event_note_rounded,
+                    label: 'Agenda de Sesiones',
+                    selected: selectedIndex == 1,
+                    onTap: () {
+                      onIndexChanged(1);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _DrawerItem(
+                    icon: Icons.people_outline_rounded,
+                    selectedIcon: Icons.people_rounded,
+                    label: 'Clientes',
+                    selected: selectedIndex == 2,
+                    onTap: () {
+                      onIndexChanged(2);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  if (!isEmployee) ...[
+                    const SizedBox(height: 8),
+                    _SectionLabel(
+                      label: 'Administración',
+                      textTheme: textTheme,
+                    ),
+                    _DrawerItem(
+                      icon: Icons.spa_outlined,
+                      selectedIcon: Icons.spa_rounded,
+                      label: 'Tratamientos',
+                      selected: selectedIndex == 3,
+                      onTap: () {
+                        onIndexChanged(3);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.payments_outlined,
+                      selectedIcon: Icons.payments_rounded,
+                      label: 'Pagos',
+                      selected: selectedIndex == 4,
+                      onTap: () {
+                        onIndexChanged(4);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.insights_outlined,
+                      selectedIcon: Icons.insights_rounded,
+                      label: 'Reportes',
+                      selected: selectedIndex == 5,
+                      onTap: () {
+                        onIndexChanged(5);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.account_balance_wallet_outlined,
+                      selectedIcon: Icons.account_balance_wallet_rounded,
+                      label: 'Finanzas',
+                      selected: selectedIndex == 6,
+                      onTap: () {
+                        onIndexChanged(6);
+                        Navigator.pop(context);
+                      },
+                    ),
+                    _DrawerItem(
+                      icon: Icons.badge_outlined,
+                      selectedIcon: Icons.badge_rounded,
+                      label: 'Empleados',
+                      selected: selectedIndex == 7,
+                      onTap: () {
+                        onIndexChanged(7);
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 8),
-                  _SectionLabel(label: 'Administración', textTheme: textTheme),
+                  _SectionLabel(label: 'Otros', textTheme: textTheme),
                   _DrawerItem(
-                    icon: Icons.spa_outlined,
-                    selectedIcon: Icons.spa_rounded,
-                    label: 'Tratamientos',
-                    selected: selectedIndex == 3,
+                    icon: Icons.info_outline_rounded,
+                    selectedIcon: Icons.info_rounded,
+                    label: 'Acerca de',
+                    selected: false,
                     onTap: () {
-                      onIndexChanged(3);
                       Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.payments_outlined,
-                    selectedIcon: Icons.payments_rounded,
-                    label: 'Pagos',
-                    selected: selectedIndex == 4,
-                    onTap: () {
-                      onIndexChanged(4);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.insights_outlined,
-                    selectedIcon: Icons.insights_rounded,
-                    label: 'Reportes',
-                    selected: selectedIndex == 5,
-                    onTap: () {
-                      onIndexChanged(5);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.account_balance_wallet_outlined,
-                    selectedIcon: Icons.account_balance_wallet_rounded,
-                    label: 'Finanzas',
-                    selected: selectedIndex == 6,
-                    onTap: () {
-                      onIndexChanged(6);
-                      Navigator.pop(context);
-                    },
-                  ),
-                  _DrawerItem(
-                    icon: Icons.badge_outlined,
-                    selectedIcon: Icons.badge_rounded,
-                    label: 'Empleados',
-                    selected: selectedIndex == 7,
-                    onTap: () {
-                      onIndexChanged(7);
-                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AboutScreen()),
+                      );
                     },
                   ),
                 ],
-                const SizedBox(height: 8),
-                _SectionLabel(label: 'Otros', textTheme: textTheme),
-                _DrawerItem(
-                  icon: Icons.info_outline_rounded,
-                  selectedIcon: Icons.info_rounded,
-                  label: 'Acerca de',
-                  selected: false,
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AboutScreen()),
-                    );
-                  },
-                ),
-              ],
+              ),
             ),
-          ),
 
-          // ── Cerrar sesión ──────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: FilledButton.tonalIcon(
-              onPressed: () {
-                Navigator.pop(context);
-                onLogout();
-              },
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Cerrar Sesión'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-                backgroundColor: colorScheme.errorContainer,
-                foregroundColor: colorScheme.error,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: FilledButton.tonalIcon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  onLogout();
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Cerrar Sesión'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  backgroundColor: colorScheme.errorContainer,
+                  foregroundColor: colorScheme.error,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -322,12 +307,12 @@ class _DrawerItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
         color: selected ? colorScheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
               children: [
                 Icon(
@@ -340,9 +325,9 @@ class _DrawerItem extends StatelessWidget {
                 const SizedBox(width: 16),
                 Text(
                   label,
-                  style: GoogleFonts.nunito(
+                  style: GoogleFonts.inter(
                     fontSize: 15,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: selected
                         ? colorScheme.onPrimaryContainer
                         : colorScheme.onSurface,
@@ -384,8 +369,9 @@ class _SucursalSelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: colorScheme.onPrimary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: isLoadingSucursales
           ? Row(
@@ -395,7 +381,7 @@ class _SucursalSelector extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: colorScheme.onPrimary,
+                    color: colorScheme.primary,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -403,7 +389,7 @@ class _SucursalSelector extends StatelessWidget {
                   'Cargando sucursales...',
                   style: GoogleFonts.nunito(
                     fontSize: 13,
-                    color: colorScheme.onPrimary,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -413,7 +399,7 @@ class _SucursalSelector extends StatelessWidget {
               children: [
                 Icon(
                   Icons.location_on_rounded,
-                  color: colorScheme.onPrimary,
+                  color: colorScheme.primary,
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -423,7 +409,7 @@ class _SucursalSelector extends StatelessWidget {
                     style: GoogleFonts.nunito(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onPrimary,
+                      color: colorScheme.onSurface,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -431,7 +417,7 @@ class _SucursalSelector extends StatelessWidget {
                 Icon(
                   Icons.lock_rounded,
                   size: 14,
-                  color: colorScheme.onPrimary.withValues(alpha: 0.6),
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ],
             )
@@ -440,7 +426,7 @@ class _SucursalSelector extends StatelessWidget {
               children: [
                 Icon(
                   Icons.location_off_rounded,
-                  color: colorScheme.onPrimary,
+                  color: colorScheme.tertiary,
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -449,16 +435,13 @@ class _SucursalSelector extends StatelessWidget {
                     'Sin sucursales',
                     style: GoogleFonts.nunito(
                       fontSize: 13,
-                      color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
                 IconButton(
                   onPressed: onRetryLoadSucursales,
-                  icon: Icon(
-                    Icons.refresh_rounded,
-                    color: colorScheme.onPrimary,
-                  ),
+                  icon: Icon(Icons.refresh_rounded, color: colorScheme.primary),
                   tooltip: 'Reintentar',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -469,7 +452,7 @@ class _SucursalSelector extends StatelessWidget {
               children: [
                 Icon(
                   Icons.location_on_rounded,
-                  color: colorScheme.onPrimary,
+                  color: colorScheme.primary,
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -491,7 +474,7 @@ class _SucursalSelector extends StatelessWidget {
                           dropdownColor: colorScheme.surface,
                           icon: Icon(
                             Icons.arrow_drop_down_rounded,
-                            color: colorScheme.onPrimary,
+                            color: colorScheme.primary,
                           ),
                           style: GoogleFonts.nunito(
                             fontSize: 13,
@@ -502,9 +485,7 @@ class _SucursalSelector extends StatelessWidget {
                             'Seleccionar sucursal',
                             style: GoogleFonts.nunito(
                               fontSize: 13,
-                              color: colorScheme.onPrimary.withValues(
-                                alpha: 0.8,
-                              ),
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                           items: sucursales.map((s) {
